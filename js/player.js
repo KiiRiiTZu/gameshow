@@ -1,3 +1,8 @@
+import {
+  getRoomByCode,
+  savePlayer
+} from "./database.js";
+
 import { normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 
@@ -38,15 +43,36 @@ realtime.subscribe(async (status) => {
 
 $("player-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+
   $("join-error").textContent = "";
 
   const name = $("player-name").value.trim();
-  const team = new FormData(event.currentTarget).get("team");
+
+  const team =
+    new FormData(event.currentTarget).get("team");
 
   if (!name) return;
 
-  player = { id: playerId, name, team };
-  await realtime.send("player_join", { player });
+  const room = await getRoomByCode(roomCode);
+
+  if (!room) {
+    $("join-error").textContent =
+      "Dieser Raum existiert nicht.";
+
+    return;
+  }
+
+  player = {
+    id: playerId,
+    name,
+    team
+  };
+
+  await savePlayer(player, room.id);
+
+  await realtime.send("player_join", {
+    player
+  });
 });
 
 $("buzzer").addEventListener("click", async () => {
