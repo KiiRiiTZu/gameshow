@@ -1,19 +1,101 @@
+import {
+  createRoom,
+  getRoomByCode,
+  getPlayers,
+  updateRoom
+} from "./database.js";
+
 import { createInitialRoomState, addOrUpdatePlayer, generateRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { registerGame } from "./games/game-engine.js";
 import { buzzerGame } from "./games/buzzer.js";
 
+async function persistRoomState() {
+  await updateRoom(roomRecord.id, {
+    blue_score: state.scores.blue,
+    red_score: state.scores.red,
+
+    current_game: state.game.id,
+    game_status: state.game.status,
+
+    buzzer_winner_id: state.game.winner?.playerId ?? null,
+    buzzer_winner_name: state.game.winner?.playerName ?? null,
+    buzzer_winner_team: state.game.winner?.team ?? null
+  });
+}
+
+async function initializeHost() {
+  const params = new URLSearchParams(window.location.search);
+  const existingCode = params.get("room");
+
+  if (existingCode) {
+    roomCode = existingCode.toUpperCase();
+
+    roomRecord = await getRoomByCode(roomCode);
+
+    if (!roomRecord) {
+      alert("Dieser Raum existiert nicht mehr.");
+      window.location.href = "./index.html";
+      return;
+    }
+  } else {
+    roomCode = generateRoomCode();
+
+    roomRecord = await createRoom(roomCode);
+
+    window.history.replaceState(
+      {},
+      "",
+      `./host.html?room=${roomCode}`
+    );
+  }
+
+  const players = await getPlayers(roomRecord.id);
+
+  state = {
+    roomCode,
+
+    scores: {
+      blue: roomRecord.blue_score,
+      red: roomRecord.red_score
+    },
+
+    players: players.map((player) => ({
+      id: player.id,
+      name: player.name,
+      team: player.team
+    })),
+
+    game: {
+      id: roomRecord.current_game,
+      status: roomRecord.game_status,
+
+      winner: roomRecord.buzzer_winner_id
+        ? {
+            playerId: roomRecord.buzzer_winner_id,
+            playerName: roomRecord.buzzer_winner_name,
+            team: roomRecord.buzzer_winner_team
+          }
+        : null
+    }
+  };
+
+  $("room-code").textContent = roomCode;
+  $("room-code-copy").textContent = roomCode;
+
+  startRealtime();
+
+  render();
+}
+
 registerGame(buzzerGame);
 
-const roomCode = generateRoomCode();
-const state = createInitialRoomState(roomCode);
+let roomCode;
+let roomRecord;
+let state;
+let realtime;
 
 const $ = (id) => document.getElementById(id);
-
-$("room-code").textContent = roomCode;
-$("room-code-copy").textContent = roomCode;
-
-let realtime;
 
 function render() {
   $("blue-score").textContent = state.scores.blue;
@@ -105,56 +187,89 @@ async function handleEvent(event, payload) {
   }
 
   if (event === "buzz") {
-    const player = state.players.find((item) => item.id === payload.playerId);
+    const player = state.players.find(
+      (item) => item.id === payload.playerId
+    );
+  
     if (!player) return;
-
+  
     const accepted = buzzerGame.registerBuzz(state, player);
+  
     if (!accepted) return;
-
+  
+    await persistRoomState();
+  
     render();
+  
     await broadcastState();
   }
 }
 
-realtime = createRoomChannel(roomCode, {
-  onEvent: handleEvent,
-  onStatus(status, error) {
-    const online = status === "SUBSCRIBED";
-    $("connection-dot").classList.toggle("online", online);
-    $("connection-text").textContent = online ? "Live verbunden" : "Verbinde…";
-    if (error) console.error("Realtime error:", error);
-  }
-});
+function startRealtime() {
+  realtime = createRoomChannel(roomCode, {
+    onEvent: handleEvent,
 
-realtime.subscribe(async (status) => {
-  if (status === "SUBSCRIBED") {
-    render();
-    await broadcastState();
-  }
-});
+    onStatus(status, error) {
+      const online = status === "SUBSCRIBED";
+
+      $("connection-dot").classList.toggle("online", online);
+
+      $("connection-text").textContent =
+        online ? "Live verbunden" : "Verbinde…";
+
+      if (error) {
+        console.error("Realtime error:", error);
+      }
+    }
+  });
+
+  realtime.subscribe(async (status) => {
+    if (status === "SUBSCRIBED") {
+      render();
+      await broadcastState();
+    }
+  });
+}
 
 $("open-buzzer").addEventListener("click", async () => {
   buzzerGame.open(state);
+
+  await persistRoomState();
+
   render();
+
   await broadcastState();
 });
 
 $("reset-buzzer").addEventListener("click", async () => {
   buzzerGame.reset(state);
+
+  await persistRoomState();
+
   render();
+
   await broadcastState();
 });
 
 $("correct-answer").addEventListener("click", async () => {
   if (!buzzerGame.awardPoint(state)) return;
+
   buzzerGame.reset(state);
+
+  await persistRoomState();
+
   render();
+
   await broadcastState();
 });
 
 $("wrong-answer").addEventListener("click", async () => {
   buzzerGame.reset(state);
+
+  await persistRoomState();
+
   render();
+
   await broadcastState();
 });
 
@@ -162,4 +277,10 @@ window.addEventListener("beforeunload", () => {
   realtime?.close();
 });
 
-render();
+initializeHost().catch((error) => {
+  console.error(error);
+
+  alert(
+    "Der Raum konnte nicht gestartet werden. Siehe Browser-Konsole."
+  );
+});
