@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gameshow · Spieler</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <main class="shell player-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">SPIELER</p>
+        <h1>Raum <span id="room-code">----</span></h1>
+      </div>
+      <div class="connection">
+        <span id="connection-dot" class="dot"></span>
+        <span id="connection-text">Verbinde…</span>
+      </div>
+    </header>
+
+    <section id="join-card" class="card">
+      <h2>Wer bist du?</h2>
+      <form id="player-form">
+        <label for="player-name">Dein Name</label>
+        <input id="player-name" maxlength="20" required placeholder="Max" autocomplete="name" />
+
+        <p class="form-label">Team wählen</p>
+        <div class="team-picker">
+          <label class="team-choice blue-choice">
+            <input type="radio" name="team" value="blue" checked />
+            <span>Team Blau</span>
+          </label>
+          <label class="team-choice red-choice">
+            <input type="radio" name="team" value="red" />
+            <span>Team Rot</span>
+          </label>
+        </div>
+
+        <button class="button primary full" type="submit">Beitreten</button>
+      </form>
+      <p id="join-error" class="error"></p>
+    </section>
+
+    <section id="game-card" class="card player-game hidden">
+      <div class="identity">
+        <span id="player-name-display"></span>
+        <span id="team-display" class="status-pill"></span>
+      </div>
+
+      <button id="buzzer" class="buzzer" disabled>
+        <span class="buzzer-small">JETZT</span>
+        <span>BUZZERN!</span>
+      </button>
+
+      <div id="player-message" class="player-message">Warte auf den Moderator…</div>
+    </section>
+  </main>
+
+  <script type="module" src="./js/player.js"></script>
+</body>
+</html>

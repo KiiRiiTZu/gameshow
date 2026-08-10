@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gameshow · Moderator</title>
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">MODERATOR</p>
+        <h1>Raum <span id="room-code">----</span></h1>
+      </div>
+      <div class="connection">
+        <span id="connection-dot" class="dot"></span>
+        <span id="connection-text">Verbinde…</span>
+      </div>
+    </header>
+
+    <section class="scoreboard">
+      <article class="team-card blue">
+        <p class="team-label">Team Blau</p>
+        <div id="blue-score" class="score">0</div>
+        <div id="blue-players" class="player-list"></div>
+      </article>
+
+      <div class="versus">VS</div>
+
+      <article class="team-card red">
+        <p class="team-label">Team Rot</p>
+        <div id="red-score" class="score">0</div>
+        <div id="red-players" class="player-list"></div>
+      </article>
+    </section>
+
+    <section class="card game-panel">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 1</p>
+          <h2>Buzzer Quiz</h2>
+        </div>
+        <span id="buzzer-status" class="status-pill closed">Buzzer geschlossen</span>
+      </div>
+
+      <div id="buzz-result" class="buzz-result">
+        <span class="muted">Öffne den Buzzer, sobald du die Frage gestellt hast.</span>
+      </div>
+
+      <div class="controls">
+        <button id="open-buzzer" class="button primary">Buzzer öffnen</button>
+        <button id="reset-buzzer" class="button secondary">Zurücksetzen</button>
+      </div>
+
+      <div id="answer-controls" class="answer-controls hidden">
+        <button id="correct-answer" class="button success">✓ Richtig · +1 Team-Punkt</button>
+        <button id="wrong-answer" class="button danger">✕ Falsch</button>
+      </div>
+    </section>
+
+    <section class="card helper-card">
+      <h3>Spieler einladen</h3>
+      <p>Öffne diese Website auf den Handys und gib dort den Raumcode <strong id="room-code-copy">----</strong> ein.</p>
+      <p class="muted small">V0.1: Der Browser des Moderators ist die Instanz, die den ersten Buzzer verbindlich festlegt.</p>
+    </section>
+  </main>
+
+  <script type="module" src="./js/host.js"></script>
+</body>
+</html>
