@@ -48,12 +48,26 @@
         <span id="team-display" class="status-pill"></span>
       </div>
 
-      <button id="buzzer" class="buzzer" disabled>
-        <span class="buzzer-small">JETZT</span>
-        <span>BUZZERN!</span>
-      </button>
+      <div id="player-buzzer-game">
+        <button id="buzzer" class="buzzer" disabled>
+          <span class="buzzer-small">JETZT</span>
+          <span>BUZZERN!</span>
+        </button>
 
-      <div id="player-message" class="player-message">Warte auf den Moderator…</div>
+        <div id="player-message" class="player-message">Warte auf den Moderator…</div>
+      </div>
+
+      <div id="player-spotify-game" class="hidden">
+        <p class="eyebrow">SPIEL 2</p>
+        <h2>Spotify Top 20</h2>
+        <div id="player-spotify-turn" class="turn-card blue">Team Blau ist dran</div>
+        <div class="strike-board player-strikes">
+          <span>Blau: <strong id="player-blue-strikes">—</strong></span>
+          <span>Rot: <strong id="player-red-strikes">—</strong></span>
+        </div>
+        <div id="player-spotify-board" class="spotify-board compact"></div>
+        <div id="player-spotify-result" class="player-message"></div>
+      </div>
     </section>
   </main>
 

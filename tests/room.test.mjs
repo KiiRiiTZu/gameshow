@@ -1,0 +1,75 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  addOrUpdatePlayer,
+  createInitialRoomState,
+  createRoomStateFromRecords
+} from "../js/room.js";
+
+test("rejects a third player in the same team", () => {
+  const state = createInitialRoomState("TEST");
+
+  assert.equal(addOrUpdatePlayer(state, { id: "1", name: "A", team: "blue" }), true);
+  assert.equal(addOrUpdatePlayer(state, { id: "2", name: "B", team: "blue" }), true);
+  assert.equal(addOrUpdatePlayer(state, { id: "3", name: "C", team: "blue" }), false);
+  assert.equal(state.players.length, 2);
+});
+
+test("rejects a team change when the target team is full", () => {
+  const state = createInitialRoomState("TEST");
+
+  addOrUpdatePlayer(state, { id: "1", name: "A", team: "blue" });
+  addOrUpdatePlayer(state, { id: "2", name: "B", team: "red" });
+  addOrUpdatePlayer(state, { id: "3", name: "C", team: "red" });
+
+  assert.equal(addOrUpdatePlayer(state, { id: "1", name: "A", team: "red" }), false);
+  assert.equal(state.players.find((item) => item.id === "1").team, "blue");
+});
+
+test("restores room, game and accepted players from database records", () => {
+  const room = {
+    blue_score: 2,
+    red_score: 4,
+    current_game: "buzzer",
+    game_status: "locked",
+    buzzer_winner_id: "2",
+    buzzer_winner_name: "B",
+    buzzer_winner_team: "red"
+  };
+  const players = [
+    { id: "1", name: "A", team: "blue" },
+    { id: "2", name: "B", team: "red" },
+    { id: "3", name: "C", team: "red" },
+    { id: "4", name: "D", team: "red" }
+  ];
+
+  const state = createRoomStateFromRecords("TEST", room, players);
+
+  assert.deepEqual(state.scores, { blue: 2, red: 4 });
+  assert.equal(state.game.status, "locked");
+  assert.equal(state.game.winner.playerId, "2");
+  assert.deepEqual(state.players.map((item) => item.id), ["1", "2", "3"]);
+});
+
+test("restores a persisted Spotify game state", () => {
+  const persistedGame = {
+    id: "spotify-top-artists",
+    status: "playing",
+    currentTeam: "red",
+    slots: [{ artist: "Artist A", team: "blue" }],
+    strikes: { blue: 1, red: 2 },
+    winningTeam: null
+  };
+  const room = {
+    blue_score: 5,
+    red_score: 3,
+    current_game: "spotify-top-artists",
+    game_status: "playing",
+    game_state: persistedGame
+  };
+
+  const state = createRoomStateFromRecords("TEST", room);
+
+  assert.deepEqual(state.game, persistedGame);
+});

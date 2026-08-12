@@ -44,6 +44,21 @@ export async function updateRoom(roomId, changes) {
   return data;
 }
 
+export async function updateRoomGameState(roomId, gameState) {
+  const { error } = await supabase
+    .from("rooms")
+    .update({ game_state: gameState })
+    .eq("id", roomId);
+
+  if (!error) return true;
+
+  const missingColumn = error.code === "PGRST204" ||
+    String(error.message || "").includes("game_state");
+
+  if (missingColumn) return false;
+  throw error;
+}
+
 export async function getPlayers(roomId) {
   const { data, error } = await supabase
     .from("players")

@@ -16,7 +16,7 @@ body {
     #0d0f17;
 }
 
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 
 .shell {
   width: min(1050px, calc(100% - 32px));
@@ -77,7 +77,7 @@ label, .form-label {
   color: #c8ccda;
 }
 
-input {
+input, select {
   width: 100%;
   border: 1px solid rgba(255,255,255,.13);
   border-radius: 14px;
@@ -87,7 +87,7 @@ input {
   outline: none;
 }
 
-input:focus { border-color: #8ca2ff; }
+input:focus, select:focus { border-color: #8ca2ff; }
 
 .button {
   border: 0;
@@ -223,6 +223,86 @@ input:focus { border-color: #8ca2ff; }
 
 .answer-controls { margin-top: 10px; }
 
+.game-finished {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 18px;
+  background: rgba(53, 208, 138, .09);
+}
+
+.game-finished p { font-size: 1.25rem; font-weight: 900; }
+
+.spotify-meta {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0 16px;
+}
+
+.turn-card {
+  padding: 16px 18px;
+  border-radius: 15px;
+  font-weight: 900;
+}
+
+.turn-card.blue { background: rgba(55,90,210,.3); }
+.turn-card.red { background: rgba(210,55,80,.28); }
+
+.strike-board {
+  display: flex;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 15px;
+  background: #11141e;
+}
+
+.strike-board strong { color: #ff7185; letter-spacing: .12em; }
+
+.spotify-controls {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) 110px auto auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.spotify-controls > div { display: grid; gap: 7px; }
+
+.spotify-board {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.spotify-slot {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  align-items: center;
+  min-height: 48px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+  background: #11141e;
+}
+
+.spotify-slot .rank {
+  display: grid;
+  align-self: stretch;
+  place-items: center;
+  color: #a8adbd;
+  background: rgba(255,255,255,.04);
+  font-weight: 900;
+}
+
+.spotify-slot .artist { padding: 10px 12px; font-weight: 800; }
+.spotify-slot.blue { border-color: rgba(90,114,246,.55); }
+.spotify-slot.red { border-color: rgba(210,55,80,.55); }
+.spotify-slot.empty .artist { color: #656b7d; font-weight: 600; }
+.spotify-board.compact { grid-template-columns: 1fr; max-height: 470px; overflow: auto; }
+.player-strikes { justify-content: center; margin: 10px 0 16px; }
+
 .helper-card { color: #c8ccda; }
 
 .team-picker {
@@ -316,6 +396,7 @@ input:focus { border-color: #8ca2ff; }
   .shell { padding-top: 24px; }
   .hero-card { padding: 27px; }
   .choice-grid, .scoreboard { grid-template-columns: 1fr; }
+  .spotify-meta, .spotify-controls, .spotify-board { grid-template-columns: 1fr; }
   .versus { text-align: center; }
   .game-heading, .topbar { align-items: flex-start; }
   .connection { margin-top: 7px; }

@@ -1,87 +1,71 @@
-# Gameshow V0.1
+# Gameshow V0.3
 
-Ein kleiner Echtzeit-Prototyp für eine Gameshow mit:
+Eine browserbasierte Multiplayer-Gameshow für einen Moderator und vier Spieler in zwei Teams. Räume, Spieler, Punkte und Spielzustände werden mit Supabase gespeichert und über Supabase Realtime synchronisiert.
 
-- 1 Moderator
-- 4 Spielern
-- 2 Teams mit je maximal 2 Spielern
-- individuellem Buzzer pro Spieler
-- zentraler Punktewertung pro Team
-- modularer Spielstruktur für spätere Minispiele
-- Supabase Realtime Broadcast
+## Enthaltene Spiele
 
-## Projekt starten
+### Spiel 1: Buzzer Quiz
 
-Die Seite sollte über einen kleinen lokalen Webserver oder online gehostet werden, nicht direkt per `file://`.
+- Der Moderator öffnet den Buzzer für eine Frage.
+- Der erste gültige Buzz wird angenommen.
+- Für eine richtige Antwort erhält das Team einen Punkt.
+- Das erste Team mit fünf Punkten gewinnt das Spiel.
+- Danach kann der Moderator Spiel 2 starten.
 
-### Lokal
+### Spiel 2: Spotify Top 20
 
-Wenn Python installiert ist:
+- Gesucht werden die 20 meistgestreamten Künstler auf Spotify 2026.
+- Team Blau und Team Rot nennen abwechselnd einen Künstler.
+- Der Moderator trägt einen Treffer auf dem richtigen Rang von 1 bis 20 ein.
+- Ist die Antwort nicht dabei, trägt der Moderator ein Kreuz für das aktive Team ein.
+- Das erste Team mit drei Kreuzen verliert das Spiel.
+
+Die zugrunde liegende Künstlerliste wird nicht automatisch validiert. Der Moderator arbeitet mit einer separaten Lösungsliste und entscheidet über Treffer und Rang.
+
+## Lokal starten
+
+Die App muss über einen Webserver geöffnet werden, nicht direkt per `file://`.
 
 ```bash
 python -m http.server 8000
 ```
 
-Dann im Browser:
-
-```text
-http://localhost:8000
-```
-
-## Ablauf
-
-1. Moderator öffnet `host.html` bzw. klickt auf **Raum erstellen**.
-2. Es wird ein zufälliger Raumcode erzeugt.
-3. Spieler öffnen die Startseite auf ihren Geräten.
-4. Sie geben den Raumcode ein, wählen Namen und Team.
-5. Pro Team können maximal zwei Spieler beitreten.
-6. Moderator klickt auf **Buzzer öffnen**.
-7. Alle vier Spieler können buzzern.
-8. Der Moderator-Browser akzeptiert nur den ersten eingegangenen Buzz.
-9. Bei **Richtig** erhält das Team einen Punkt.
-
-## Architektur
-
-```text
-Lobby / Raum
-├── Teams
-├── Spieler
-├── Scores
-└── aktuelles Spiel
-
-Game Engine
-└── Spiele
-    ├── Buzzer (V0.1)
-    ├── Deutschlandkarte (später)
-    ├── Schätzen (später)
-    └── ...
-```
-
-`js/games/game-engine.js` ist die Registry für Minispiele.
-`js/games/buzzer.js` enthält ausschließlich die Buzzer-Spielregeln.
-Lobby, Teams und Realtime sind davon getrennt.
-
-## Wichtige Einschränkungen von V0.1
-
-Der Moderator-Browser ist aktuell die autoritative Instanz. Das ist für einen privaten Prototypen gut geeignet, aber noch nicht die endgültige Produktionsarchitektur.
-
-Noch nicht enthalten:
-
-- persistente Datenbank
-- Benutzer-Authentifizierung
-- private Realtime-Channels
-- serverseitige/transaktionale Buzzer-Entscheidung
-- Wiederherstellung eines Raums nach Reload des Moderator-Browsers
-- Schutz gegen manipulierte Client-Nachrichten
-
-Für V0.2/V0.3 empfiehlt sich, Räume, Spieler, Teams, Matches und Ergebnisse in der Supabase-Datenbank zu modellieren und sicherheitskritische Aktionen serverseitig bzw. atomar abzuwickeln.
+Danach `http://localhost:8000` im Browser öffnen.
 
 ## Supabase
 
-Die Browser-Konfiguration liegt in:
+Die Browser-Konfiguration befindet sich in `js/config.js`. Dort darf ausschließlich ein Publishable Key verwendet werden, niemals ein `service_role`- oder Secret-Key.
+
+Für die Persistenz variabler Spielzustände muss die Migration aus
+`supabase/migrations/202608120001_add_room_game_state.sql` einmal im Supabase SQL Editor ausgeführt werden.
+
+Ohne diese Migration bleibt der Spielablauf funktionsfähig und der Moderator-Browser hält einen lokalen Recovery-Zustand. Eine geräteübergreifende Wiederherstellung des zweiten Spiels benötigt jedoch die Migration.
+
+## Projektstruktur
 
 ```text
-js/config.js
+index.html                     Startseite und Raumcode
+host.html                      Moderatoransicht
+player.html                    Spieleransicht
+js/database.js                 Supabase-Datenzugriff
+js/realtime.js                 Raumbezogene Broadcasts
+js/room.js                     Gemeinsamer Raumzustand
+js/games/game-engine.js        Registry der Minispiele
+js/games/buzzer.js             Regeln des Buzzer Quiz
+js/games/spotify-top-artists.js Regeln des Spotify-Spiels
+supabase/migrations/           Versionierte Datenbankänderungen
+tests/                         Regeltests
 ```
 
-Der verwendete Publishable Key ist ein Client-Key. Es darf dort niemals ein `service_role`- oder Secret-Key eingetragen werden.
+## Tests
+
+```bash
+node --test tests/*.test.mjs
+```
+
+## Noch offene Produktionshärtung
+
+- Moderator-Authentifizierung und Rollenmodell
+- private Realtime-Channels und strengere RLS-Policies
+- atomare serverseitige Entscheidung des ersten Buzzers
+- atomare serverseitige Durchsetzung der Teamkapazität

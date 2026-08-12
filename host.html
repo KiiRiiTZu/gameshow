@@ -35,7 +35,7 @@
       </article>
     </section>
 
-    <section class="card game-panel">
+    <section id="buzzer-game-panel" class="card game-panel">
       <div class="game-heading">
         <div>
           <p class="eyebrow">SPIEL 1</p>
@@ -57,12 +57,56 @@
         <button id="correct-answer" class="button success">✓ Richtig · +1 Team-Punkt</button>
         <button id="wrong-answer" class="button danger">✕ Falsch</button>
       </div>
+
+      <div id="buzzer-finished-controls" class="game-finished hidden">
+        <p id="buzzer-winner-message"></p>
+        <button id="start-spotify-game" class="button primary">Spiel 2 starten</button>
+      </div>
+    </section>
+
+    <section id="spotify-game-panel" class="card game-panel hidden">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 2</p>
+          <h2>Spotify Top 20</h2>
+          <p class="muted">Die 20 meistgestreamten Künstler auf Spotify 2026</p>
+        </div>
+        <span id="spotify-status" class="status-pill">Läuft</span>
+      </div>
+
+      <div class="spotify-meta">
+        <div id="spotify-turn" class="turn-card blue">Team Blau ist dran</div>
+        <div class="strike-board">
+          <span>Blau: <strong id="blue-strikes">—</strong></span>
+          <span>Rot: <strong id="red-strikes">—</strong></span>
+        </div>
+      </div>
+
+      <form id="spotify-answer-form" class="spotify-controls">
+        <div>
+          <label for="spotify-artist">Genannter Künstler</label>
+          <input id="spotify-artist" maxlength="80" required placeholder="Künstlername" autocomplete="off" />
+        </div>
+        <div>
+          <label for="spotify-rank">Position</label>
+          <select id="spotify-rank" required></select>
+        </div>
+        <button class="button success" type="submit">✓ Treffer eintragen</button>
+        <button id="spotify-miss" class="button danger" type="button">✕ Nicht dabei</button>
+      </form>
+
+      <p id="spotify-error" class="error"></p>
+      <div id="spotify-board" class="spotify-board"></div>
+
+      <div id="spotify-finished" class="game-finished hidden">
+        <p id="spotify-winner-message"></p>
+      </div>
     </section>
 
     <section class="card helper-card">
       <h3>Spieler einladen</h3>
       <p>Öffne diese Website auf den Handys und gib dort den Raumcode <strong id="room-code-copy">----</strong> ein.</p>
-      <p class="muted small">V0.1: Der Browser des Moderators ist die Instanz, die den ersten Buzzer verbindlich festlegt.</p>
+      <p class="muted small">Der Moderator steuert Spielablauf, Treffer und Wertung für alle verbundenen Spieler.</p>
     </section>
   </main>
 
