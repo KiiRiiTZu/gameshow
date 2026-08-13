@@ -10,6 +10,7 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 
 - Der Moderator öffnet den Buzzer für eine Frage.
 - Der erste gültige Buzz wird angenommen.
+- Sobald der erste Buzz bestätigt ist, wird der Buzzer-Sound beim Moderator und bei allen verbundenen Spielern abgespielt.
 - Für eine richtige Antwort erhält das Team einen Quizpunkt.
 - Das erste Team mit fünf Punkten gewinnt das Spiel.
 - Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
@@ -19,7 +20,7 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 
 - Gespielt werden drei vorbereitete Listen: Spotify-Stars, bevölkerungsreichste Länder und umsatzstärkste deutsche Unternehmen.
 - Team Blau und Team Rot nennen abwechselnd einen Eintrag.
-- Der Moderator wählt die passende vorbereitete Lösung aus und deckt sie auf; eine Texteingabe ist nicht mehr nötig.
+- In der streambaren Moderatoransicht bleiben alle Lösungen verborgen. Der Moderator klickt nur auf den passenden Rang, um den hinterlegten Eintrag samt Wert aufzudecken.
 - Ist die Antwort nicht dabei, trägt der Moderator ein Kreuz für das aktive Team ein.
 - Nach drei Kreuzen verliert ein Team die aktuelle Runde.
 - Das erste Team mit zwei Rundensiegen gewinnt das Spiel und erhält einen Spielpunkt für die Gesamtwertung.
@@ -51,11 +52,13 @@ host.html                      Moderatoransicht
 player.html                    Spieleransicht
 js/database.js                 Supabase-Datenzugriff
 js/realtime.js                 Raumbezogene Broadcasts
+js/audio.js                    Gemeinsame Soundeffekte
 js/room.js                     Gemeinsamer Raumzustand
 js/games/game-engine.js        Registry der Minispiele
 js/games/buzzer.js             Regeln des Buzzer Quiz
 js/games/spotify-top-artists.js Regeln des Top-20-Spiels
 js/games/top-20-lists.js       Vorbereitete Lösungen für alle drei Runden
+assets/audio/buzzer.mp3        Soundeffekt für den ersten gültigen Buzz
 supabase/migrations/           Versionierte Datenbankänderungen
 tests/                         Regeltests
 ```

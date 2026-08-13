@@ -5,6 +5,7 @@ import {
 
 import { createRoomStateFromRecords, normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
+import { playBuzzerSound } from "./audio.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
 const TOP_20_SLOT_COUNT = 20;
@@ -116,6 +117,11 @@ $("buzzer").addEventListener("click", async () => {
 });
 
 async function handleEvent(event, payload) {
+  if (event === "buzz_winner") {
+    void playBuzzerSound();
+    return;
+  }
+
   if (event === "join_result" && payload.playerId === playerId) {
     if (!payload.accepted) {
       const restoredPlayer = roomState?.players?.find((item) => item.id === playerId);

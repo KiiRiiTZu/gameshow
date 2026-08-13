@@ -9,6 +9,7 @@ import {
 
 import { addOrUpdatePlayer, createRoomStateFromRecords, generateRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
+import { playBuzzerSound } from "./audio.js";
 import { registerGame } from "./games/game-engine.js";
 import { BUZZER_WINNING_SCORE, buzzerGame } from "./games/buzzer.js";
 import { top20Game } from "./games/spotify-top-artists.js";
@@ -199,7 +200,7 @@ function renderSpotifyGame() {
   $("spotify-turn").className = `turn-card ${displayTeam}`;
   $("blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("red-strikes").textContent = renderStrikes(game.strikes?.red);
-  $("spotify-board").innerHTML = renderSpotifySlots(revealed, list);
+  $("spotify-board").innerHTML = renderSpotifySlots(revealed, list, interactionLocked);
   $("spotify-finished").classList.toggle("hidden", !interactionLocked);
   $("spotify-winner-message").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20 mit ${game.roundWins[game.winningTeam]} Rundensiegen!`
@@ -209,15 +210,10 @@ function renderSpotifyGame() {
   $("next-top20-round").classList.toggle("hidden", isFinished);
   $("next-top20-round").disabled = moderatorActionPending;
 
-  const form = $("spotify-answer-form");
-  form.querySelectorAll("select, button").forEach((control) => {
-    control.disabled = interactionLocked || moderatorActionPending;
-  });
-
-  populateSpotifyRanks(list, revealed);
+  $("spotify-miss").disabled = interactionLocked || moderatorActionPending;
 }
 
-function renderSpotifySlots(revealed, list) {
+function renderSpotifySlots(revealed, list, interactionLocked) {
   return Array.from({ length: TOP_20_SLOT_COUNT }, (_, index) => {
     const slot = revealed[index];
     const teamClass = slot?.team || "empty";
@@ -225,31 +221,17 @@ function renderSpotifySlots(revealed, list) {
     const value = slot
       ? `<span class="value">${escapeHtml(list.valueLabel)}: ${escapeHtml(slot.value)}</span>`
       : "";
+    const rank = index + 1;
+    const disabled = slot || interactionLocked || moderatorActionPending ? " disabled" : "";
+    const label = slot ? `Rang ${rank}: ${slot.answer}` : `Rang ${rank} aufdecken`;
 
     return `
-      <div class="spotify-slot ${teamClass}">
-        <span class="rank">${index + 1}</span>
+      <button class="spotify-slot top20-reveal ${teamClass}" type="button" data-rank="${rank}" aria-label="${escapeHtml(label)}"${disabled}>
+        <span class="rank">${rank}</span>
         <span class="artist">${answer}${value}</span>
-      </div>
+      </button>
     `;
   }).join("");
-}
-
-function populateSpotifyRanks(list, revealed) {
-  const select = $("spotify-rank");
-  const selectedRank = Number(select.value);
-
-  select.innerHTML = list.entries.map((entry, index) => {
-    const rank = index + 1;
-    const disabled = revealed[index] ? " disabled" : "";
-    const selected = selectedRank === rank && !revealed[index] ? " selected" : "";
-    return `<option value="${rank}"${disabled}${selected}>#${rank} · ${escapeHtml(entry.answer)} · ${escapeHtml(entry.value)}</option>`;
-  }).join("");
-
-  if (select.selectedIndex < 0) {
-    const firstAvailable = Array.from(select.options).find((option) => !option.disabled);
-    if (firstAvailable) firstAvailable.selected = true;
-  }
 }
 
 function renderPlayers(team) {
@@ -356,6 +338,11 @@ async function handlePlayerJoin(incomingPlayer) {
 }
 
 async function handleEvent(event, payload) {
+  if (event === "buzz_winner") {
+    void playBuzzerSound();
+    return;
+  }
+
   if (event === "player_join") {
     await handlePlayerJoin(payload.player);
     return;
@@ -369,6 +356,10 @@ async function handleEvent(event, payload) {
   if (event === "buzz") {
     const player = state.players.find((item) => item.id === payload.playerId);
     if (!player || !buzzerGame.registerBuzz(state, player)) return;
+    await realtime.send("buzz_winner", {
+      playerId: player.id,
+      receivedAt: state.game.winner.receivedAt
+    });
     await persistRenderAndBroadcast();
   }
 }
@@ -420,17 +411,19 @@ $("start-spotify-game").addEventListener("click", async () => {
   });
 });
 
-$("spotify-answer-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
+$("spotify-board").addEventListener("click", async (event) => {
+  const slot = event.target.closest("[data-rank]");
+  if (!slot || slot.disabled) return;
+
   $("spotify-error").textContent = "";
 
   const accepted = await runModeratorAction(() => top20Game.reveal(
     state,
-    Number($("spotify-rank").value)
+    Number(slot.dataset.rank)
   ));
 
   if (!accepted) {
-    $("spotify-error").textContent = "Bitte wähle eine noch nicht aufgedeckte Lösung.";
+    $("spotify-error").textContent = "Diese Lösung kann gerade nicht aufgedeckt werden.";
   }
 });
 

@@ -288,14 +288,14 @@ input:focus, select:focus { border-color: #8ca2ff; }
 
 .strike-board strong { color: #ff7185; letter-spacing: .12em; }
 
-.spotify-controls {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto auto;
-  align-items: end;
-  gap: 10px;
+.top20-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
 }
 
-.spotify-controls > div { display: grid; gap: 7px; }
+.top20-actions p { margin: 0; }
 
 .spotify-board {
   display: grid;
@@ -305,6 +305,7 @@ input:focus, select:focus { border-color: #8ca2ff; }
 }
 
 .spotify-slot {
+  width: 100%;
   display: grid;
   grid-template-columns: 40px 1fr;
   align-items: center;
@@ -313,7 +314,18 @@ input:focus, select:focus { border-color: #8ca2ff; }
   border: 1px solid rgba(255,255,255,.07);
   border-radius: 12px;
   background: #11141e;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+  text-align: left;
 }
+
+.top20-reveal { cursor: pointer; transition: border-color .18s ease, background .18s ease, transform .08s ease; }
+.top20-reveal.empty:hover:not(:disabled) { border-color: rgba(255,255,255,.28); background: #171b28; }
+.top20-reveal.empty:active:not(:disabled) { transform: translateY(1px); }
+.top20-reveal:focus-visible { outline: 2px solid #8ca2ff; outline-offset: 2px; }
+.top20-reveal:disabled { opacity: 1; }
+.top20-reveal.empty:disabled { cursor: not-allowed; }
 
 .spotify-slot .rank {
   display: grid;
@@ -425,7 +437,8 @@ input:focus, select:focus { border-color: #8ca2ff; }
   .shell { padding-top: 24px; }
   .hero-card { padding: 27px; }
   .choice-grid, .scoreboard { grid-template-columns: 1fr; }
-  .spotify-meta, .spotify-controls, .spotify-board { grid-template-columns: 1fr; }
+  .spotify-meta, .spotify-board { grid-template-columns: 1fr; }
+  .top20-actions { align-items: stretch; flex-direction: column; }
   .versus { text-align: center; }
   .game-heading, .topbar { align-items: flex-start; }
   .connection { margin-top: 7px; }
