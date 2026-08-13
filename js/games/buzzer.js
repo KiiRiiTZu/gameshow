@@ -1,4 +1,12 @@
 export const BUZZER_WINNING_SCORE = 5;
+const SCORE_SYSTEM_VERSION = 2;
+
+function currentGameScores(state) {
+  return {
+    blue: Number(state.game?.scores?.blue) || 0,
+    red: Number(state.game?.scores?.red) || 0
+  };
+}
 
 export const buzzerGame = {
   id: "buzzer",
@@ -7,11 +15,15 @@ export const buzzerGame = {
   open(state) {
     if (state.game.status === "finished") return false;
 
+    const scores = currentGameScores(state);
+
     state.game = {
       id: "buzzer",
       status: "open",
       winner: null,
-      winningTeam: null
+      winningTeam: null,
+      scores,
+      scoreSystemVersion: SCORE_SYSTEM_VERSION
     };
 
     return true;
@@ -34,11 +46,15 @@ export const buzzerGame = {
   reset(state) {
     if (state.game.status === "finished") return false;
 
+    const scores = currentGameScores(state);
+
     state.game = {
       id: "buzzer",
       status: "waiting",
       winner: null,
-      winningTeam: null
+      winningTeam: null,
+      scores,
+      scoreSystemVersion: SCORE_SYSTEM_VERSION
     };
 
     return true;
@@ -50,11 +66,13 @@ export const buzzerGame = {
     const team = state.game.winner?.team;
     if (!team) return false;
 
-    state.scores[team] += 1;
+    state.game.scores = currentGameScores(state);
+    state.game.scores[team] += 1;
 
-    if (state.scores[team] >= BUZZER_WINNING_SCORE) {
+    if (state.game.scores[team] >= BUZZER_WINNING_SCORE) {
       state.game.status = "finished";
       state.game.winningTeam = team;
+      state.scores[team] += 1;
     }
 
     return true;

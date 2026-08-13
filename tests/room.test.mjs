@@ -47,6 +47,7 @@ test("restores room, game and accepted players from database records", () => {
   const state = createRoomStateFromRecords("TEST", room, players);
 
   assert.deepEqual(state.scores, { blue: 2, red: 4 });
+  assert.deepEqual(state.game.scores, { blue: 0, red: 0 });
   assert.equal(state.game.status, "locked");
   assert.equal(state.game.winner.playerId, "2");
   assert.deepEqual(state.players.map((item) => item.id), ["1", "2", "3"]);
@@ -59,7 +60,8 @@ test("restores a persisted Spotify game state", () => {
     currentTeam: "red",
     slots: [{ artist: "Artist A", team: "blue" }],
     strikes: { blue: 1, red: 2 },
-    winningTeam: null
+    winningTeam: null,
+    scoreSystemVersion: 2
   };
   const room = {
     blue_score: 5,
@@ -72,4 +74,25 @@ test("restores a persisted Spotify game state", () => {
   const state = createRoomStateFromRecords("TEST", room);
 
   assert.deepEqual(state.game, persistedGame);
+  assert.deepEqual(state.scores, { blue: 5, red: 3 });
+});
+
+test("upgrades legacy buzzer points into separate quiz and match scores", () => {
+  const room = {
+    blue_score: 5,
+    red_score: 3,
+    current_game: "buzzer",
+    game_status: "finished",
+    game_state: {
+      id: "buzzer",
+      status: "finished",
+      winner: null,
+      winningTeam: "blue"
+    }
+  };
+
+  const state = createRoomStateFromRecords("TEST", room);
+
+  assert.deepEqual(state.game.scores, { blue: 5, red: 3 });
+  assert.deepEqual(state.scores, { blue: 1, red: 0 });
 });

@@ -2,14 +2,17 @@
 
 Eine browserbasierte Multiplayer-Gameshow für einen Moderator und vier Spieler in zwei Teams. Räume, Spieler, Punkte und Spielzustände werden mit Supabase gespeichert und über Supabase Realtime synchronisiert.
 
+Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne Wertung. Für den Gesamtsieg erhält das Gewinnerteam anschließend genau einen Spielpunkt.
+
 ## Enthaltene Spiele
 
 ### Spiel 1: Buzzer Quiz
 
 - Der Moderator öffnet den Buzzer für eine Frage.
 - Der erste gültige Buzz wird angenommen.
-- Für eine richtige Antwort erhält das Team einen Punkt.
+- Für eine richtige Antwort erhält das Team einen Quizpunkt.
 - Das erste Team mit fünf Punkten gewinnt das Spiel.
+- Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
 - Danach kann der Moderator Spiel 2 starten.
 
 ### Spiel 2: Spotify Top 20
@@ -19,6 +22,7 @@ Eine browserbasierte Multiplayer-Gameshow für einen Moderator und vier Spieler 
 - Der Moderator trägt einen Treffer auf dem richtigen Rang von 1 bis 20 ein.
 - Ist die Antwort nicht dabei, trägt der Moderator ein Kreuz für das aktive Team ein.
 - Das erste Team mit drei Kreuzen verliert das Spiel.
+- Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
 
 Die zugrunde liegende Künstlerliste wird nicht automatisch validiert. Der Moderator arbeitet mit einer separaten Lösungsliste und entscheidet über Treffer und Rang.
 

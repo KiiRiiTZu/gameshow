@@ -1,4 +1,50 @@
 export const TEAM_CAPACITY = 2;
+export const SCORE_SYSTEM_VERSION = 2;
+
+function emptyTeamScores() {
+  return { blue: 0, red: 0 };
+}
+
+function normalizeTeamScores(scores) {
+  return {
+    blue: Number(scores?.blue) || 0,
+    red: Number(scores?.red) || 0
+  };
+}
+
+function upgradePersistedGameScores(game, legacyScores) {
+  if (!game || game.scoreSystemVersion === SCORE_SYSTEM_VERSION) return game;
+
+  const upgradedGame = {
+    ...game,
+    scoreSystemVersion: SCORE_SYSTEM_VERSION
+  };
+
+  if (game.id === "buzzer") {
+    upgradedGame.scores = normalizeTeamScores(legacyScores);
+  }
+
+  return upgradedGame;
+}
+
+function inferCompletedGameScores(game, legacyScores) {
+  const matchScores = emptyTeamScores();
+
+  if (game.id === "buzzer") {
+    if (game.status === "finished" && game.winningTeam) matchScores[game.winningTeam] = 1;
+    return matchScores;
+  }
+
+  const previousWinner = legacyScores.blue > legacyScores.red
+    ? "blue"
+    : legacyScores.red > legacyScores.blue
+      ? "red"
+      : null;
+
+  if (previousWinner) matchScores[previousWinner] += 1;
+  if (game.status === "finished" && game.winningTeam) matchScores[game.winningTeam] += 1;
+  return matchScores;
+}
 
 export function generateRoomCode(length = 4) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -13,12 +59,15 @@ export function normalizeRoomCode(value) {
 export function createInitialRoomState(roomCode) {
   return {
     roomCode,
-    scores: { blue: 0, red: 0 },
+    scores: emptyTeamScores(),
     players: [],
     game: {
       id: "buzzer",
       status: "waiting",
-      winner: null
+      winner: null,
+      winningTeam: null,
+      scores: emptyTeamScores(),
+      scoreSystemVersion: SCORE_SYSTEM_VERSION
     }
   };
 }
@@ -30,27 +79,38 @@ export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
     ? room.game_state
     : null;
 
+  const legacyScores = normalizeTeamScores({
+    blue: room.blue_score,
+    red: room.red_score
+  });
+  const game = persistedGame || {
+    id: room.current_game || "buzzer",
+    status: room.game_status || "waiting",
+    winner: room.buzzer_winner_id
+      ? {
+          playerId: room.buzzer_winner_id,
+          playerName: room.buzzer_winner_name,
+          team: room.buzzer_winner_team
+        }
+      : null,
+    winningTeam: room.game_status === "finished"
+      ? (room.blue_score >= room.red_score ? "blue" : "red")
+      : null,
+    scores: emptyTeamScores(),
+    scoreSystemVersion: SCORE_SYSTEM_VERSION
+  };
+  const isLegacyPersistedGame = Boolean(persistedGame) &&
+    persistedGame.scoreSystemVersion !== SCORE_SYSTEM_VERSION;
+
   const state = {
     roomCode,
-    scores: {
-      blue: room.blue_score ?? 0,
-      red: room.red_score ?? 0
-    },
+    scores: isLegacyPersistedGame
+      ? inferCompletedGameScores(game, legacyScores)
+      : legacyScores,
     players: [],
-    game: persistedGame || {
-      id: room.current_game || "buzzer",
-      status: room.game_status || "waiting",
-      winner: room.buzzer_winner_id
-        ? {
-            playerId: room.buzzer_winner_id,
-            playerName: room.buzzer_winner_name,
-            team: room.buzzer_winner_team
-          }
-        : null,
-      winningTeam: room.game_status === "finished"
-        ? (room.blue_score >= room.red_score ? "blue" : "red")
-        : null
-    }
+    game: isLegacyPersistedGame
+      ? upgradePersistedGameScores(game, legacyScores)
+      : game
   };
 
   for (const record of playerRecords) {

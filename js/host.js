@@ -125,6 +125,10 @@ function renderBuzzerGame() {
   const isLocked = status === "locked";
   const isFinished = status === "finished";
   const winner = state.game.winner;
+  const gameScores = state.game.scores || { blue: 0, red: 0 };
+
+  $("buzzer-blue-score").textContent = gameScores.blue;
+  $("buzzer-red-score").textContent = gameScores.red;
 
   $("buzzer-status").textContent = isOpen
     ? "Buzzer offen"
@@ -144,7 +148,7 @@ function renderBuzzerGame() {
   $("buzzer-finished-controls").classList.toggle("hidden", !isFinished);
 
   if (isFinished) {
-    const winningTeam = state.game.winningTeam || (state.scores.blue >= BUZZER_WINNING_SCORE ? "blue" : "red");
+    const winningTeam = state.game.winningTeam || (gameScores.blue >= BUZZER_WINNING_SCORE ? "blue" : "red");
     const teamName = getTeamName(winningTeam);
     $("buzzer-winner-message").textContent = `🏆 ${teamName} gewinnt das Buzzer Quiz mit ${BUZZER_WINNING_SCORE} Punkten!`;
     $("buzz-result").classList.add("winner");

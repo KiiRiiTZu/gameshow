@@ -1,5 +1,6 @@
 export const SPOTIFY_SLOT_COUNT = 20;
 export const SPOTIFY_MAX_STRIKES = 3;
+const SCORE_SYSTEM_VERSION = 2;
 
 function otherTeam(team) {
   return team === "blue" ? "red" : "blue";
@@ -16,7 +17,8 @@ export const spotifyTopArtistsGame = {
       currentTeam: startingTeam,
       slots: Array.from({ length: SPOTIFY_SLOT_COUNT }, () => null),
       strikes: { blue: 0, red: 0 },
-      winningTeam: null
+      winningTeam: null,
+      scoreSystemVersion: SCORE_SYSTEM_VERSION
     };
   },
 
@@ -53,6 +55,7 @@ export const spotifyTopArtistsGame = {
     if (state.game.strikes[losingTeam] >= SPOTIFY_MAX_STRIKES) {
       state.game.status = "finished";
       state.game.winningTeam = otherTeam(losingTeam);
+      state.scores[state.game.winningTeam] += 1;
       return true;
     }
 

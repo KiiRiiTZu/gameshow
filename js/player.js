@@ -159,6 +159,10 @@ function render() {
   const status = roomState.game?.status;
   const winner = roomState.game?.winner;
   const buzzer = $("buzzer");
+  const gameScores = roomState.game?.scores || { blue: 0, red: 0 };
+
+  $("player-buzzer-blue-score").textContent = gameScores.blue;
+  $("player-buzzer-red-score").textContent = gameScores.red;
 
   buzzer.disabled = status !== "open";
 
@@ -169,7 +173,7 @@ function render() {
 
   if (status === "finished") {
     const winningTeam = roomState.game.winningTeam ||
-      (roomState.scores.blue >= roomState.scores.red ? "blue" : "red");
+      (gameScores.blue >= gameScores.red ? "blue" : "red");
     $("player-message").textContent = `🏆 ${getTeamName(winningTeam)} gewinnt das Buzzer Quiz!`;
     return;
   }

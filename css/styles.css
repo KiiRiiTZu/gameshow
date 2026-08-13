@@ -164,6 +164,7 @@ input:focus, select:focus { border-color: #8ca2ff; }
 .team-card.red { background: linear-gradient(145deg, rgba(193,53,75,.45), rgba(25,28,40,.92)); }
 
 .team-label { font-weight: 900; text-transform: uppercase; letter-spacing: .08em; opacity: .82; }
+.score-caption { margin: 10px 0 -10px; color: #a8adbd; font-size: .82rem; }
 .score { font-size: 5rem; font-weight: 900; line-height: 1; margin: 18px 0; }
 .player-list { display: grid; gap: 8px; }
 
@@ -178,6 +179,25 @@ input:focus, select:focus { border-color: #8ca2ff; }
 .versus { align-self: center; font-weight: 900; opacity: .45; }
 
 .game-panel { margin-bottom: 22px; }
+
+.round-score {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 14px;
+  margin: 20px 0;
+  padding: 14px 18px;
+  border-radius: 15px;
+  background: #11141e;
+  color: #a8adbd;
+  text-align: center;
+  font-size: .85rem;
+  font-weight: 800;
+}
+
+.round-score span:first-child { color: #8ca2ff; text-align: left; }
+.round-score span:last-child { color: #ff8b9b; text-align: right; }
+.round-score strong { color: white; font-size: 1.45rem; }
 
 .game-heading {
   display: flex;

@@ -22,6 +22,7 @@
     <section class="scoreboard">
       <article class="team-card blue">
         <p class="team-label">Team Blau</p>
+        <p class="score-caption">Gewonnene Spiele</p>
         <div id="blue-score" class="score">0</div>
         <div id="blue-players" class="player-list"></div>
       </article>
@@ -30,6 +31,7 @@
 
       <article class="team-card red">
         <p class="team-label">Team Rot</p>
+        <p class="score-caption">Gewonnene Spiele</p>
         <div id="red-score" class="score">0</div>
         <div id="red-players" class="player-list"></div>
       </article>
@@ -44,6 +46,12 @@
         <span id="buzzer-status" class="status-pill closed">Buzzer geschlossen</span>
       </div>
 
+      <div class="round-score" aria-label="Punktestand im Buzzer Quiz">
+        <span>Blau <strong id="buzzer-blue-score">0</strong></span>
+        <span>Quizpunkte</span>
+        <span><strong id="buzzer-red-score">0</strong> Rot</span>
+      </div>
+
       <div id="buzz-result" class="buzz-result">
         <span class="muted">Öffne den Buzzer, sobald du die Frage gestellt hast.</span>
       </div>
@@ -54,7 +62,7 @@
       </div>
 
       <div id="answer-controls" class="answer-controls hidden">
-        <button id="correct-answer" class="button success">✓ Richtig · +1 Team-Punkt</button>
+        <button id="correct-answer" class="button success">✓ Richtig · +1 Quizpunkt</button>
         <button id="wrong-answer" class="button danger">✕ Falsch</button>
       </div>
 
