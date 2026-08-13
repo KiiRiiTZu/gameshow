@@ -12,6 +12,7 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Der erste gültige Buzz wird angenommen.
 - Sobald der erste Buzz bestätigt ist, wird der Buzzer-Sound beim Moderator und bei allen verbundenen Spielern abgespielt.
 - Für eine richtige Antwort erhält das Team einen Quizpunkt.
+- Bei einer falschen Antwort erhält das Gegnerteam einen Quizpunkt.
 - Das erste Team mit fünf Punkten gewinnt das Spiel.
 - Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
 - Danach kann der Moderator Spiel 2 starten.
@@ -22,7 +23,7 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Team Blau und Team Rot nennen abwechselnd einen Eintrag.
 - In der streambaren Moderatoransicht bleiben alle Lösungen verborgen. Der Moderator klickt nur auf den passenden Rang, um den hinterlegten Eintrag samt Wert aufzudecken.
 - Ist die Antwort nicht dabei, trägt der Moderator ein Kreuz für das aktive Team ein.
-- Nach drei Kreuzen verliert ein Team die aktuelle Runde.
+- Nach zwei Kreuzen verliert ein Team die aktuelle Runde.
 - Das erste Team mit zwei Rundensiegen gewinnt das Spiel und erhält einen Spielpunkt für die Gesamtwertung.
 
 ## Lokal starten

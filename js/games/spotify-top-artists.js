@@ -1,6 +1,6 @@
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./top-20-lists.js";
 
-export const TOP_20_MAX_STRIKES = 3;
+export const TOP_20_MAX_STRIKES = 2;
 export const TOP_20_ROUNDS_TO_WIN = 2;
 const SCORE_SYSTEM_VERSION = 2;
 

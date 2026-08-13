@@ -344,8 +344,6 @@ input:focus, select:focus { border-color: #8ca2ff; }
 .spotify-board.compact { grid-template-columns: 1fr; max-height: 470px; overflow: auto; }
 .player-strikes { justify-content: center; margin: 10px 0 16px; }
 
-.helper-card { color: #c8ccda; }
-
 .team-picker {
   display: grid;
   grid-template-columns: 1fr 1fr;

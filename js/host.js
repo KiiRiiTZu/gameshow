@@ -98,7 +98,6 @@ async function initializeHost() {
   if (state.game.id === top20Game.id) top20Game.normalize(state);
 
   $("room-code").textContent = roomCode;
-  $("room-code-copy").textContent = roomCode;
   startRealtime();
   render();
 }
@@ -400,7 +399,11 @@ $("correct-answer").addEventListener("click", async () => {
 });
 
 $("wrong-answer").addEventListener("click", async () => {
-  await runModeratorAction(() => buzzerGame.reset(state));
+  await runModeratorAction(() => {
+    if (!buzzerGame.awardOpponentPoint(state)) return false;
+    if (state.game.status !== "finished") buzzerGame.reset(state);
+    return true;
+  });
 });
 
 $("start-spotify-game").addEventListener("click", async () => {

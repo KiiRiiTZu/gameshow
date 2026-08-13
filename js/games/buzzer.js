@@ -8,6 +8,10 @@ function currentGameScores(state) {
   };
 }
 
+function otherTeam(team) {
+  return team === "blue" ? "red" : "blue";
+}
+
 export const buzzerGame = {
   id: "buzzer",
   name: "Buzzer Quiz",
@@ -60,11 +64,9 @@ export const buzzerGame = {
     return true;
   },
 
-  awardPoint(state) {
+  awardPoint(state, team = state.game.winner?.team) {
     if (state.game.status !== "locked") return false;
-
-    const team = state.game.winner?.team;
-    if (!team) return false;
+    if (!["blue", "red"].includes(team)) return false;
 
     state.game.scores = currentGameScores(state);
     state.game.scores[team] += 1;
@@ -76,5 +78,11 @@ export const buzzerGame = {
     }
 
     return true;
+  },
+
+  awardOpponentPoint(state) {
+    const answeringTeam = state.game.winner?.team;
+    if (!["blue", "red"].includes(answeringTeam)) return false;
+    return this.awardPoint(state, otherTeam(answeringTeam));
   }
 };

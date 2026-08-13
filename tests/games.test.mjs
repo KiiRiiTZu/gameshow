@@ -36,6 +36,37 @@ test("keeps buzzer quiz points when the next question starts", () => {
   assert.deepEqual(state.game.scores, { blue: 2, red: 1 });
 });
 
+test("awards a quiz point to the opposing team after a wrong answer", () => {
+  const state = createInitialRoomState("TEST");
+  state.game = {
+    id: "buzzer",
+    status: "locked",
+    winner: { playerId: "1", playerName: "A", team: "blue" },
+    winningTeam: null,
+    scores: { blue: 2, red: 3 }
+  };
+
+  assert.equal(buzzerGame.awardOpponentPoint(state), true);
+  assert.deepEqual(state.game.scores, { blue: 2, red: 4 });
+  assert.deepEqual(state.scores, { blue: 0, red: 0 });
+});
+
+test("lets the opposing team win the buzzer game from a wrong answer", () => {
+  const state = createInitialRoomState("TEST");
+  state.game = {
+    id: "buzzer",
+    status: "locked",
+    winner: { playerId: "1", playerName: "A", team: "blue" },
+    winningTeam: null,
+    scores: { blue: 2, red: BUZZER_WINNING_SCORE - 1 }
+  };
+
+  assert.equal(buzzerGame.awardOpponentPoint(state), true);
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "red");
+  assert.deepEqual(state.scores, { blue: 0, red: 1 });
+});
+
 test("reveals prepared Top 20 entries and alternates teams", () => {
   const state = createInitialRoomState("TEST");
   top20Game.start(state, "blue");
@@ -50,7 +81,7 @@ test("reveals prepared Top 20 entries and alternates teams", () => {
   assert.equal(top20Game.reveal(state, 4), false);
 });
 
-test("ends a Top 20 round after a team's third miss", () => {
+test("ends a Top 20 round after a team's second miss", () => {
   const state = createInitialRoomState("TEST");
   top20Game.start(state, "blue");
   state.game.currentTeam = "red";
