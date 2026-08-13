@@ -53,12 +53,14 @@ test("restores room, game and accepted players from database records", () => {
   assert.deepEqual(state.players.map((item) => item.id), ["1", "2", "3"]);
 });
 
-test("restores a persisted Spotify game state", () => {
+test("restores a persisted Top 20 game state", () => {
   const persistedGame = {
     id: "spotify-top-artists",
     status: "playing",
+    roundIndex: 1,
+    roundWins: { blue: 1, red: 0 },
     currentTeam: "red",
-    slots: [{ artist: "Artist A", team: "blue" }],
+    revealed: ["blue"],
     strikes: { blue: 1, red: 2 },
     winningTeam: null,
     scoreSystemVersion: 2

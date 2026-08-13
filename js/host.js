@@ -11,10 +11,11 @@ import { addOrUpdatePlayer, createRoomStateFromRecords, generateRoomCode } from 
 import { createRoomChannel } from "./realtime.js";
 import { registerGame } from "./games/game-engine.js";
 import { BUZZER_WINNING_SCORE, buzzerGame } from "./games/buzzer.js";
-import { SPOTIFY_SLOT_COUNT, spotifyTopArtistsGame } from "./games/spotify-top-artists.js";
+import { top20Game } from "./games/spotify-top-artists.js";
+import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
 
 registerGame(buzzerGame);
-registerGame(spotifyTopArtistsGame);
+registerGame(top20Game);
 
 let roomCode;
 let roomRecord;
@@ -93,13 +94,10 @@ async function initializeHost() {
   state = createRoomStateFromRecords(roomCode, roomRecord, players);
   restoreLocalGameState();
 
-  if (state.game.id === spotifyTopArtistsGame.id && !Array.isArray(state.game.slots)) {
-    spotifyTopArtistsGame.start(state);
-  }
+  if (state.game.id === top20Game.id) top20Game.normalize(state);
 
   $("room-code").textContent = roomCode;
   $("room-code-copy").textContent = roomCode;
-  populateSpotifyRanks();
   startRealtime();
   render();
 }
@@ -111,7 +109,7 @@ function render() {
   renderPlayers("blue");
   renderPlayers("red");
 
-  const spotifyIsActive = state.game.id === spotifyTopArtistsGame.id;
+  const spotifyIsActive = state.game.id === top20Game.id;
   $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive);
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
 
@@ -175,63 +173,80 @@ function renderBuzzerGame() {
 function renderSpotifyGame() {
   const game = state.game;
   const isFinished = game.status === "finished";
+  const isRoundFinished = game.status === "round-finished";
+  const interactionLocked = isFinished || isRoundFinished;
   const currentTeam = game.currentTeam || "blue";
-  const slots = Array.isArray(game.slots) ? game.slots : [];
+  const displayTeam = isFinished ? game.winningTeam : isRoundFinished ? game.roundWinner : currentTeam;
+  const revealed = Array.isArray(game.revealed) ? game.revealed : [];
+  const list = getTop20List(game.roundIndex);
+  const roundNumber = game.roundIndex + 1;
 
-  $("spotify-status").textContent = isFinished ? "Spiel beendet" : "Läuft";
-  $("spotify-status").className = `status-pill ${isFinished ? "closed" : "open"}`;
+  $("top20-title").textContent = `Liste ${roundNumber}: ${list.title}`;
+  $("top20-description").textContent = list.description;
+  $("top20-round-wins").textContent =
+    `Rundensiege · Blau ${game.roundWins.blue} : ${game.roundWins.red} Rot`;
+  $("spotify-status").textContent = isFinished
+    ? "Spiel beendet"
+    : isRoundFinished
+      ? `Runde ${roundNumber} beendet`
+      : `Runde ${roundNumber} von ${TOP_20_LISTS.length}`;
+  $("spotify-status").className = `status-pill ${interactionLocked ? "closed" : "open"}`;
   $("spotify-turn").textContent = isFinished
-    ? `${getTeamName(game.winningTeam)} gewinnt!`
+    ? `${getTeamName(game.winningTeam)} gewinnt das Spiel!`
+    : isRoundFinished
+      ? `${getTeamName(game.roundWinner)} gewinnt Runde ${roundNumber}!`
     : `${getTeamName(currentTeam)} ist dran`;
-  $("spotify-turn").className = `turn-card ${isFinished ? game.winningTeam : currentTeam}`;
+  $("spotify-turn").className = `turn-card ${displayTeam}`;
   $("blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("red-strikes").textContent = renderStrikes(game.strikes?.red);
-  $("spotify-board").innerHTML = renderSpotifySlots(slots);
-  $("spotify-finished").classList.toggle("hidden", !isFinished);
+  $("spotify-board").innerHTML = renderSpotifySlots(revealed, list);
+  $("spotify-finished").classList.toggle("hidden", !interactionLocked);
   $("spotify-winner-message").textContent = isFinished
-    ? `🏆 ${getTeamName(game.winningTeam)} gewinnt das Spotify-Spiel!`
-    : "";
+    ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20 mit ${game.roundWins[game.winningTeam]} Rundensiegen!`
+    : isRoundFinished
+      ? `${getTeamName(game.roundWinner)} gewinnt Liste ${roundNumber}.`
+      : "";
+  $("next-top20-round").classList.toggle("hidden", isFinished);
+  $("next-top20-round").disabled = moderatorActionPending;
 
   const form = $("spotify-answer-form");
-  form.querySelectorAll("input, select, button").forEach((control) => {
-    control.disabled = isFinished || moderatorActionPending;
+  form.querySelectorAll("select, button").forEach((control) => {
+    control.disabled = interactionLocked || moderatorActionPending;
   });
 
-  updateAvailableRanks(slots);
+  populateSpotifyRanks(list, revealed);
 }
 
-function renderSpotifySlots(slots) {
-  return Array.from({ length: SPOTIFY_SLOT_COUNT }, (_, index) => {
-    const slot = slots[index];
+function renderSpotifySlots(revealed, list) {
+  return Array.from({ length: TOP_20_SLOT_COUNT }, (_, index) => {
+    const slot = revealed[index];
     const teamClass = slot?.team || "empty";
-    const artist = slot ? escapeHtml(slot.artist) : "Noch offen";
+    const answer = slot ? escapeHtml(slot.answer) : "Noch offen";
+    const value = slot
+      ? `<span class="value">${escapeHtml(list.valueLabel)}: ${escapeHtml(slot.value)}</span>`
+      : "";
 
     return `
       <div class="spotify-slot ${teamClass}">
         <span class="rank">${index + 1}</span>
-        <span class="artist">${artist}</span>
+        <span class="artist">${answer}${value}</span>
       </div>
     `;
   }).join("");
 }
 
-function populateSpotifyRanks() {
-  $("spotify-rank").innerHTML = Array.from(
-    { length: SPOTIFY_SLOT_COUNT },
-    (_, index) => `<option value="${index + 1}">#${index + 1}</option>`
-  ).join("");
-}
-
-function updateAvailableRanks(slots) {
+function populateSpotifyRanks(list, revealed) {
   const select = $("spotify-rank");
-  let selectedIsAvailable = false;
+  const selectedRank = Number(select.value);
 
-  Array.from(select.options).forEach((option, index) => {
-    option.disabled = Boolean(slots[index]);
-    if (option.selected && !option.disabled) selectedIsAvailable = true;
-  });
+  select.innerHTML = list.entries.map((entry, index) => {
+    const rank = index + 1;
+    const disabled = revealed[index] ? " disabled" : "";
+    const selected = selectedRank === rank && !revealed[index] ? " selected" : "";
+    return `<option value="${rank}"${disabled}${selected}>#${rank} · ${escapeHtml(entry.answer)} · ${escapeHtml(entry.value)}</option>`;
+  }).join("");
 
-  if (!selectedIsAvailable) {
+  if (select.selectedIndex < 0) {
     const firstAvailable = Array.from(select.options).find((option) => !option.disabled);
     if (firstAvailable) firstAvailable.selected = true;
   }
@@ -400,7 +415,7 @@ $("wrong-answer").addEventListener("click", async () => {
 $("start-spotify-game").addEventListener("click", async () => {
   await runModeratorAction(() => {
     if (state.game.id !== "buzzer" || state.game.status !== "finished") return false;
-    spotifyTopArtistsGame.start(state);
+    top20Game.start(state);
     return true;
   });
 });
@@ -409,23 +424,24 @@ $("spotify-answer-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   $("spotify-error").textContent = "";
 
-  const accepted = await runModeratorAction(() => spotifyTopArtistsGame.recordHit(
-      state,
-      $("spotify-artist").value,
-      Number($("spotify-rank").value)
-    ));
+  const accepted = await runModeratorAction(() => top20Game.reveal(
+    state,
+    Number($("spotify-rank").value)
+  ));
 
   if (!accepted) {
-    $("spotify-error").textContent = "Bitte wähle eine freie Position und einen noch nicht genannten Künstler.";
-    return;
+    $("spotify-error").textContent = "Bitte wähle eine noch nicht aufgedeckte Lösung.";
   }
-
-  $("spotify-artist").value = "";
 });
 
 $("spotify-miss").addEventListener("click", async () => {
   $("spotify-error").textContent = "";
-  await runModeratorAction(() => spotifyTopArtistsGame.recordMiss(state));
+  await runModeratorAction(() => top20Game.recordMiss(state));
+});
+
+$("next-top20-round").addEventListener("click", async () => {
+  $("spotify-error").textContent = "";
+  await runModeratorAction(() => top20Game.startNextRound(state));
 });
 
 window.addEventListener("beforeunload", () => {

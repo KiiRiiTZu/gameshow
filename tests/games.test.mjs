@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { BUZZER_WINNING_SCORE, buzzerGame } from "../js/games/buzzer.js";
-import { spotifyTopArtistsGame } from "../js/games/spotify-top-artists.js";
+import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/spotify-top-artists.js";
+import { TOP_20_LISTS, TOP_20_SLOT_COUNT } from "../js/games/top-20-lists.js";
 import { createInitialRoomState } from "../js/room.js";
 
 test("finishes the buzzer game when a team reaches five points", () => {
@@ -35,27 +36,96 @@ test("keeps buzzer quiz points when the next question starts", () => {
   assert.deepEqual(state.game.scores, { blue: 2, red: 1 });
 });
 
-test("places Spotify hits in ranked slots and alternates teams", () => {
+test("reveals prepared Top 20 entries and alternates teams", () => {
   const state = createInitialRoomState("TEST");
-  spotifyTopArtistsGame.start(state, "blue");
+  top20Game.start(state, "blue");
 
-  assert.equal(spotifyTopArtistsGame.recordHit(state, "Artist A", 4), true);
-  assert.deepEqual(state.game.slots[3], { artist: "Artist A", team: "blue" });
+  assert.equal(top20Game.reveal(state, 4), true);
+  assert.deepEqual(state.game.revealed[3], {
+    team: "blue",
+    answer: "The Weeknd",
+    value: "~96,7"
+  });
   assert.equal(state.game.currentTeam, "red");
-  assert.equal(spotifyTopArtistsGame.recordHit(state, "Artist B", 4), false);
-  assert.equal(spotifyTopArtistsGame.recordHit(state, "artist a", 5), false);
+  assert.equal(top20Game.reveal(state, 4), false);
 });
 
-test("ends the Spotify game after a team's third miss", () => {
+test("ends a Top 20 round after a team's third miss", () => {
   const state = createInitialRoomState("TEST");
-  spotifyTopArtistsGame.start(state, "red");
-  state.game.strikes.red = 2;
+  top20Game.start(state, "blue");
+  state.game.currentTeam = "red";
+  state.game.strikes.red = TOP_20_MAX_STRIKES - 1;
 
-  assert.equal(spotifyTopArtistsGame.recordMiss(state), true);
-  assert.equal(state.game.strikes.red, 3);
+  assert.equal(top20Game.recordMiss(state), true);
+  assert.equal(state.game.strikes.red, TOP_20_MAX_STRIKES);
+  assert.equal(state.game.status, "round-finished");
+  assert.equal(state.game.roundWinner, "blue");
+  assert.deepEqual(state.game.roundWins, { blue: 1, red: 0 });
+  assert.deepEqual(state.scores, { blue: 0, red: 0 });
+});
+
+test("awards one match point to the first team with two Top 20 round wins", () => {
+  const state = createInitialRoomState("TEST");
+  top20Game.start(state, "blue");
+
+  state.game.currentTeam = "red";
+  state.game.strikes.red = TOP_20_MAX_STRIKES - 1;
+  top20Game.recordMiss(state);
+
+  assert.equal(top20Game.startNextRound(state), true);
+  assert.equal(state.game.roundIndex, 1);
+  assert.equal(state.game.currentTeam, "red");
+  assert.equal(state.game.revealed.length, TOP_20_SLOT_COUNT);
+  assert.ok(state.game.revealed.every((slot) => slot === null));
+
+  state.game.strikes.red = TOP_20_MAX_STRIKES - 1;
+  assert.equal(top20Game.recordMiss(state), true);
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "blue");
+  assert.deepEqual(state.game.roundWins, { blue: 2, red: 0 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(spotifyTopArtistsGame.recordMiss(state), false);
+  assert.equal(top20Game.recordMiss(state), false);
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
+});
+
+test("starts the third list when the first two rounds are split", () => {
+  const state = createInitialRoomState("TEST");
+  top20Game.start(state, "blue");
+
+  state.game.roundWins = { blue: 1, red: 1 };
+  state.game.roundIndex = 1;
+  state.game.status = "round-finished";
+  state.game.roundWinner = "red";
+
+  assert.equal(top20Game.startNextRound(state), true);
+  assert.equal(state.game.roundIndex, 2);
+  assert.equal(state.game.listTitle, "Umsatzstärkste deutsche Unternehmen");
+  assert.equal(state.game.currentTeam, "blue");
+});
+
+test("contains three complete prepared Top 20 lists", () => {
+  assert.equal(TOP_20_LISTS.length, 3);
+  assert.ok(TOP_20_LISTS.every((list) => list.entries.length === TOP_20_SLOT_COUNT));
+});
+
+test("normalizes a persisted single-round Spotify state", () => {
+  const state = createInitialRoomState("TEST");
+  state.game = {
+    id: top20Game.id,
+    status: "playing",
+    currentTeam: "red",
+    slots: [{ artist: "Taylor Swift", team: "blue" }],
+    strikes: { blue: 1, red: 0 },
+    winningTeam: null
+  };
+
+  assert.equal(top20Game.normalize(state), true);
+  assert.deepEqual(state.game.revealed[0], {
+    team: "blue",
+    answer: "Taylor Swift",
+    value: ""
+  });
+  assert.equal(state.game.revealed.length, TOP_20_SLOT_COUNT);
+  assert.deepEqual(state.game.roundWins, { blue: 0, red: 0 });
+  assert.equal("slots" in state.game, false);
 });

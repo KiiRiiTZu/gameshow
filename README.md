@@ -15,16 +15,14 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
 - Danach kann der Moderator Spiel 2 starten.
 
-### Spiel 2: Spotify Top 20
+### Spiel 2: Top 20 (Best of 3)
 
-- Gesucht werden die 20 meistgestreamten Künstler auf Spotify 2026.
-- Team Blau und Team Rot nennen abwechselnd einen Künstler.
-- Der Moderator trägt einen Treffer auf dem richtigen Rang von 1 bis 20 ein.
+- Gespielt werden drei vorbereitete Listen: Spotify-Stars, bevölkerungsreichste Länder und umsatzstärkste deutsche Unternehmen.
+- Team Blau und Team Rot nennen abwechselnd einen Eintrag.
+- Der Moderator wählt die passende vorbereitete Lösung aus und deckt sie auf; eine Texteingabe ist nicht mehr nötig.
 - Ist die Antwort nicht dabei, trägt der Moderator ein Kreuz für das aktive Team ein.
-- Das erste Team mit drei Kreuzen verliert das Spiel.
-- Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
-
-Die zugrunde liegende Künstlerliste wird nicht automatisch validiert. Der Moderator arbeitet mit einer separaten Lösungsliste und entscheidet über Treffer und Rang.
+- Nach drei Kreuzen verliert ein Team die aktuelle Runde.
+- Das erste Team mit zwei Rundensiegen gewinnt das Spiel und erhält einen Spielpunkt für die Gesamtwertung.
 
 ## Lokal starten
 
@@ -56,7 +54,8 @@ js/realtime.js                 Raumbezogene Broadcasts
 js/room.js                     Gemeinsamer Raumzustand
 js/games/game-engine.js        Registry der Minispiele
 js/games/buzzer.js             Regeln des Buzzer Quiz
-js/games/spotify-top-artists.js Regeln des Spotify-Spiels
+js/games/spotify-top-artists.js Regeln des Top-20-Spiels
+js/games/top-20-lists.js       Vorbereitete Lösungen für alle drei Runden
 supabase/migrations/           Versionierte Datenbankänderungen
 tests/                         Regeltests
 ```

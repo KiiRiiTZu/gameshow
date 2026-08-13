@@ -68,22 +68,25 @@
 
       <div id="buzzer-finished-controls" class="game-finished hidden">
         <p id="buzzer-winner-message"></p>
-        <button id="start-spotify-game" class="button primary">Spiel 2 starten</button>
+        <button id="start-spotify-game" class="button primary">Top 20 starten</button>
       </div>
     </section>
 
     <section id="spotify-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 2</p>
-          <h2>Spotify Top 20</h2>
-          <p class="muted">Die 20 meistgestreamten Künstler auf Spotify 2026</p>
+          <p class="eyebrow">SPIEL 2 · BEST OF 3</p>
+          <h2 id="top20-title">Top 20</h2>
+          <p id="top20-description" class="muted"></p>
         </div>
         <span id="spotify-status" class="status-pill">Läuft</span>
       </div>
 
       <div class="spotify-meta">
-        <div id="spotify-turn" class="turn-card blue">Team Blau ist dran</div>
+        <div>
+          <div id="spotify-turn" class="turn-card blue">Team Blau ist dran</div>
+          <div id="top20-round-wins" class="round-wins">Rundensiege · Blau 0 : 0 Rot</div>
+        </div>
         <div class="strike-board">
           <span>Blau: <strong id="blue-strikes">—</strong></span>
           <span>Rot: <strong id="red-strikes">—</strong></span>
@@ -92,14 +95,10 @@
 
       <form id="spotify-answer-form" class="spotify-controls">
         <div>
-          <label for="spotify-artist">Genannter Künstler</label>
-          <input id="spotify-artist" maxlength="80" required placeholder="Künstlername" autocomplete="off" />
-        </div>
-        <div>
-          <label for="spotify-rank">Position</label>
+          <label for="spotify-rank">Richtige Lösung auswählen</label>
           <select id="spotify-rank" required></select>
         </div>
-        <button class="button success" type="submit">✓ Treffer eintragen</button>
+        <button class="button success" type="submit">✓ Lösung aufdecken</button>
         <button id="spotify-miss" class="button danger" type="button">✕ Nicht dabei</button>
       </form>
 
@@ -108,6 +107,7 @@
 
       <div id="spotify-finished" class="game-finished hidden">
         <p id="spotify-winner-message"></p>
+        <button id="next-top20-round" class="button primary">Nächste Liste starten</button>
       </div>
     </section>
 

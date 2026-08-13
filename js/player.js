@@ -5,7 +5,9 @@ import {
 
 import { createRoomStateFromRecords, normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
-import { SPOTIFY_SLOT_COUNT, spotifyTopArtistsGame } from "./games/spotify-top-artists.js";
+
+const TOP_20_GAME_ID = "spotify-top-artists";
+const TOP_20_SLOT_COUNT = 20;
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -147,7 +149,7 @@ async function handleEvent(event, payload) {
 function render() {
   if (!joined || !roomState) return;
 
-  const spotifyIsActive = roomState.game?.id === spotifyTopArtistsGame.id;
+  const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
   $("player-buzzer-game").classList.toggle("hidden", spotifyIsActive);
   $("player-spotify-game").classList.toggle("hidden", !spotifyIsActive);
 
@@ -193,30 +195,43 @@ function render() {
 function renderSpotifyGame() {
   const game = roomState.game;
   const isFinished = game.status === "finished";
-  const displayTeam = isFinished ? game.winningTeam : game.currentTeam;
+  const isRoundFinished = game.status === "round-finished";
+  const displayTeam = isFinished ? game.winningTeam : isRoundFinished ? game.roundWinner : game.currentTeam;
+  const roundNumber = game.roundIndex + 1;
 
+  $("player-top20-title").textContent = `Liste ${roundNumber}: ${game.listTitle || "Top 20"}`;
+  $("player-top20-description").textContent = game.listDescription || "";
+  $("player-top20-round-wins").textContent =
+    `Rundensiege · Blau ${game.roundWins.blue} : ${game.roundWins.red} Rot`;
   $("player-spotify-turn").textContent = isFinished
-    ? `${getTeamName(game.winningTeam)} gewinnt!`
+    ? `${getTeamName(game.winningTeam)} gewinnt das Spiel!`
+    : isRoundFinished
+      ? `${getTeamName(game.roundWinner)} gewinnt Runde ${roundNumber}!`
     : `${getTeamName(game.currentTeam)} ist dran`;
   $("player-spotify-turn").className = `turn-card ${displayTeam}`;
   $("player-blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("player-red-strikes").textContent = renderStrikes(game.strikes?.red);
-  $("player-spotify-board").innerHTML = renderSpotifySlots(game.slots);
+  $("player-spotify-board").innerHTML = renderSpotifySlots(game.revealed, game.valueLabel);
   $("player-spotify-result").textContent = isFinished
-    ? `🏆 ${getTeamName(game.winningTeam)} gewinnt das Spotify-Spiel!`
-    : "Nennt abwechselnd einen Künstler. Der Moderator trägt Treffer und Fehlversuche ein.";
+    ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20!`
+    : isRoundFinished
+      ? `Liste ${roundNumber} ist beendet. Wartet auf die nächste Liste.`
+      : `Nennt abwechselnd einen Eintrag. Der Moderator deckt richtige Lösungen auf.`;
 }
 
-function renderSpotifySlots(slots = []) {
-  return Array.from({ length: SPOTIFY_SLOT_COUNT }, (_, index) => {
-    const slot = slots[index];
+function renderSpotifySlots(revealed = [], valueLabel = "Wert") {
+  return Array.from({ length: TOP_20_SLOT_COUNT }, (_, index) => {
+    const slot = revealed[index];
     const teamClass = slot?.team || "empty";
-    const artist = slot ? escapeHtml(slot.artist) : "Noch offen";
+    const answer = slot ? escapeHtml(slot.answer) : "Noch offen";
+    const value = slot
+      ? `<span class="value">${escapeHtml(valueLabel)}: ${escapeHtml(slot.value)}</span>`
+      : "";
 
     return `
       <div class="spotify-slot ${teamClass}">
         <span class="rank">${index + 1}</span>
-        <span class="artist">${artist}</span>
+        <span class="artist">${answer}${value}</span>
       </div>
     `;
   }).join("");
