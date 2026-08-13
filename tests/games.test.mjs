@@ -4,6 +4,12 @@ import assert from "node:assert/strict";
 import { BUZZER_WINNING_SCORE, buzzerGame } from "../js/games/buzzer.js";
 import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT } from "../js/games/top-20-lists.js";
+import {
+  GERMANY_MAP_QUESTIONS,
+  GERMANY_MAP_ROUNDS_TO_WIN,
+  distanceInKilometers,
+  germanyMapGame
+} from "../js/games/germany-map.js";
 import { createInitialRoomState } from "../js/room.js";
 
 test("finishes the buzzer game when a team reaches five points", () => {
@@ -159,4 +165,53 @@ test("normalizes a persisted single-round Spotify state", () => {
   assert.equal(state.game.revealed.length, TOP_20_SLOT_COUNT);
   assert.deepEqual(state.game.roundWins, { blue: 0, red: 0 });
   assert.equal("slots" in state.game, false);
+});
+
+test("contains eleven prepared Germany map questions", () => {
+  assert.equal(GERMANY_MAP_QUESTIONS.length, 11);
+  assert.ok(GERMANY_MAP_QUESTIONS.every((question) =>
+    question.prompt && question.answer && Number.isFinite(question.target.lat) && Number.isFinite(question.target.lng)
+  ));
+});
+
+test("calculates geographic distances in kilometers", () => {
+  const berlin = { lat: 52.5200, lng: 13.4050 };
+  const hamburg = { lat: 53.5511, lng: 9.9937 };
+  const distance = distanceInKilometers(berlin, hamburg);
+
+  assert.ok(distance > 250 && distance < 260);
+});
+
+test("shares one map pin per team and awards the closer team", () => {
+  const state = createInitialRoomState("TEST");
+  germanyMapGame.start(state);
+  const target = GERMANY_MAP_QUESTIONS[0].target;
+
+  assert.equal(germanyMapGame.placePin(state, "blue", { lat: 53.5, lng: 10 }), true);
+  assert.equal(germanyMapGame.placePin(state, "blue", target), true);
+  assert.deepEqual(state.game.pins.blue, target);
+  assert.equal(germanyMapGame.placePin(state, "red", { lat: 52.52, lng: 13.405 }), true);
+  assert.equal(germanyMapGame.revealRound(state), true);
+  assert.equal(state.game.roundWinner, "blue");
+  assert.deepEqual(state.game.roundScores, { blue: 1, red: 0 });
+  assert.equal(state.game.distances.blue, 0);
+});
+
+test("finishes the best of eleven map game at six points", () => {
+  const state = createInitialRoomState("TEST");
+  germanyMapGame.start(state);
+  state.game.roundScores.blue = GERMANY_MAP_ROUNDS_TO_WIN - 1;
+  const target = GERMANY_MAP_QUESTIONS[0].target;
+
+  germanyMapGame.placePin(state, "blue", target);
+  germanyMapGame.placePin(state, "red", { lat: 53.5, lng: 10 });
+  germanyMapGame.revealRound(state);
+
+  assert.equal(state.game.status, "revealed");
+  assert.equal(germanyMapGame.startNextRound(state), true);
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "blue");
+  assert.deepEqual(state.scores, { blue: 1, red: 0 });
+  assert.equal(germanyMapGame.startNextRound(state), false);
+  assert.deepEqual(state.scores, { blue: 1, red: 0 });
 });

@@ -344,6 +344,79 @@ input:focus, select:focus { border-color: #8ca2ff; }
 .spotify-board.compact { grid-template-columns: 1fr; max-height: 470px; overflow: auto; }
 .player-strikes { justify-content: center; margin: 10px 0 16px; }
 
+.map-question-card {
+  margin: 20px 0 14px;
+  padding: 18px 20px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  background: #11141e;
+}
+
+.map-question-card h3 { margin-bottom: 0; line-height: 1.4; }
+
+.germany-map {
+  width: min(690px, 100%);
+  margin: 0 auto;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 35% 25%, rgba(70, 105, 180, .18), transparent 45%),
+    #0f131d;
+}
+
+.germany-map-svg { display: block; width: 100%; height: auto; }
+.germany-map-svg.interactive { cursor: crosshair; touch-action: manipulation; }
+
+.germany-outline {
+  fill: #28303d;
+  stroke: #657086;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.germany-map-svg.interactive .germany-outline:hover { fill: #303a49; }
+
+.map-marker circle { stroke: white; stroke-width: 3; }
+.map-marker.blue circle { fill: #5a72f6; }
+.map-marker.red circle { fill: #d23750; }
+.map-marker.target circle { fill: #f5b83d; }
+.map-marker .marker-center { fill: white; stroke: none; }
+.map-marker text { fill: white; font-size: 15px; font-weight: 900; paint-order: stroke; stroke: #0d0f17; stroke-width: 4px; }
+
+.distance-line { stroke-width: 3; stroke-dasharray: 8 7; opacity: .8; }
+.distance-line.blue { stroke: #7f94ff; }
+.distance-line.red { stroke: #ff7185; }
+
+.map-legend, .map-pin-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 12px;
+  color: #c8ccda;
+  font-size: .9rem;
+}
+
+.legend-dot { display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 50%; }
+.legend-dot.blue { background: #5a72f6; }
+.legend-dot.red { background: #d23750; }
+.legend-dot.target { background: #f5b83d; }
+
+.map-pin-status span { padding: 8px 11px; border-radius: 999px; background: #232938; }
+.map-pin-status .ready { color: #65e3a8; }
+
+.map-result {
+  margin: 16px 0;
+  padding: 18px;
+  border-radius: 16px;
+  text-align: center;
+  background: rgba(53, 208, 138, .10);
+}
+
+.map-result strong { display: block; margin-bottom: 7px; font-size: 1.2rem; }
+.player-map { margin-bottom: 16px; }
+
 .team-picker {
   display: grid;
   grid-template-columns: 1fr 1fr;

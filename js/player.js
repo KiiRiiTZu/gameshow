@@ -6,9 +6,12 @@ import {
 import { createRoomStateFromRecords, normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
+import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
+import { createGermanyMap } from "./germany-map-view.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
 const TOP_20_SLOT_COUNT = 20;
+const GERMANY_MAP_GAME_ID = "germany-map";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -29,6 +32,7 @@ let roomState = null;
 let joined = false;
 let sendingBuzz = false;
 let realtime = null;
+let playerMap = null;
 
 function showPlayerGame() {
   if (!player) return;
@@ -78,6 +82,15 @@ async function initializePlayer() {
     player = restoredPlayer;
     showPlayerGame();
   }
+
+  playerMap = createGermanyMap($("player-germany-map"), {
+    async onPlacePin(position) {
+      if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
+          roomState.game.status !== "placing") return;
+
+      await realtime.send("map_pin", { playerId, position });
+    }
+  });
 
   startRealtime();
   render();
@@ -156,8 +169,15 @@ function render() {
   if (!joined || !roomState) return;
 
   const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
-  $("player-buzzer-game").classList.toggle("hidden", spotifyIsActive);
+  const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
+  $("player-buzzer-game").classList.toggle("hidden", spotifyIsActive || mapIsActive);
   $("player-spotify-game").classList.toggle("hidden", !spotifyIsActive);
+  $("player-map-game").classList.toggle("hidden", !mapIsActive);
+
+  if (mapIsActive) {
+    renderMapGame();
+    return;
+  }
 
   if (spotifyIsActive) {
     renderSpotifyGame();
@@ -241,6 +261,46 @@ function renderSpotifySlots(revealed = [], valueLabel = "Wert") {
       </div>
     `;
   }).join("");
+}
+
+function renderMapGame() {
+  const game = roomState.game;
+  const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
+  const isRevealed = game.status === "revealed" || game.status === "finished";
+  const isFinished = game.status === "finished";
+  const ownPin = game.pins?.[player.team];
+
+  $("player-map-question-number").textContent =
+    `FRAGE ${game.roundIndex + 1} VON ${GERMANY_MAP_QUESTIONS.length}`;
+  $("player-map-question").textContent = question.prompt;
+  $("player-map-blue-score").textContent = game.roundScores.blue;
+  $("player-map-red-score").textContent = game.roundScores.red;
+  $("player-map-instruction").textContent = isRevealed
+    ? "Der Moderator hat das Ziel aufgedeckt."
+    : ownPin
+      ? "Euer Team-Pin ist gesetzt. Ihr könnt ihn bis zur Auswertung noch verschieben."
+      : "Tippt auf die Karte, um euren gemeinsamen Team-Pin zu setzen.";
+
+  playerMap?.render({
+    pins: isRevealed
+      ? game.pins
+      : { blue: player.team === "blue" ? ownPin : null, red: player.team === "red" ? ownPin : null },
+    target: question.target,
+    revealed: isRevealed,
+    locked: isRevealed
+  });
+
+  if (isRevealed) {
+    const blueDistance = Math.round(game.distances.blue);
+    const redDistance = Math.round(game.distances.red);
+    $("player-map-result").textContent = isFinished
+      ? `🏆 ${getTeamName(game.winningTeam)} gewinnt das Kartenspiel! Blau: ${blueDistance} km · Rot: ${redDistance} km`
+      : `${question.answer} · ${getTeamName(game.roundWinner)} ist näher! Blau: ${blueDistance} km · Rot: ${redDistance} km`;
+  } else {
+    $("player-map-result").textContent = ownPin
+      ? "Pin gesetzt ✓ Wartet auf das andere Team und den Moderator."
+      : "Euer Team hat noch keinen Pin gesetzt.";
+  }
 }
 
 function getTeamName(team) {

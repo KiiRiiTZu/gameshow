@@ -14,9 +14,12 @@ import { registerGame } from "./games/game-engine.js";
 import { BUZZER_WINNING_SCORE, buzzerGame } from "./games/buzzer.js";
 import { top20Game } from "./games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
+import { GERMANY_MAP_QUESTIONS, GERMANY_MAP_ROUNDS_TO_WIN, germanyMapGame } from "./games/germany-map.js";
+import { createGermanyMap } from "./germany-map-view.js";
 
 registerGame(buzzerGame);
 registerGame(top20Game);
+registerGame(germanyMapGame);
 
 let roomCode;
 let roomRecord;
@@ -24,6 +27,7 @@ let state;
 let realtime;
 let supportsRemoteGameState = true;
 let moderatorActionPending = false;
+let hostMap;
 
 const $ = (id) => document.getElementById(id);
 
@@ -96,8 +100,10 @@ async function initializeHost() {
   restoreLocalGameState();
 
   if (state.game.id === top20Game.id) top20Game.normalize(state);
+  if (state.game.id === germanyMapGame.id) germanyMapGame.normalize(state);
 
   $("room-code").textContent = roomCode;
+  hostMap = createGermanyMap($("host-germany-map"));
   startRealtime();
   render();
 }
@@ -110,10 +116,13 @@ function render() {
   renderPlayers("red");
 
   const spotifyIsActive = state.game.id === top20Game.id;
-  $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive);
+  const mapIsActive = state.game.id === germanyMapGame.id;
+  $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive || mapIsActive);
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
+  $("map-game-panel").classList.toggle("hidden", !mapIsActive);
 
-  if (spotifyIsActive) renderSpotifyGame();
+  if (mapIsActive) renderMapGame();
+  else if (spotifyIsActive) renderSpotifyGame();
   else renderBuzzerGame();
 }
 
@@ -207,9 +216,64 @@ function renderSpotifyGame() {
       ? `${getTeamName(game.roundWinner)} gewinnt Liste ${roundNumber}.`
       : "";
   $("next-top20-round").classList.toggle("hidden", isFinished);
+  $("start-map-game").classList.toggle("hidden", !isFinished);
   $("next-top20-round").disabled = moderatorActionPending;
+  $("start-map-game").disabled = moderatorActionPending;
 
   $("spotify-miss").disabled = interactionLocked || moderatorActionPending;
+}
+
+function renderMapGame() {
+  const game = state.game;
+  const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
+  const isRevealed = game.status === "revealed" || game.status === "finished";
+  const isFinished = game.status === "finished";
+  const bothPinsReady = Boolean(game.pins?.blue && game.pins?.red);
+
+  $("map-round-label").textContent = `Frage ${game.roundIndex + 1} von ${GERMANY_MAP_QUESTIONS.length}`;
+  $("map-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
+  $("map-question").textContent = question.prompt;
+  $("map-blue-score").textContent = game.roundScores.blue;
+  $("map-red-score").textContent = game.roundScores.red;
+  $("map-status").textContent = isFinished
+    ? "Spiel beendet"
+    : isRevealed
+      ? "Ziel aufgedeckt"
+      : "Pins setzen";
+  $("map-status").className = `status-pill ${isRevealed ? "closed" : "open"}`;
+
+  hostMap.render({
+    pins: game.pins,
+    target: question.target,
+    revealed: isRevealed,
+    locked: true
+  });
+
+  $("target-legend").classList.toggle("hidden", !isRevealed);
+  $("map-pin-status").innerHTML = `
+    <span class="${game.pins?.blue ? "ready" : ""}">Blau: ${game.pins?.blue ? "Pin gesetzt ✓" : "wartet…"}</span>
+    <span class="${game.pins?.red ? "ready" : ""}">Rot: ${game.pins?.red ? "Pin gesetzt ✓" : "wartet…"}</span>
+  `;
+
+  $("reveal-map-round").classList.toggle("hidden", isRevealed);
+  $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady;
+  $("next-map-round").classList.toggle("hidden", !isRevealed || isFinished);
+  $("next-map-round").disabled = moderatorActionPending;
+  $("next-map-round").textContent = game.roundScores[game.roundWinner] >= GERMANY_MAP_ROUNDS_TO_WIN
+    ? "Spiel abschließen"
+    : "Nächste Frage";
+  $("map-result").classList.toggle("hidden", !isRevealed);
+
+  if (isRevealed) {
+    const blueDistance = Math.round(game.distances.blue);
+    const redDistance = Math.round(game.distances.red);
+    const winner = getTeamName(game.roundWinner || game.winningTeam);
+    $("map-result").innerHTML = `
+      <strong>${escapeHtml(question.answer)} · ${winner} ist näher!</strong>
+      <span>Team Blau: ${blueDistance} km · Team Rot: ${redDistance} km</span>
+      ${isFinished ? `<p>🏆 ${getTeamName(game.winningTeam)} gewinnt das Kartenspiel!</p>` : ""}
+    `;
+  }
 }
 
 function renderSpotifySlots(revealed, list, interactionLocked) {
@@ -352,6 +416,13 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "map_pin") {
+    const player = state.players.find((item) => item.id === payload.playerId);
+    if (!player || !germanyMapGame.placePin(state, player.team, payload.position)) return;
+    await persistRenderAndBroadcast();
+    return;
+  }
+
   if (event === "buzz") {
     const player = state.players.find((item) => item.id === payload.playerId);
     if (!player || !buzzerGame.registerBuzz(state, player)) return;
@@ -438,6 +509,21 @@ $("spotify-miss").addEventListener("click", async () => {
 $("next-top20-round").addEventListener("click", async () => {
   $("spotify-error").textContent = "";
   await runModeratorAction(() => top20Game.startNextRound(state));
+});
+
+$("start-map-game").addEventListener("click", async () => {
+  await runModeratorAction(() => {
+    if (state.game.id !== top20Game.id || state.game.status !== "finished") return false;
+    return germanyMapGame.start(state);
+  });
+});
+
+$("reveal-map-round").addEventListener("click", async () => {
+  await runModeratorAction(() => germanyMapGame.revealRound(state));
+});
+
+$("next-map-round").addEventListener("click", async () => {
+  await runModeratorAction(() => germanyMapGame.startNextRound(state));
 });
 
 window.addEventListener("beforeunload", () => {
