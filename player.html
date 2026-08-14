@@ -109,6 +109,44 @@
         <p id="player-matching-error" class="error"></p>
         <div id="player-matching-result" class="player-message"></div>
       </div>
+
+      <div id="player-price-game" class="hidden">
+        <p class="eyebrow">SPIEL 5 · BEST OF 9</p>
+        <h2>Was kostet das?</h2>
+        <p id="player-price-round" class="muted">Produkt 1 von 9</p>
+        <div class="round-score" aria-label="Punktestand im Preisratespiel">
+          <span>Blau <strong id="player-price-blue-score">0</strong></span>
+          <span>Rundensiege</span>
+          <span><strong id="player-price-red-score">0</strong> Rot</span>
+        </div>
+
+        <div class="player-price-layout">
+          <article class="price-product-card">
+            <div class="price-product-image">
+              <img id="player-price-product-image" src="" alt="">
+            </div>
+            <h3 id="player-price-product-name"></h3>
+          </article>
+
+          <div class="price-team-form">
+            <label for="player-price-amount">Euer gemeinsamer Preis</label>
+            <div class="price-input-wrap">
+              <input id="player-price-amount" type="text" inputmode="decimal"
+                autocomplete="off" placeholder="z. B. 12,99">
+              <span>€</span>
+            </div>
+
+            <label for="player-price-comment">Team-Notiz</label>
+            <textarea id="player-price-comment" maxlength="280" rows="5"
+              placeholder="Schreibt hier eure Überlegungen. Nur dein Team und der Moderator können sie lesen."></textarea>
+            <p class="muted small">Preis und Notiz werden live mit deinem Teampartner synchronisiert.</p>
+            <button id="lock-price-guess" class="button primary full">Preis einloggen</button>
+            <p id="player-price-error" class="error"></p>
+          </div>
+        </div>
+
+        <div id="player-price-result" class="player-message"></div>
+      </div>
     </section>
   </main>
 

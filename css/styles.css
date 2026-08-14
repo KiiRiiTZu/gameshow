@@ -16,7 +16,7 @@ body {
     #0d0f17;
 }
 
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 
 .shell {
   width: min(1050px, calc(100% - 32px));
@@ -77,7 +77,7 @@ label, .form-label {
   color: #c8ccda;
 }
 
-input, select {
+input, select, textarea {
   width: 100%;
   border: 1px solid rgba(255,255,255,.13);
   border-radius: 14px;
@@ -87,7 +87,8 @@ input, select {
   outline: none;
 }
 
-input:focus, select:focus { border-color: #8ca2ff; }
+textarea { resize: vertical; min-height: 120px; }
+input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .button {
   border: 0;
@@ -493,6 +494,96 @@ input:focus, select:focus { border-color: #8ca2ff; }
 
 .player-matching-board .matching-card { min-width: 0; }
 
+.price-host-layout,
+.player-price-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, .9fr) minmax(420px, 1.1fr);
+  gap: 22px;
+  align-items: stretch;
+  margin: 20px 0;
+}
+
+.price-product-card {
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 20px;
+  background: #11141e;
+}
+
+.price-product-image {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  padding: 18px;
+  background: #f6f6f7;
+}
+
+.price-product-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.price-product-card h3 {
+  margin: 0;
+  padding: 15px 18px;
+  text-align: center;
+}
+
+.price-team-drafts { display: grid; gap: 14px; }
+
+.price-team-draft,
+.price-team-form {
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 18px;
+  background: #11141e;
+}
+
+.price-team-draft.blue { border-color: rgba(90,114,246,.5); }
+.price-team-draft.red { border-color: rgba(210,55,80,.5); }
+
+.price-team-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.price-team-heading strong { font-size: 1.15rem; }
+.price-guess-value { font-size: clamp(1.6rem, 3vw, 2.5rem); font-weight: 950; }
+
+.price-comment-preview {
+  min-height: 58px;
+  margin: 12px 0 0;
+  padding: 13px 14px;
+  border-radius: 12px;
+  background: rgba(255,255,255,.045);
+  color: #c8ccda;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.price-team-form { display: grid; align-content: start; gap: 10px; }
+.price-team-form .full { margin-top: 4px; }
+
+.price-input-wrap { position: relative; }
+.price-input-wrap input { padding-right: 48px; font-size: 1.25rem; font-weight: 900; }
+.price-input-wrap span {
+  position: absolute;
+  top: 50%;
+  right: 17px;
+  transform: translateY(-50%);
+  color: #a8adbd;
+  font-weight: 900;
+}
+
+.price-team-form.locked { border-color: rgba(53,208,138,.55); }
+.price-team-form.locked input,
+.price-team-form.locked textarea { opacity: .7; }
+
 .team-picker {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -625,7 +716,7 @@ input:focus, select:focus { border-color: #8ca2ff; }
   .hero-card { padding: 27px; }
   .choice-grid, .scoreboard { grid-template-columns: 1fr; }
   .spotify-meta, .spotify-board { grid-template-columns: 1fr; }
-  .matching-board { grid-template-columns: 1fr; }
+  .matching-board, .price-host-layout, .player-price-layout { grid-template-columns: 1fr; }
   .top20-actions { align-items: stretch; flex-direction: column; }
   .versus { text-align: center; }
   .game-heading, .topbar { align-items: flex-start; }

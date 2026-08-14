@@ -175,6 +175,60 @@
         <button id="complete-matching-turn" class="button secondary hidden">Nächste Spieler</button>
         <button id="reveal-matching-all" class="button primary hidden">Alle Antworten aufdecken</button>
         <button id="next-matching-round" class="button primary hidden">Nächste Runde</button>
+        <button id="start-price-game" class="button primary hidden">Preisratespiel starten</button>
+      </div>
+      <p id="matching-next-game-error" class="error"></p>
+    </section>
+
+    <section id="price-game-panel" class="card game-panel hidden">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 5 · BEST OF 9</p>
+          <h2>Was kostet das?</h2>
+          <p id="price-round-label" class="muted">Produkt 1 von 9</p>
+        </div>
+        <span id="price-status" class="status-pill open">Teams beraten sich</span>
+      </div>
+
+      <div class="round-score" aria-label="Punktestand im Preisratespiel">
+        <span>Blau <strong id="price-blue-score">0</strong></span>
+        <span>Rundensiege</span>
+        <span><strong id="price-red-score">0</strong> Rot</span>
+      </div>
+
+      <div class="price-host-layout">
+        <article class="price-product-card">
+          <div class="price-product-image">
+            <img id="price-product-image" src="" alt="">
+          </div>
+          <h3 id="price-product-name"></h3>
+        </article>
+
+        <div class="price-team-drafts">
+          <article class="price-team-draft blue">
+            <div class="price-team-heading">
+              <strong>Team Blau</strong>
+              <span id="price-blue-lock" class="status-pill">Offen</span>
+            </div>
+            <div id="price-blue-guess" class="price-guess-value">Noch keine Eingabe</div>
+            <p id="price-blue-comment" class="price-comment-preview">Noch kein Kommentar</p>
+          </article>
+          <article class="price-team-draft red">
+            <div class="price-team-heading">
+              <strong>Team Rot</strong>
+              <span id="price-red-lock" class="status-pill">Offen</span>
+            </div>
+            <div id="price-red-guess" class="price-guess-value">Noch keine Eingabe</div>
+            <p id="price-red-comment" class="price-comment-preview">Noch kein Kommentar</p>
+          </article>
+        </div>
+      </div>
+
+      <div id="price-round-result" class="map-result hidden"></div>
+      <p id="price-error" class="error"></p>
+      <div class="controls">
+        <button id="reveal-price-round" class="button primary">Preis aufdecken &amp; auswerten</button>
+        <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
       </div>
     </section>
 

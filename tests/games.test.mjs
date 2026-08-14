@@ -24,6 +24,19 @@ import {
   encryptMatchingSubmission,
   exportMatchingPublicKey
 } from "../js/matching-crypto.js";
+import {
+  PRICE_GAME_WINNING_SCORE,
+  formatEuroAmount,
+  guessThePriceGame,
+  parseEuroAmount
+} from "../js/games/guess-the-price.js";
+import { PRICE_PRODUCTS } from "../js/games/guess-the-price-products.js";
+import {
+  createEncryptionKeyPair,
+  decryptPrivatePayload,
+  encryptPrivatePayload,
+  exportEncryptionPublicKey
+} from "../js/private-channel-crypto.js";
 import { createInitialRoomState } from "../js/room.js";
 
 test("finishes the buzzer game when a team reaches five points", () => {
@@ -367,4 +380,69 @@ test("encrypts player assignments so only the moderator key can read them", asyn
 
   assert.equal(JSON.stringify(encrypted).includes("Max"), false);
   assert.deepEqual(await decryptMatchingSubmission(keyPair.privateKey, encrypted), payload);
+});
+
+test("contains nine complete price products without public prices", () => {
+  assert.equal(PRICE_PRODUCTS.length, 9);
+  assert.ok(PRICE_PRODUCTS.every((product) => product.id && product.name &&
+    product.src.endsWith(".webp") && !("price" in product)));
+  assert.ok(PRICE_PRODUCTS.every((product) =>
+    existsSync(new URL(`../${product.src.replace("./", "")}`, import.meta.url))
+  ));
+});
+
+test("parses German and common Euro inputs", () => {
+  assert.equal(parseEuroAmount("12,99€"), 12.99);
+  assert.equal(parseEuroAmount("12.99"), 12.99);
+  assert.equal(parseEuroAmount("2.269,00 €"), 2269);
+  assert.equal(parseEuroAmount("4.746"), 4746);
+  assert.equal(parseEuroAmount("-2,00"), null);
+  assert.equal(parseEuroAmount("abc"), null);
+  assert.equal(formatEuroAmount(2269), "2.269,00 €");
+});
+
+test("locks both teams and awards the closer price guess", () => {
+  const state = createInitialRoomState("TEST");
+  guessThePriceGame.start(state);
+
+  assert.equal(guessThePriceGame.lockTeam(state, "blue"), true);
+  assert.equal(state.game.status, "guessing");
+  assert.equal(guessThePriceGame.lockTeam(state, "red"), true);
+  assert.equal(state.game.status, "ready-to-reveal");
+  assert.equal(guessThePriceGame.revealRound(state, { blue: null, red: 40 }), false);
+  assert.equal(guessThePriceGame.revealRound(state, { blue: 30, red: 40 }), true);
+  assert.equal(state.game.revealed.actualPrice, 29.99);
+  assert.equal(state.game.revealed.roundWinner, "blue");
+  assert.deepEqual(state.game.roundScores, { blue: 1, red: 0 });
+  assert.equal(state.game.status, "revealed");
+});
+
+test("finishes the best of nine price game at five wins", () => {
+  const state = createInitialRoomState("TEST");
+  guessThePriceGame.start(state);
+
+  for (let round = 0; round < PRICE_GAME_WINNING_SCORE; round += 1) {
+    guessThePriceGame.lockTeam(state, "blue");
+    guessThePriceGame.lockTeam(state, "red");
+    guessThePriceGame.revealRound(state, { blue: 0, red: 10_000_000 });
+    if (round < PRICE_GAME_WINNING_SCORE - 1) guessThePriceGame.startNextRound(state);
+  }
+
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "blue");
+  assert.deepEqual(state.game.roundScores, { blue: 5, red: 0 });
+  assert.deepEqual(state.scores, { blue: 1, red: 0 });
+  assert.equal(guessThePriceGame.startNextRound(state), false);
+});
+
+test("encrypts private team drafts for one recipient", async () => {
+  const keyPair = await createEncryptionKeyPair();
+  const otherKeyPair = await createEncryptionKeyPair();
+  const publicKey = await exportEncryptionPublicKey(keyPair.publicKey);
+  const payload = { roundIndex: 2, amount: "59,99", comment: "Ich tippe knapp 60 Euro" };
+  const encrypted = await encryptPrivatePayload(publicKey, payload);
+
+  assert.equal(JSON.stringify(encrypted).includes("60 Euro"), false);
+  assert.deepEqual(await decryptPrivatePayload(keyPair.privateKey, encrypted), payload);
+  await assert.rejects(() => decryptPrivatePayload(otherKeyPair.privateKey, encrypted));
 });

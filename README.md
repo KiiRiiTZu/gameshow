@@ -1,4 +1,4 @@
-# Gameshow V0.4
+# Gameshow V0.5
 
 Eine browserbasierte Multiplayer-Gameshow für einen Moderator und vier Spieler in zwei Teams. Räume, Spieler, Punkte und Spielzustände werden mit Supabase gespeichert und über Supabase Realtime synchronisiert.
 
@@ -35,6 +35,24 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Das nähere Team erhält einen Kartenpunkt; das erste Team mit sechs Punkten gewinnt das Spiel.
 - Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
 
+### Spiel 4: Wer passt zu wem? (4 Runden)
+
+- Pro Runde ordnen beide Spieler jedes Teams vier Bilder den registrierten Spielern zu.
+- Spieler und Moderator wählen Namen ausschließlich über Dropdown-Felder aus.
+- Die Zuordnungen werden bis zum gemeinsamen Aufdecken verschlüsselt an den Moderator gesendet.
+- Jede Übereinstimmung innerhalb eines Teams zählt einen Punkt.
+- Nach vier Runden gewinnt das Team mit den meisten Übereinstimmungen einen Spielpunkt.
+
+### Spiel 5: Was kostet das? (Best of 9)
+
+- Neun Amazon-Produkte werden nacheinander gezeigt.
+- Beide Spieler eines Teams bearbeiten einen gemeinsamen Euro-Tipp und eine live synchronisierte Team-Notiz.
+- Team-Tipp und Notiz sind nur für die beiden Teamspieler und den Moderator lesbar.
+- Beide Spieler können den gemeinsamen Preis einloggen.
+- Nach dem Einloggen beider Teams deckt der Moderator den echten Preis und die Abstände auf.
+- Das nähere Team gewinnt die Runde; das erste Team mit fünf Rundensiegen gewinnt das Spiel.
+- Nach dem letzten Spiel wird der Gesamtsieger der Gameshow angezeigt.
+
 ## Lokal starten
 
 Die App muss über einen Webserver geöffnet werden, nicht direkt per `file://`.
@@ -70,6 +88,9 @@ js/games/spotify-top-artists.js Regeln des Top-20-Spiels
 js/games/top-20-lists.js       Vorbereitete Lösungen für alle drei Runden
 js/games/germany-map.js        Fragen, Ziele, Distanz- und Spielregeln
 js/germany-map-view.js         Interaktive SVG-Deutschlandkarte
+js/games/matching-game.js      Regeln des Zuordnungsspiels
+js/games/guess-the-price.js    Regeln des Preisratespiels
+js/private-channel-crypto.js   Verschlüsselte private Team-Payloads
 assets/audio/buzzer.mp3        Soundeffekt für den ersten gültigen Buzz
 supabase/migrations/           Versionierte Datenbankänderungen
 tests/                         Regeltests

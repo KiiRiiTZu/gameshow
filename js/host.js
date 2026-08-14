@@ -23,15 +23,23 @@ import {
   matchingGame
 } from "./games/matching-game.js";
 import {
+  formatEuroAmount,
+  guessThePriceGame,
+  parseEuroAmount
+} from "./games/guess-the-price.js";
+import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
+import {
   createMatchingKeyPair,
   decryptMatchingSubmission,
   exportMatchingPublicKey
 } from "./matching-crypto.js";
+import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
 
 registerGame(buzzerGame);
 registerGame(top20Game);
 registerGame(germanyMapGame);
 registerGame(matchingGame);
+registerGame(guessThePriceGame);
 
 let roomCode;
 let roomRecord;
@@ -43,6 +51,8 @@ let hostMap;
 let matchingAssignments = [];
 let matchingKeyPair;
 let matchingPublicKey;
+let priceDrafts = emptyPriceDrafts();
+const pricePlayerKeys = new Map();
 
 const $ = (id) => document.getElementById(id);
 
@@ -52,6 +62,46 @@ function gameStorageKey() {
 
 function matchingStorageKey() {
   return `gameshow-matching-assignments-${roomRecord.id}`;
+}
+
+function priceStorageKey() {
+  return `gameshow-price-drafts-${roomRecord.id}`;
+}
+
+function emptyPriceDrafts(roundIndex = 0) {
+  return {
+    roundIndex,
+    blue: { amount: "", comment: "", updatedBy: null },
+    red: { amount: "", comment: "", updatedBy: null }
+  };
+}
+
+function savePriceDrafts() {
+  try {
+    localStorage.setItem(priceStorageKey(), JSON.stringify(priceDrafts));
+  } catch (error) {
+    console.warn("Private price drafts could not be saved:", error);
+  }
+}
+
+function restorePriceDrafts() {
+  priceDrafts = emptyPriceDrafts(state.game.roundIndex);
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(priceStorageKey()));
+    if (!saved || saved.roundIndex !== state.game.roundIndex) return false;
+    for (const team of ["blue", "red"]) {
+      priceDrafts[team] = {
+        amount: String(saved[team]?.amount || "").slice(0, 40),
+        comment: String(saved[team]?.comment || "").slice(0, 280),
+        updatedBy: saved[team]?.updatedBy || null
+      };
+    }
+    return true;
+  } catch (error) {
+    console.warn("Private price drafts could not be restored:", error);
+    return false;
+  }
 }
 
 function emptyMatchingAssignments() {
@@ -163,6 +213,10 @@ async function initializeHost() {
       state.game.submittedTeams = { blue: false, red: false };
     }
   }
+  if (state.game.id === guessThePriceGame.id) {
+    guessThePriceGame.normalize(state);
+    restorePriceDrafts();
+  }
 
   $("room-code").textContent = roomCode;
   hostMap = createGermanyMap($("host-germany-map"));
@@ -182,19 +236,95 @@ function render() {
   const spotifyIsActive = state.game.id === top20Game.id;
   const mapIsActive = state.game.id === germanyMapGame.id;
   const matchingIsActive = state.game.id === matchingGame.id;
+  const priceIsActive = state.game.id === guessThePriceGame.id;
   document.querySelector(".shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || mapIsActive || matchingIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
   );
-  $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive || mapIsActive || matchingIsActive);
+  $("buzzer-game-panel").classList.toggle(
+    "hidden",
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
+  );
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
   $("map-game-panel").classList.toggle("hidden", !mapIsActive);
   $("matching-game-panel").classList.toggle("hidden", !matchingIsActive);
+  $("price-game-panel").classList.toggle("hidden", !priceIsActive);
 
-  if (matchingIsActive) renderMatchingGame();
+  if (priceIsActive) renderPriceGame();
+  else if (matchingIsActive) renderMatchingGame();
   else if (mapIsActive) renderMapGame();
   else if (spotifyIsActive) renderSpotifyGame();
   else renderBuzzerGame();
+}
+
+function renderPriceDraft(team) {
+  const draft = priceDrafts[team];
+  const parsedAmount = parseEuroAmount(draft.amount);
+  const locked = Boolean(state.game.lockedTeams?.[team]);
+  $(`price-${team}-guess`).textContent = parsedAmount === null
+    ? draft.amount || "Noch keine Eingabe"
+    : formatEuroAmount(parsedAmount);
+  $(`price-${team}-comment`).textContent = draft.comment || "Noch kein Kommentar";
+  $(`price-${team}-lock`).textContent = locked ? "Eingeloggt ✓" : "Offen";
+  $(`price-${team}-lock`).className = `status-pill ${locked ? "open" : ""}`;
+}
+
+function renderPriceGame() {
+  const game = state.game;
+  const product = getPriceProduct(game.roundIndex);
+  const isRevealed = ["revealed", "finished"].includes(game.status);
+  const isFinished = game.status === "finished";
+  const bothLocked = game.lockedTeams.blue && game.lockedTeams.red;
+
+  $("price-round-label").textContent =
+    `Produkt ${game.roundIndex + 1} von ${PRICE_PRODUCTS.length}`;
+  $("price-blue-score").textContent = game.roundScores.blue;
+  $("price-red-score").textContent = game.roundScores.red;
+  $("price-product-image").src = product.src;
+  $("price-product-image").alt = product.name;
+  $("price-product-name").textContent = product.name;
+  $("price-status").textContent = isFinished
+    ? "Spiel beendet"
+    : isRevealed ? "Preis aufgedeckt" : bothLocked ? "Bereit zum Aufdecken" : "Teams beraten sich";
+  $("price-status").className = `status-pill ${isRevealed ? "closed" : "open"}`;
+
+  renderPriceDraft("blue");
+  renderPriceDraft("red");
+
+  $("reveal-price-round").classList.toggle("hidden", isRevealed);
+  $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
+  $("next-price-round").classList.toggle("hidden", !isRevealed || isFinished);
+  $("next-price-round").disabled = moderatorActionPending;
+  $("price-round-result").classList.toggle("hidden", !isRevealed);
+
+  if (!isRevealed) return;
+
+  const result = game.revealed;
+  const roundMessage = result.roundWinner
+    ? `${getTeamName(result.roundWinner)} liegt näher.`
+    : "Beide Teams liegen exakt gleich weit entfernt.";
+  const finalMessage = isFinished
+    ? game.winningTeam
+      ? `<p>🏆 ${getTeamName(game.winningTeam)} gewinnt das Preisratespiel mit ${game.roundScores[game.winningTeam]} Punkten!</p>`
+      : "<p>Das Preisratespiel endet unentschieden.</p>"
+    : "";
+  const overallWinner = state.scores.blue === state.scores.red
+    ? null
+    : state.scores.blue > state.scores.red ? "blue" : "red";
+  const overallMessage = isFinished
+    ? `<p><strong>${overallWinner
+      ? `🎉 ${getTeamName(overallWinner)} gewinnt die gesamte Gameshow!`
+      : "Die Gameshow endet insgesamt unentschieden."}</strong><br>` +
+      `Gesamtstand: Blau ${state.scores.blue} · ${state.scores.red} Rot</p>`
+    : "";
+  $("price-round-result").innerHTML = `
+    <strong>Amazon-Preis: ${formatEuroAmount(result.actualPrice)}</strong>
+    <span>Blau: ${formatEuroAmount(result.guesses.blue)} (${formatEuroAmount(result.differences.blue)} entfernt)</span><br>
+    <span>Rot: ${formatEuroAmount(result.guesses.red)} (${formatEuroAmount(result.differences.red)} entfernt)</span>
+    <p>${roundMessage}</p>
+    ${finalMessage}
+    ${overallMessage}
+  `;
 }
 
 function renderBuzzerGame() {
@@ -465,6 +595,10 @@ function renderMatchingGame() {
   $("reveal-matching-all").disabled = moderatorActionPending;
   $("next-matching-round").classList.toggle("hidden", game.status !== "round-finished");
   $("next-matching-round").disabled = moderatorActionPending;
+  $("start-price-game").classList.toggle("hidden", !isFinished);
+  $("start-price-game").disabled = moderatorActionPending ||
+    state.players.filter((player) => player.team === "blue").length !== 2 ||
+    state.players.filter((player) => player.team === "red").length !== 2;
   $("matching-round-result").classList.toggle("hidden", !result);
 
   if (result) {
@@ -536,6 +670,9 @@ async function broadcastState() {
   const publicState = structuredClone(state);
   if (state.game.id === matchingGame.id) {
     publicState.matchingSubmissionKey = matchingPublicKey;
+  }
+  if (state.game.id === guessThePriceGame.id) {
+    publicState.priceSubmissionKey = matchingPublicKey;
   }
   await realtime.send("room_state", publicState);
 }
@@ -657,6 +794,92 @@ async function handleMatchingSubmission(payload) {
   }
 }
 
+async function sendPricePrivateState(playerId) {
+  if (state.game.id !== guessThePriceGame.id) return false;
+  const roomPlayer = state.players.find((item) => item.id === playerId);
+  const publicKey = pricePlayerKeys.get(playerId);
+  if (!roomPlayer || !publicKey) return false;
+
+  try {
+    const encrypted = await encryptPrivatePayload(publicKey, {
+      roundIndex: state.game.roundIndex,
+      draft: priceDrafts[roomPlayer.team],
+      locked: Boolean(state.game.lockedTeams?.[roomPlayer.team])
+    });
+    await realtime.send("price_private_state", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.warn("Private price state could not be encrypted:", error);
+    return false;
+  }
+}
+
+async function syncPriceTeam(team) {
+  const teamPlayers = state.players.filter((player) => player.team === team);
+  await Promise.all(teamPlayers.map((player) => sendPricePrivateState(player.id)));
+}
+
+async function syncAllPriceTeams() {
+  await Promise.all([syncPriceTeam("blue"), syncPriceTeam("red")]);
+}
+
+async function handlePriceKeyRegistration(payload) {
+  const roomPlayer = state.players.find((item) => item.id === payload?.playerId);
+  if (!roomPlayer || !payload?.publicKey || payload.publicKey.kty !== "RSA") return;
+  pricePlayerKeys.set(roomPlayer.id, payload.publicKey);
+  if (state.game.id === guessThePriceGame.id) await sendPricePrivateState(roomPlayer.id);
+}
+
+async function handlePriceSubmission(payload) {
+  if (state.game.id !== guessThePriceGame.id || state.game.status !== "guessing" ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+
+  const player = state.players.find((item) => item.id === payload.playerId);
+  if (!player || state.game.lockedTeams[player.team]) return;
+
+  try {
+    const submission = await decryptPrivatePayload(
+      matchingKeyPair.privateKey,
+      payload.encrypted
+    );
+    const valid = submission?.playerId === player.id &&
+      submission.roundIndex === state.game.roundIndex &&
+      ["draft", "lock"].includes(submission.type);
+    if (!valid) return;
+
+    const amount = String(submission.amount || "").slice(0, 40);
+    const comment = String(submission.comment || "").slice(0, 280);
+    priceDrafts[player.team] = { amount, comment, updatedBy: player.id };
+    savePriceDrafts();
+    render();
+
+    if (submission.type === "lock") {
+      const parsedAmount = parseEuroAmount(amount);
+      if (parsedAmount === null) {
+        await realtime.send("price_lock_result", {
+          playerId: player.id,
+          accepted: false,
+          reason: "Bitte gebt zuerst einen gültigen Euro-Betrag ein."
+        });
+        await syncPriceTeam(player.team);
+        return;
+      }
+
+      const accepted = guessThePriceGame.lockTeam(state, player.team);
+      await realtime.send("price_lock_result", {
+        playerId: player.id,
+        accepted,
+        reason: accepted ? "" : "Der Team-Preis konnte nicht eingeloggt werden."
+      });
+      if (accepted) await persistRenderAndBroadcast();
+    }
+
+    await syncPriceTeam(player.team);
+  } catch (error) {
+    console.warn("Encrypted price submission could not be processed:", error);
+  }
+}
+
 async function handleEvent(event, payload) {
   if (event === "buzz_winner") {
     void playBuzzerSound();
@@ -675,6 +898,16 @@ async function handleEvent(event, payload) {
 
   if (event === "matching_assignment") {
     await handleMatchingSubmission(payload);
+    return;
+  }
+
+  if (event === "price_key_registration") {
+    await handlePriceKeyRegistration(payload);
+    return;
+  }
+
+  if (event === "price_private_submission") {
+    await handlePriceSubmission(payload);
     return;
   }
 
@@ -869,6 +1102,52 @@ $("reveal-matching-all").addEventListener("click", async () => {
 $("next-matching-round").addEventListener("click", async () => {
   $("matching-error").textContent = "";
   await runModeratorAction(() => matchingGame.startNextRound(state));
+});
+
+$("start-price-game").addEventListener("click", async () => {
+  $("matching-next-game-error").textContent = "";
+
+  if (state.players.length !== 4) {
+    $("matching-next-game-error").textContent =
+      "Für das Preisratespiel müssen alle vier Spieler im Raum sein.";
+    return;
+  }
+
+  const accepted = await runModeratorAction(() => {
+    if (state.game.id !== matchingGame.id || state.game.status !== "finished") return false;
+    guessThePriceGame.start(state);
+    priceDrafts = emptyPriceDrafts(0);
+    savePriceDrafts();
+    return true;
+  });
+  if (accepted) await syncAllPriceTeams();
+});
+
+$("reveal-price-round").addEventListener("click", async () => {
+  $("price-error").textContent = "";
+  const guesses = {
+    blue: parseEuroAmount(priceDrafts.blue.amount),
+    red: parseEuroAmount(priceDrafts.red.amount)
+  };
+
+  if (guesses.blue === null || guesses.red === null) {
+    $("price-error").textContent = "Beide Teams benötigen einen gültigen Preis.";
+    return;
+  }
+
+  await runModeratorAction(() => guessThePriceGame.revealRound(state, guesses));
+});
+
+$("next-price-round").addEventListener("click", async () => {
+  $("price-error").textContent = "";
+  const nextRoundIndex = state.game.roundIndex + 1;
+  const accepted = await runModeratorAction(() => {
+    if (!guessThePriceGame.startNextRound(state)) return false;
+    priceDrafts = emptyPriceDrafts(nextRoundIndex);
+    savePriceDrafts();
+    return true;
+  });
+  if (accepted) await syncAllPriceTeams();
 });
 
 window.addEventListener("beforeunload", () => {

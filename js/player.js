@@ -14,11 +14,20 @@ import {
   MATCHING_TURNS
 } from "./games/matching-game.js";
 import { encryptMatchingSubmission } from "./matching-crypto.js";
+import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
+import { formatEuroAmount, parseEuroAmount } from "./euro.js";
+import {
+  createEncryptionKeyPair,
+  decryptPrivatePayload,
+  encryptPrivatePayload,
+  exportEncryptionPublicKey
+} from "./private-channel-crypto.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
 const TOP_20_SLOT_COUNT = 20;
 const GERMANY_MAP_GAME_ID = "germany-map";
 const MATCHING_GAME_ID = "matching-game";
+const PRICE_GAME_ID = "guess-the-price";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -42,6 +51,11 @@ let realtime = null;
 let playerMap = null;
 let matchingSubmissionPending = false;
 let matchingDraft = { key: "", values: ["", "", "", ""] };
+let priceKeyPair = null;
+let pricePublicKey = null;
+let priceDraft = { roundIndex: -1, amount: "", comment: "", locked: false };
+let priceDraftTimer = null;
+let priceSubmissionPending = false;
 
 function showPlayerGame() {
   if (!player) return;
@@ -100,6 +114,9 @@ async function initializePlayer() {
       await realtime.send("map_pin", { playerId, position });
     }
   });
+
+  priceKeyPair = await createEncryptionKeyPair();
+  pricePublicKey = await exportEncryptionPublicKey(priceKeyPair.publicKey);
 
   startRealtime();
   render();
@@ -196,6 +213,69 @@ $("submit-matching-assignment").addEventListener("click", async () => {
   }
 });
 
+async function registerPriceKey() {
+  if (!realtime || !player || !pricePublicKey) return;
+  await realtime.send("price_key_registration", { playerId, publicKey: pricePublicKey });
+}
+
+async function sendPriceSubmission(type = "draft") {
+  if (!player || roomState?.game?.id !== PRICE_GAME_ID ||
+      roomState.game.status !== "guessing" || roomState.game.lockedTeams?.[player.team] ||
+      !roomState.priceSubmissionKey) return false;
+
+  try {
+    const encrypted = await encryptPrivatePayload(roomState.priceSubmissionKey, {
+      type,
+      playerId,
+      roundIndex: roomState.game.roundIndex,
+      amount: priceDraft.amount,
+      comment: priceDraft.comment
+    });
+    await realtime.send("price_private_submission", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.error("Private price draft could not be encrypted:", error);
+    $("player-price-error").textContent = "Der Teamentwurf konnte nicht synchronisiert werden.";
+    return false;
+  }
+}
+
+function schedulePriceDraft() {
+  clearTimeout(priceDraftTimer);
+  priceDraftTimer = setTimeout(() => {
+    void sendPriceSubmission("draft");
+  }, 140);
+}
+
+$("player-price-amount").addEventListener("input", (event) => {
+  priceDraft.amount = event.currentTarget.value.slice(0, 40);
+  $("player-price-error").textContent = "";
+  schedulePriceDraft();
+});
+
+$("player-price-comment").addEventListener("input", (event) => {
+  priceDraft.comment = event.currentTarget.value.slice(0, 280);
+  $("player-price-error").textContent = "";
+  schedulePriceDraft();
+});
+
+$("lock-price-guess").addEventListener("click", async () => {
+  if (priceSubmissionPending || parseEuroAmount(priceDraft.amount) === null) {
+    $("player-price-error").textContent = "Bitte gebt zuerst einen gültigen Euro-Betrag ein.";
+    return;
+  }
+
+  clearTimeout(priceDraftTimer);
+  priceSubmissionPending = true;
+  $("player-price-error").textContent = "Preis wird eingeloggt…";
+  renderPriceGame();
+  const sent = await sendPriceSubmission("lock");
+  if (!sent) {
+    priceSubmissionPending = false;
+    renderPriceGame();
+  }
+});
+
 async function handleEvent(event, payload) {
   if (event === "buzz_winner") {
     void playBuzzerSound();
@@ -216,6 +296,35 @@ async function handleEvent(event, payload) {
 
     player = payload.player || player;
     showPlayerGame();
+    await registerPriceKey();
+    render();
+    return;
+  }
+
+  if (event === "price_private_state" && payload.playerId === playerId &&
+      payload.encrypted && priceKeyPair?.privateKey) {
+    try {
+      const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
+      if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
+      priceDraft = {
+        roundIndex: privateState.roundIndex,
+        amount: String(privateState.draft?.amount || ""),
+        comment: String(privateState.draft?.comment || ""),
+        locked: Boolean(privateState.locked)
+      };
+      priceSubmissionPending = false;
+      render();
+    } catch (error) {
+      console.warn("Private team draft could not be decrypted:", error);
+    }
+    return;
+  }
+
+  if (event === "price_lock_result" && payload.playerId === playerId) {
+    priceSubmissionPending = false;
+    $("player-price-error").textContent = payload.accepted
+      ? "Euer Team-Preis ist eingeloggt."
+      : payload.reason || "Der Preis konnte nicht eingeloggt werden.";
     render();
     return;
   }
@@ -237,6 +346,17 @@ async function handleEvent(event, payload) {
     }
 
     sendingBuzz = false;
+    if (roomState.game?.id === PRICE_GAME_ID) {
+      if (priceDraft.roundIndex !== roomState.game.roundIndex) {
+        priceDraft = {
+          roundIndex: roomState.game.roundIndex,
+          amount: "",
+          comment: "",
+          locked: Boolean(roomState.game.lockedTeams?.[player?.team])
+        };
+      }
+      await registerPriceKey();
+    }
     render();
   }
 }
@@ -247,14 +367,24 @@ function render() {
   const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
   const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
   const matchingIsActive = roomState.game?.id === MATCHING_GAME_ID;
+  const priceIsActive = roomState.game?.id === PRICE_GAME_ID;
   document.querySelector(".player-shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || mapIsActive || matchingIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
   );
-  $("player-buzzer-game").classList.toggle("hidden", spotifyIsActive || mapIsActive || matchingIsActive);
+  $("player-buzzer-game").classList.toggle(
+    "hidden",
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
+  );
   $("player-spotify-game").classList.toggle("hidden", !spotifyIsActive);
   $("player-map-game").classList.toggle("hidden", !mapIsActive);
   $("player-matching-game").classList.toggle("hidden", !matchingIsActive);
+  $("player-price-game").classList.toggle("hidden", !priceIsActive);
+
+  if (priceIsActive) {
+    renderPriceGame();
+    return;
+  }
 
   if (matchingIsActive) {
     renderMatchingGame();
@@ -511,6 +641,72 @@ function renderMatchingGame() {
     $("player-matching-result").textContent = "Trage deine vier Zuordnungen ein. Das andere Team kann sie nicht lesen.";
   } else {
     $("player-matching-result").textContent = "Warte auf euren nächsten Zuordnungsdurchgang.";
+  }
+}
+
+function renderPriceGame() {
+  const game = roomState.game;
+  const product = getPriceProduct(game.roundIndex);
+  const isRevealed = ["revealed", "finished"].includes(game.status);
+  const isFinished = game.status === "finished";
+  const ownTeam = player?.team || "blue";
+  const locked = Boolean(game.lockedTeams?.[ownTeam] || priceDraft.locked);
+  const editable = game.status === "guessing" && !locked && !priceSubmissionPending;
+
+  $("player-price-round").textContent =
+    `Produkt ${game.roundIndex + 1} von ${PRICE_PRODUCTS.length}`;
+  $("player-price-blue-score").textContent = game.roundScores.blue;
+  $("player-price-red-score").textContent = game.roundScores.red;
+  $("player-price-product-image").src = product.src;
+  $("player-price-product-image").alt = product.name;
+  $("player-price-product-name").textContent = product.name;
+
+  const amountInput = $("player-price-amount");
+  const commentInput = $("player-price-comment");
+  if (amountInput.value !== priceDraft.amount) amountInput.value = priceDraft.amount;
+  if (commentInput.value !== priceDraft.comment) commentInput.value = priceDraft.comment;
+  amountInput.disabled = !editable;
+  commentInput.disabled = !editable;
+  $("lock-price-guess").disabled = !editable || parseEuroAmount(priceDraft.amount) === null;
+  $("lock-price-guess").textContent = priceSubmissionPending
+    ? "Wird eingeloggt…"
+    : locked ? "Team-Preis eingeloggt ✓" : "Preis einloggen";
+  $("lock-price-guess").closest(".price-team-form").classList.toggle("locked", locked);
+
+  if (isRevealed) {
+    const result = game.revealed;
+    const roundMessage = result.roundWinner
+      ? `${getTeamName(result.roundWinner)} liegt näher.`
+      : "Beide Teams liegen exakt gleich weit entfernt.";
+    const overallWinner = roomState.scores.blue === roomState.scores.red
+      ? null
+      : roomState.scores.blue > roomState.scores.red ? "blue" : "red";
+    $("player-price-result").innerHTML = `
+      <strong>Preis: ${formatEuroAmount(result.actualPrice)}</strong><br>
+      Blau: ${formatEuroAmount(result.guesses.blue)} · Rot: ${formatEuroAmount(result.guesses.red)}<br>
+      ${roundMessage}
+      ${isFinished
+        ? game.winningTeam
+          ? `<br>🏆 ${getTeamName(game.winningTeam)} gewinnt das Preisratespiel!`
+          : "<br>Das Spiel endet unentschieden."
+        : ""}
+      ${isFinished
+        ? `<br><strong>${overallWinner
+          ? `🎉 ${getTeamName(overallWinner)} gewinnt die gesamte Gameshow!`
+          : "Die Gameshow endet insgesamt unentschieden."}</strong>`
+        : ""}
+    `;
+    return;
+  }
+
+  if (locked) {
+    $("player-price-result").textContent = game.lockedTeams.blue && game.lockedTeams.red
+      ? "Beide Teams sind eingeloggt. Der Moderator kann den Preis aufdecken."
+      : "Euer Preis ist eingeloggt. Wartet auf das andere Team.";
+  } else {
+    $("player-price-result").textContent = roomState.priceSubmissionKey
+      ? "Beratet euch und loggt euren gemeinsamen Preis ein."
+      : "Die sichere Team-Verbindung wird aufgebaut…";
   }
 }
 
