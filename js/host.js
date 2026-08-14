@@ -20,6 +20,8 @@ import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
   MATCHING_TURNS,
+  areMatchingValuesUnique,
+  getPrivateMatchingAssignments,
   matchingGame
 } from "./games/matching-game.js";
 import {
@@ -34,6 +36,7 @@ import {
   exportMatchingPublicKey
 } from "./matching-crypto.js";
 import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
+import { showGameTransition, showWinnerCelebration } from "./game-effects.js";
 
 registerGame(buzzerGame);
 registerGame(top20Game);
@@ -53,6 +56,8 @@ let matchingKeyPair;
 let matchingPublicKey;
 let priceDrafts = emptyPriceDrafts();
 const pricePlayerKeys = new Map();
+let previousGameId = null;
+let previousGameStatus = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -222,11 +227,29 @@ async function initializeHost() {
   hostMap = createGermanyMap($("host-germany-map"));
   matchingKeyPair = await createMatchingKeyPair();
   matchingPublicKey = await exportMatchingPublicKey(matchingKeyPair.publicKey);
+  previousGameId = state.game.id;
+  previousGameStatus = state.game.status;
   startRealtime();
   render();
 }
 
+function renderGameEffects() {
+  const gameId = state.game.id;
+  const status = state.game.status;
+
+  if (previousGameId && previousGameId !== gameId) {
+    showGameTransition(gameId);
+  } else if (previousGameId === gameId && previousGameStatus !== "finished" &&
+      status === "finished" && state.game.winningTeam) {
+    showWinnerCelebration(state.game.winningTeam, state.players, gameId);
+  }
+
+  previousGameId = gameId;
+  previousGameStatus = status;
+}
+
 function render() {
+  renderGameEffects();
   $("blue-score").textContent = state.scores.blue;
   $("red-score").textContent = state.scores.red;
 
@@ -499,29 +522,34 @@ function matchingResultClass(imageAssignments, assignerIndex, hasResult) {
   return ownValue && ownValue === otherValue ? " matched" : " missed";
 }
 
-function renderMatchingPlayerOptions(selectedValue = "") {
+function renderMatchingPlayerOptions(selectedValue = "", usedValues = []) {
   return [
     `<option value="">Spieler wählen</option>`,
     ...state.players.map((player) =>
-      `<option value="${escapeHtml(player.name)}"${player.name === selectedValue ? " selected" : ""}>${escapeHtml(player.name)}</option>`
+      `<option value="${escapeHtml(player.name)}"${player.name === selectedValue ? " selected" : ""}` +
+      `${usedValues.includes(player.name) && player.name !== selectedValue ? " disabled" : ""}>` +
+      `${escapeHtml(player.name)}</option>`
     )
   ].join("");
 }
 
-function renderMatchingAssignment(imageAssignments, assignerIndex, game, hasResult) {
+function renderMatchingAssignment(roundAssignments, imageIndex, assignerIndex, game, hasResult) {
+  const imageAssignments = roundAssignments[imageIndex];
   const assigner = MATCHING_ASSIGNERS[assignerIndex];
   const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
   const turnIndex = Math.floor(assignerIndex / 2);
-  const isActive = game.status === "assigning" && game.activeTurnIndex === turnIndex;
+  const isActive = game.status === "assigning" && game.activeTurnIndex === turnIndex &&
+    !game.submittedTeams[assigner.team];
   const isFuture = game.status === "assigning" && game.activeTurnIndex < turnIndex;
   const disabled = isActive ? "" : " disabled";
   const value = imageAssignments[assignerIndex] || "";
+  const usedValues = roundAssignments.map((assignments) => assignments[assignerIndex]).filter(Boolean);
 
   return `
     <label class="matching-assignment ${positions[assignerIndex]} ${assigner.team}${isActive ? " active" : ""}${isFuture ? " future" : ""}${matchingResultClass(imageAssignments, assignerIndex, hasResult)}">
-      <select data-matching-input="${assignerIndex}"
+      <select data-matching-input="${assignerIndex}" data-image-index="${imageIndex}"
         aria-label="${escapeHtml(assigner.label)}"${disabled}>
-        ${renderMatchingPlayerOptions(value)}
+        ${renderMatchingPlayerOptions(value, usedValues)}
       </select>
     </label>
   `;
@@ -535,7 +563,7 @@ function renderMatchingBoard(round, game, roundAssignments) {
       <div class="matching-image-frame">
         <img src="${image.src}" alt="${escapeHtml(image.label)}">
         ${MATCHING_ASSIGNERS.map((_, assignerIndex) =>
-          renderMatchingAssignment(roundAssignments[imageIndex], assignerIndex, game, hasResult)
+          renderMatchingAssignment(roundAssignments, imageIndex, assignerIndex, game, hasResult)
         ).join("")}
       </div>
     </article>
@@ -761,14 +789,20 @@ async function handleMatchingSubmission(payload) {
     const expectedPlayer = state.game.assignerOrder?.[assignerIndex];
     const values = submission?.values?.map((value) => String(value || "").trim());
     const registeredNames = new Set(state.players.map((item) => item.name));
+    const selectedValues = Array.isArray(values) ? values.filter(Boolean) : [];
+    const type = submission?.type || "submit";
     const valid = player && expectedPlayer?.id === player.id &&
       submission.playerId === player.id &&
       submission.roundIndex === state.game.roundIndex &&
       submission.turnIndex === state.game.activeTurnIndex &&
+      ["draft", "submit"].includes(type) &&
       Array.isArray(values) && values.length === 4 &&
-      values.every((value) => registeredNames.has(value));
+      values.every((value) => !value || registeredNames.has(value)) &&
+      areMatchingValuesUnique(selectedValues);
 
-    if (!valid || !matchingGame.submitTeam(state, team)) {
+    if (!valid || (type === "submit" &&
+        (values.some((value) => !value) || !matchingGame.submitTeam(state, team)))) {
+      if (type === "draft") return;
       await realtime.send("matching_submission_result", {
         playerId: payload.playerId,
         accepted: false
@@ -780,11 +814,19 @@ async function handleMatchingSubmission(payload) {
       matchingAssignments[state.game.roundIndex][imageIndex][assignerIndex] = value;
     });
     saveMatchingAssignments();
+
+    if (type === "draft") {
+      render();
+      await syncMatchingTeam(team);
+      return;
+    }
+
     await realtime.send("matching_submission_result", {
       playerId: player.id,
       accepted: true
     });
     await persistRenderAndBroadcast();
+    await syncMatchingTeam(team);
   } catch (error) {
     console.warn("Encrypted matching submission could not be processed:", error);
     await realtime.send("matching_submission_result", {
@@ -792,6 +834,35 @@ async function handleMatchingSubmission(payload) {
       accepted: false
     });
   }
+}
+
+async function sendMatchingPrivateState(playerId) {
+  if (state.game.id !== matchingGame.id) return false;
+  const roomPlayer = state.players.find((item) => item.id === playerId);
+  const publicKey = pricePlayerKeys.get(playerId);
+  if (!roomPlayer || !publicKey) return false;
+
+  try {
+    const roundAssignments = matchingAssignments[state.game.roundIndex] || [];
+    const encrypted = await encryptPrivatePayload(publicKey, {
+      roundIndex: state.game.roundIndex,
+      assignments: getPrivateMatchingAssignments(roundAssignments, roomPlayer.team)
+    });
+    await realtime.send("matching_private_state", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.warn("Private matching state could not be encrypted:", error);
+    return false;
+  }
+}
+
+async function syncMatchingTeam(team) {
+  const teamPlayers = state.players.filter((player) => player.team === team);
+  await Promise.all(teamPlayers.map((player) => sendMatchingPrivateState(player.id)));
+}
+
+async function syncAllMatchingTeams() {
+  await Promise.all([syncMatchingTeam("blue"), syncMatchingTeam("red")]);
 }
 
 async function sendPricePrivateState(playerId) {
@@ -827,6 +898,7 @@ async function handlePriceKeyRegistration(payload) {
   const roomPlayer = state.players.find((item) => item.id === payload?.playerId);
   if (!roomPlayer || !payload?.publicKey || payload.publicKey.kty !== "RSA") return;
   pricePlayerKeys.set(roomPlayer.id, payload.publicKey);
+  if (state.game.id === matchingGame.id) await sendMatchingPrivateState(roomPlayer.id);
   if (state.game.id === guessThePriceGame.id) await sendPricePrivateState(roomPlayer.id);
 }
 
@@ -1031,13 +1103,40 @@ $("start-matching-game").addEventListener("click", async () => {
     return;
   }
 
-  await runModeratorAction(() => {
+  const accepted = await runModeratorAction(() => {
     if (state.game.id !== germanyMapGame.id || state.game.status !== "finished") return false;
     if (!matchingGame.start(state, assignerOrder)) return false;
     matchingAssignments = emptyMatchingAssignments();
     saveMatchingAssignments();
     return true;
   });
+  if (accepted) await syncAllMatchingTeams();
+});
+
+$("matching-board").addEventListener("change", async (event) => {
+  const select = event.target.closest("[data-matching-input][data-image-index]");
+  if (!select || select.disabled || state.game.id !== matchingGame.id ||
+      state.game.status !== "assigning") return;
+
+  const assignerIndex = Number(select.dataset.matchingInput);
+  const imageIndex = Number(select.dataset.imageIndex);
+  const team = MATCHING_ASSIGNERS[assignerIndex]?.team;
+  const roundAssignments = matchingAssignments[state.game.roundIndex];
+  const nextValues = roundAssignments.map((assignments, index) =>
+    index === imageIndex ? select.value : assignments[assignerIndex]
+  ).filter(Boolean);
+
+  if (!areMatchingValuesUnique(nextValues)) {
+    $("matching-error").textContent = "Jede Person darf pro Durchgang nur einmal gewählt werden.";
+    renderMatchingGame();
+    return;
+  }
+
+  $("matching-error").textContent = "";
+  roundAssignments[imageIndex][assignerIndex] = select.value;
+  saveMatchingAssignments();
+  renderMatchingGame();
+  await syncMatchingTeam(team);
 });
 
 $("save-matching-assignment").addEventListener("click", async () => {
@@ -1059,16 +1158,21 @@ $("save-matching-assignment").addEventListener("click", async () => {
   const hasUnknownName = completeSubmissions.some(({ values }) =>
     values.some((value) => !registeredNames.has(value))
   );
+  const hasDuplicateName = completeSubmissions.some(({ values }) =>
+    !areMatchingValuesUnique(values)
+  );
 
-  if (partialSubmission || !completeSubmissions.length || hasUnknownName) {
+  if (partialSubmission || !completeSubmissions.length || hasUnknownName || hasDuplicateName) {
     $("matching-error").textContent =
       hasUnknownName
         ? "Bitte ausschließlich registrierte Spieler auswählen."
+        : hasDuplicateName
+          ? "Jede Person darf pro Durchgang nur einmal gewählt werden."
         : "Bitte pro Team entweder alle vier Namen oder noch keinen Namen auswählen.";
     return;
   }
 
-  await runModeratorAction(() => {
+  const accepted = await runModeratorAction(() => {
     if (state.game.id !== matchingGame.id || state.game.status !== "assigning" ||
         state.game.activeTurnIndex !== turnIndex) return false;
 
@@ -1082,11 +1186,15 @@ $("save-matching-assignment").addEventListener("click", async () => {
     saveMatchingAssignments();
     return true;
   });
+  if (accepted) {
+    await Promise.all(completeSubmissions.map(({ team }) => syncMatchingTeam(team)));
+  }
 });
 
 $("complete-matching-turn").addEventListener("click", async () => {
   $("matching-error").textContent = "";
-  await runModeratorAction(() => matchingGame.completeTurn(state));
+  const accepted = await runModeratorAction(() => matchingGame.completeTurn(state));
+  if (accepted) await syncAllMatchingTeams();
 });
 
 $("reveal-matching-all").addEventListener("click", async () => {
@@ -1101,7 +1209,8 @@ $("reveal-matching-all").addEventListener("click", async () => {
 
 $("next-matching-round").addEventListener("click", async () => {
   $("matching-error").textContent = "";
-  await runModeratorAction(() => matchingGame.startNextRound(state));
+  const accepted = await runModeratorAction(() => matchingGame.startNextRound(state));
+  if (accepted) await syncAllMatchingTeams();
 });
 
 $("start-price-game").addEventListener("click", async () => {

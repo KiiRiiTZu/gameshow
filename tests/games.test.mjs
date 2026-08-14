@@ -15,6 +15,8 @@ import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
   MATCHING_TURNS,
+  areMatchingValuesUnique,
+  getPrivateMatchingAssignments,
   matchingGame,
   scoreMatchingAssignments
 } from "../js/games/matching-game.js";
@@ -38,6 +40,18 @@ import {
   exportEncryptionPublicKey
 } from "../js/private-channel-crypto.js";
 import { createInitialRoomState } from "../js/room.js";
+import { getGamePresentation } from "../js/game-effects.js";
+
+test("contains presentation cards for all five games", () => {
+  assert.deepEqual([
+    "buzzer",
+    "spotify-top-artists",
+    "germany-map",
+    "matching-game",
+    "guess-the-price"
+  ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5]);
+  assert.equal(getGamePresentation("matching-game").name, "Wer passt zu wem?");
+});
 
 test("finishes the buzzer game when a team reaches five points", () => {
   const state = createInitialRoomState("TEST");
@@ -382,6 +396,27 @@ test("encrypts player assignments so only the moderator key can read them", asyn
   assert.deepEqual(await decryptMatchingSubmission(keyPair.privateKey, encrypted), payload);
 });
 
+test("rejects duplicate people in one matching assignment", () => {
+  assert.equal(areMatchingValuesUnique(["Max", "Lisa", "Tom", "Mia"]), true);
+  assert.equal(areMatchingValuesUnique(["Max", "Lisa", " max ", "Mia"]), false);
+  assert.equal(areMatchingValuesUnique(["Max", "", "", ""]), true);
+});
+
+test("shares matching drafts only with the corresponding team", () => {
+  const assignments = [
+    ["Max", "Lisa", "Tom", "Mia"],
+    ["Tom", "Mia", "Max", "Lisa"]
+  ];
+  assert.deepEqual(getPrivateMatchingAssignments(assignments, "blue"), [
+    ["Max", "Tom"],
+    ["Tom", "Max"]
+  ]);
+  assert.deepEqual(getPrivateMatchingAssignments(assignments, "red"), [
+    ["Lisa", "Mia"],
+    ["Mia", "Lisa"]
+  ]);
+});
+
 test("contains nine complete price products without public prices", () => {
   assert.equal(PRICE_PRODUCTS.length, 9);
   assert.ok(PRICE_PRODUCTS.every((product) => product.id && product.name &&
@@ -389,6 +424,17 @@ test("contains nine complete price products without public prices", () => {
   assert.ok(PRICE_PRODUCTS.every((product) =>
     existsSync(new URL(`../${product.src.replace("./", "")}`, import.meta.url))
   ));
+  assert.deepEqual(PRICE_PRODUCTS.map((product) => product.id), [
+    "ck-one",
+    "ferrero-box",
+    "weber-grill",
+    "der-nachbar",
+    "iphone-17-pro-max",
+    "hyperx-cloud-3",
+    "cat-toy",
+    "rtx-5090",
+    "mercedes"
+  ]);
 });
 
 test("parses German and common Euro inputs", () => {
@@ -433,6 +479,23 @@ test("finishes the best of nine price game at five wins", () => {
   assert.deepEqual(state.game.roundScores, { blue: 5, red: 0 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
   assert.equal(guessThePriceGame.startNextRound(state), false);
+});
+
+test("uses the requested product order with matching prices", () => {
+  const state = createInitialRoomState("TEST");
+  const expectedPrices = [29.99, 59.99, 548, 25, 2269, 94.36, 22.94, 4746.04, 144.48];
+  guessThePriceGame.start(state);
+
+  expectedPrices.forEach((expectedPrice, index) => {
+    guessThePriceGame.lockTeam(state, "blue");
+    guessThePriceGame.lockTeam(state, "red");
+    guessThePriceGame.revealRound(state, { blue: 0, red: 0 });
+    assert.equal(state.game.revealed.actualPrice, expectedPrice);
+    if (index < expectedPrices.length - 1) guessThePriceGame.startNextRound(state);
+  });
+
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, null);
 });
 
 test("encrypts private team drafts for one recipient", async () => {

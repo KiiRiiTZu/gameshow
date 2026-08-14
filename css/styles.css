@@ -179,6 +179,16 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .versus { align-self: center; font-weight: 900; opacity: .45; }
 
+.host-page .topbar { margin-bottom: 18px; }
+.host-page .topbar h1 { font-size: clamp(1.55rem, 3vw, 2.25rem); }
+.host-page .scoreboard { gap: 13px; margin-bottom: 16px; }
+.host-page .team-card { min-height: 170px; padding: 18px 20px; border-radius: 20px; }
+.host-page .team-label { margin-bottom: 6px; }
+.host-page .score-caption { margin: 4px 0 -4px; }
+.host-page .score { margin: 10px 0 12px; font-size: 3.4rem; }
+.host-page .player-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.host-page .player-chip { padding: 7px 10px; }
+
 .game-panel { margin-bottom: 22px; }
 
 .round-score {
@@ -583,6 +593,146 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .price-team-form.locked { border-color: rgba(53,208,138,.55); }
 .price-team-form.locked input,
 .price-team-form.locked textarea { opacity: .7; }
+
+.game-transition-overlay,
+.winner-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(7, 9, 15, .88);
+  backdrop-filter: blur(12px);
+  animation: effect-fade-in .28s ease both;
+}
+
+.game-transition-overlay.leaving,
+.winner-celebration.leaving { animation: effect-fade-out .45s ease both; }
+
+.game-transition-card {
+  width: min(620px, 82vw);
+  aspect-ratio: 16 / 9;
+  perspective: 1400px;
+}
+
+.game-transition-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  animation: game-card-flip 3.3s cubic-bezier(.7, 0, .25, 1) both;
+}
+
+.game-transition-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 8px;
+  padding: 35px;
+  border: 5px solid #f4c451;
+  border-radius: 28px;
+  backface-visibility: hidden;
+  text-align: center;
+  background: linear-gradient(145deg, #ee542f, #a91f2f);
+  box-shadow: 0 35px 100px rgba(0,0,0,.55), inset 0 0 45px rgba(255,255,255,.12);
+  -webkit-backface-visibility: hidden;
+}
+
+.game-transition-face span {
+  letter-spacing: .3em;
+  font-size: clamp(.9rem, 2vw, 1.3rem);
+  font-weight: 950;
+}
+
+.game-transition-face strong {
+  font-size: clamp(3.4rem, 10vw, 7rem);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.game-transition-front { animation: game-front-visibility 3.3s steps(1, end) both; }
+.game-transition-back {
+  animation: game-back-visibility 3.3s steps(1, end) both;
+}
+.game-transition-back strong { font-size: clamp(2.1rem, 6vw, 4.4rem); }
+
+.winner-celebration { z-index: 1100; background: rgba(7, 9, 15, .7); }
+
+.winner-celebration-panel {
+  position: relative;
+  z-index: 2;
+  width: min(690px, 84vw);
+  padding: 42px;
+  border: 3px solid rgba(255,255,255,.72);
+  border-radius: 30px;
+  text-align: center;
+  box-shadow: 0 35px 110px rgba(0,0,0,.52);
+  animation: winner-panel-in .55s cubic-bezier(.2, .9, .25, 1.25) both;
+}
+
+.winner-celebration.blue .winner-celebration-panel {
+  background: linear-gradient(145deg, rgba(49,79,202,.97), rgba(20,29,71,.97));
+}
+.winner-celebration.red .winner-celebration-panel {
+  background: linear-gradient(145deg, rgba(193,48,72,.97), rgba(76,20,35,.97));
+}
+
+.winner-celebration-panel span { letter-spacing: .16em; font-weight: 900; opacity: .82; }
+.winner-celebration-panel strong { display: block; margin: 10px 0; font-size: clamp(2.8rem, 8vw, 6rem); }
+.winner-celebration-panel p { margin: 0; font-size: clamp(1.25rem, 3vw, 2.1rem); font-weight: 900; }
+
+.confetti-field { position: absolute; inset: 0; overflow: hidden; }
+.confetti-field i {
+  position: absolute;
+  top: -8vh;
+  left: 0;
+  width: 11px;
+  height: 20px;
+  border-radius: 2px;
+  transform: translateX(var(--x));
+  animation: confetti-fall var(--duration) var(--delay) linear infinite;
+}
+
+@keyframes game-card-flip {
+  0% { opacity: 0; transform: translateY(35px) scale(.86); }
+  14%, 42% { opacity: 1; transform: translateY(0) scale(1, 1); }
+  49%, 51% { opacity: 1; transform: translateY(0) scale(.03, 1); }
+  58%, 88% { opacity: 1; transform: translateY(0) scale(1, 1); }
+  100% { opacity: 0; transform: translateY(-22px) scale(.94); }
+}
+
+@keyframes game-front-visibility {
+  0%, 49% { visibility: visible; }
+  50%, 100% { visibility: hidden; }
+}
+
+@keyframes game-back-visibility {
+  0%, 49% { visibility: hidden; }
+  50%, 100% { visibility: visible; }
+}
+
+@keyframes confetti-fall {
+  from { transform: translate(var(--x), -8vh) rotate(0deg); }
+  to { transform: translate(calc(var(--x) + var(--drift)), 112vh) rotate(760deg); }
+}
+
+@keyframes winner-panel-in {
+  from { opacity: 0; transform: scale(.65) rotate(-2deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes effect-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes effect-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .game-transition-card-inner { animation: none; }
+  .game-transition-front { display: none; }
+  .game-transition-back { visibility: visible; animation: none; }
+  .confetti-field { display: none; }
+  .winner-celebration-panel { animation: none; }
+}
 
 .team-picker {
   display: grid;

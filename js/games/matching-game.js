@@ -71,6 +71,18 @@ function normalizeName(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
 }
 
+export function areMatchingValuesUnique(values) {
+  const selected = (values || []).map(normalizeName).filter(Boolean);
+  return new Set(selected).size === selected.length;
+}
+
+export function getPrivateMatchingAssignments(roundAssignments, team) {
+  const indexes = team === "blue" ? [0, 2] : team === "red" ? [1, 3] : [];
+  return (roundAssignments || []).map((imageAssignments) =>
+    indexes.map((index) => String(imageAssignments?.[index] || ""))
+  );
+}
+
 export function scoreMatchingAssignments(assignments) {
   const scores = emptyScores();
 

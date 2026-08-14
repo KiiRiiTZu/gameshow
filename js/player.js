@@ -11,7 +11,8 @@ import { createGermanyMap } from "./germany-map-view.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
-  MATCHING_TURNS
+  MATCHING_TURNS,
+  areMatchingValuesUnique
 } from "./games/matching-game.js";
 import { encryptMatchingSubmission } from "./matching-crypto.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
@@ -22,6 +23,7 @@ import {
   encryptPrivatePayload,
   exportEncryptionPublicKey
 } from "./private-channel-crypto.js";
+import { showGameTransition, showWinnerCelebration } from "./game-effects.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
 const TOP_20_SLOT_COUNT = 20;
@@ -51,11 +53,15 @@ let realtime = null;
 let playerMap = null;
 let matchingSubmissionPending = false;
 let matchingDraft = { key: "", values: ["", "", "", ""] };
+let matchingDraftTimer = null;
+let matchingTeamState = { roundIndex: -1, assignments: Array.from({ length: 4 }, () => ["", ""]) };
 let priceKeyPair = null;
 let pricePublicKey = null;
 let priceDraft = { roundIndex: -1, amount: "", comment: "", locked: false };
 let priceDraftTimer = null;
 let priceSubmissionPending = false;
+let previousGameId = null;
+let previousGameStatus = null;
 
 function showPlayerGame() {
   if (!player) return;
@@ -98,6 +104,8 @@ async function initializePlayer() {
 
   const players = await getPlayers(room.id);
   roomState = createRoomStateFromRecords(roomCode, room, players);
+  previousGameId = roomState.game.id;
+  previousGameStatus = roomState.game.status;
 
   const restoredPlayer = roomState.players.find((item) => item.id === playerId);
 
@@ -167,10 +175,55 @@ function currentMatchingAssignment() {
   return { turn, assignerIndex };
 }
 
+function matchingPrivateIndex(assignerIndex) {
+  return player?.team === "blue"
+    ? assignerIndex === 0 ? 0 : 1
+    : assignerIndex === 1 ? 0 : 1;
+}
+
+function updateMatchingOptionAvailability() {
+  const selects = [...document.querySelectorAll("[data-player-matching-input]")];
+  const selectedValues = selects.map((select) => select.value).filter(Boolean);
+  selects.forEach((select) => {
+    [...select.options].forEach((option) => {
+      option.disabled = Boolean(option.value) && option.value !== select.value &&
+        selectedValues.includes(option.value);
+    });
+  });
+}
+
+async function sendMatchingAssignment(type = "draft") {
+  const assignment = currentMatchingAssignment();
+  if (!assignment || !roomState.matchingSubmissionKey ||
+      roomState.game.submittedTeams?.[player.team]) return false;
+
+  try {
+    const encrypted = await encryptMatchingSubmission(roomState.matchingSubmissionKey, {
+      type,
+      playerId,
+      roundIndex: roomState.game.roundIndex,
+      turnIndex: roomState.game.activeTurnIndex,
+      values: matchingDraft.values.map((value) => value.trim())
+    });
+    await realtime.send("matching_assignment", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.error("Matching submission could not be encrypted:", error);
+    $("player-matching-error").textContent = "Die Zuordnungen konnten nicht gesendet werden.";
+    return false;
+  }
+}
+
 $("player-matching-board").addEventListener("input", (event) => {
   const input = event.target.closest("[data-player-matching-input]");
   if (!input) return;
   matchingDraft.values[Number(input.dataset.imageIndex)] = input.value;
+  $("player-matching-error").textContent = "";
+  updateMatchingOptionAvailability();
+  clearTimeout(matchingDraftTimer);
+  matchingDraftTimer = setTimeout(() => {
+    void sendMatchingAssignment("draft");
+  }, 120);
 });
 
 $("submit-matching-assignment").addEventListener("click", async () => {
@@ -193,22 +246,18 @@ $("submit-matching-assignment").addEventListener("click", async () => {
     $("player-matching-error").textContent = "Bitte ausschließlich registrierte Spieler auswählen.";
     return;
   }
+  if (!areMatchingValuesUnique(values)) {
+    $("player-matching-error").textContent =
+      "Jede Person darf pro Durchgang nur einmal gewählt werden.";
+    return;
+  }
 
+  clearTimeout(matchingDraftTimer);
   matchingSubmissionPending = true;
   render();
-
-  try {
-    const encrypted = await encryptMatchingSubmission(roomState.matchingSubmissionKey, {
-      playerId,
-      roundIndex: roomState.game.roundIndex,
-      turnIndex: roomState.game.activeTurnIndex,
-      values
-    });
-    await realtime.send("matching_assignment", { playerId, encrypted });
-  } catch (error) {
-    console.error("Matching submission could not be encrypted:", error);
+  const sent = await sendMatchingAssignment("submit");
+  if (!sent) {
     matchingSubmissionPending = false;
-    $("player-matching-error").textContent = "Die Zuordnungen konnten nicht gesendet werden.";
     render();
   }
 });
@@ -329,6 +378,31 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "matching_private_state" && payload.playerId === playerId &&
+      payload.encrypted && priceKeyPair?.privateKey) {
+    try {
+      const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
+      if (privateState.roundIndex !== roomState?.game?.roundIndex ||
+          !Array.isArray(privateState.assignments)) return;
+      matchingTeamState = {
+        roundIndex: privateState.roundIndex,
+        assignments: privateState.assignments.map((pair) => [
+          String(pair?.[0] || ""),
+          String(pair?.[1] || "")
+        ])
+      };
+      const assignment = currentMatchingAssignment();
+      if (assignment && !roomState.game.submittedTeams?.[player.team]) {
+        const privateIndex = matchingPrivateIndex(assignment.assignerIndex);
+        matchingDraft.values = matchingTeamState.assignments.map((pair) => pair[privateIndex]);
+      }
+      render();
+    } catch (error) {
+      console.warn("Private team assignments could not be decrypted:", error);
+    }
+    return;
+  }
+
   if (event === "matching_submission_result" && payload.playerId === playerId) {
     matchingSubmissionPending = false;
     $("player-matching-error").textContent = payload.accepted
@@ -346,6 +420,14 @@ async function handleEvent(event, payload) {
     }
 
     sendingBuzz = false;
+    if (player) await registerPriceKey();
+    if (roomState.game?.id === MATCHING_GAME_ID &&
+        matchingTeamState.roundIndex !== roomState.game.roundIndex) {
+      matchingTeamState = {
+        roundIndex: roomState.game.roundIndex,
+        assignments: Array.from({ length: 4 }, () => ["", ""])
+      };
+    }
     if (roomState.game?.id === PRICE_GAME_ID) {
       if (priceDraft.roundIndex !== roomState.game.roundIndex) {
         priceDraft = {
@@ -355,7 +437,6 @@ async function handleEvent(event, payload) {
           locked: Boolean(roomState.game.lockedTeams?.[player?.team])
         };
       }
-      await registerPriceKey();
     }
     render();
   }
@@ -363,6 +444,17 @@ async function handleEvent(event, payload) {
 
 function render() {
   if (!joined || !roomState) return;
+
+  const currentGameId = roomState.game?.id;
+  const currentGameStatus = roomState.game?.status;
+  if (previousGameId && previousGameId !== currentGameId) {
+    showGameTransition(currentGameId);
+  } else if (previousGameId === currentGameId && previousGameStatus !== "finished" &&
+      currentGameStatus === "finished" && roomState.game.winningTeam) {
+    showWinnerCelebration(roomState.game.winningTeam, roomState.players, currentGameId);
+  }
+  previousGameId = currentGameId;
+  previousGameStatus = currentGameStatus;
 
   const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
   const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
@@ -520,7 +612,7 @@ function renderMapGame() {
   }
 }
 
-function renderPlayerMatchingBox(value, assignerIndex, imageIndex, editable = false) {
+function renderPlayerMatchingBox(value, assignerIndex, imageIndex, editable = false, usedValues = []) {
   const assigner = MATCHING_ASSIGNERS[assignerIndex];
   const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
   const attributes = editable
@@ -529,7 +621,9 @@ function renderPlayerMatchingBox(value, assignerIndex, imageIndex, editable = fa
   const options = [
     `<option value="">Spieler wählen</option>`,
     ...roomState.players.map((roomPlayer) =>
-      `<option value="${escapeHtml(roomPlayer.name)}"${roomPlayer.name === value ? " selected" : ""}>${escapeHtml(roomPlayer.name)}</option>`
+      `<option value="${escapeHtml(roomPlayer.name)}"${roomPlayer.name === value ? " selected" : ""}` +
+      `${editable && usedValues.includes(roomPlayer.name) && roomPlayer.name !== value ? " disabled" : ""}>` +
+      `${escapeHtml(roomPlayer.name)}</option>`
     )
   ].join("");
 
@@ -555,16 +649,44 @@ function renderPlayerMatchingOverlays(game, imageIndex, assignment) {
     overlays.push(renderPlayerMatchingBox(values[0], 1, imageIndex));
     overlays.push(renderPlayerMatchingBox(values[1], 3, imageIndex));
   }
-  if (assignment && !game.submittedTeams?.[player.team]) {
+  if (game.revealedTeams?.blue || game.revealedTeams?.red) return overlays.join("");
+
+  const ownIndexes = player.team === "blue" ? [0, 2] : [1, 3];
+  ownIndexes.forEach((assignerIndex, privateIndex) => {
+    const editable = assignment?.assignerIndex === assignerIndex &&
+      !game.submittedTeams?.[player.team];
+    const value = editable
+      ? matchingDraft.values[imageIndex]
+      : matchingTeamState.assignments[imageIndex]?.[privateIndex] || "";
+    if (!editable && !value) return;
     overlays.push(renderPlayerMatchingBox(
-      matchingDraft.values[imageIndex],
-      assignment.assignerIndex,
+      value,
+      assignerIndex,
       imageIndex,
-      true
+      editable,
+      editable ? matchingDraft.values.filter(Boolean) : []
     ));
-  }
+  });
 
   return overlays.join("");
+}
+
+function matchingDraftValuesFor(assignerIndex) {
+  const privateIndex = matchingPrivateIndex(assignerIndex);
+  return matchingTeamState.assignments.map((pair) => pair?.[privateIndex] || "");
+}
+
+function ensureMatchingDraft(game, assignment) {
+  if (!assignment) return;
+  const draftKey = `${game.roundIndex}-${game.activeTurnIndex}-${assignment.assignerIndex}`;
+  if (matchingDraft.key !== draftKey) {
+    matchingDraft = {
+      key: draftKey,
+      values: matchingDraftValuesFor(assignment.assignerIndex)
+    };
+    matchingSubmissionPending = false;
+    $("player-matching-error").textContent = "";
+  }
 }
 
 function renderMatchingGame() {
@@ -574,19 +696,12 @@ function renderMatchingGame() {
   const bluePlayer = game.assignerOrder?.[turn.assignerIndexes.blue];
   const redPlayer = game.assignerOrder?.[turn.assignerIndexes.red];
   const assignment = currentMatchingAssignment();
-  const draftKey = assignment
-    ? `${game.roundIndex}-${game.activeTurnIndex}-${assignment.assignerIndex}`
-    : "";
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
   const isRevealing = ["ready-to-reveal", "revealing"].includes(game.status);
   const result = game.roundResults?.[game.roundIndex];
 
-  if (draftKey && matchingDraft.key !== draftKey) {
-    matchingDraft = { key: draftKey, values: ["", "", "", ""] };
-    matchingSubmissionPending = false;
-    $("player-matching-error").textContent = "";
-  }
+  ensureMatchingDraft(game, assignment);
 
   $("player-matching-round").textContent =
     `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
@@ -600,6 +715,7 @@ function renderMatchingGame() {
       </div>
     </article>
   `).join("");
+  updateMatchingOptionAvailability();
 
   if (isFinished || isRoundFinished || isRevealing) {
     $("player-matching-turn").className = "matching-turn finished";
@@ -683,7 +799,8 @@ function renderPriceGame() {
       : roomState.scores.blue > roomState.scores.red ? "blue" : "red";
     $("player-price-result").innerHTML = `
       <strong>Preis: ${formatEuroAmount(result.actualPrice)}</strong><br>
-      Blau: ${formatEuroAmount(result.guesses.blue)} · Rot: ${formatEuroAmount(result.guesses.red)}<br>
+      Blau: ${formatEuroAmount(result.guesses.blue)} (${formatEuroAmount(result.differences.blue)} entfernt)<br>
+      Rot: ${formatEuroAmount(result.guesses.red)} (${formatEuroAmount(result.differences.red)} entfernt)<br>
       ${roundMessage}
       ${isFinished
         ? game.winningTeam
