@@ -2,7 +2,7 @@
 
 Eine browserbasierte Multiplayer-Gameshow für einen Moderator und vier Spieler in zwei Teams. Räume, Spieler, Punkte und Spielzustände werden mit Supabase gespeichert und über Supabase Realtime synchronisiert.
 
-Zwischen den Spielen erscheint eine automatisch drehende Ankündigungskarte. Nach jedem Spiel werden das Gewinnerteam und die Namen seiner Spieler mit einer Konfetti-Animation eingeblendet.
+Zwischen den Spielen erscheint eine automatisch drehende Ankündigungskarte. Nach dem Aufdecken der Ergebnisse startet der Moderator mit einem zweiten Klick eine Konfetti-Animation mit Gewinnerteam und Spielernamen.
 
 Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne Wertung. Für den Gesamtsieg erhält das Gewinnerteam anschließend genau einen Spielpunkt.
 
@@ -42,7 +42,8 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Pro Runde ordnen beide Spieler jedes Teams vier Bilder den registrierten Spielern zu.
 - Spieler und Moderator wählen Namen ausschließlich über Dropdown-Felder aus.
 - Die Zuordnungen werden bis zum gemeinsamen Aufdecken verschlüsselt an den Moderator gesendet.
-- Moderator und Teampartner sehen die laufende Auswahl bereits vor dem Abschicken; das gegnerische Team kann sie nicht lesen.
+- Der Moderator sieht die laufende Auswahl bereits vor dem Abschicken. Jeder Spieler sieht bis zum Aufdecken ausschließlich seine eigenen Zuordnungen.
+- Spieler 1 gibt in der ersten Runde vor, Spieler 2 in der zweiten; anschließend wechseln die Rollen weiter ab.
 - Jede registrierte Person darf pro Zuordnungsdurchgang nur einmal gewählt werden.
 - Jede Übereinstimmung innerhalb eines Teams zählt einen Punkt.
 - Nach vier Runden gewinnt das Team mit den meisten Übereinstimmungen einen Spielpunkt.

@@ -16,6 +16,7 @@ import {
   MATCHING_GAME_ROUNDS,
   MATCHING_TURNS,
   areMatchingValuesUnique,
+  getMatchingTurn,
   getPrivateMatchingAssignments,
   matchingGame,
   scoreMatchingAssignments
@@ -396,25 +397,31 @@ test("encrypts player assignments so only the moderator key can read them", asyn
   assert.deepEqual(await decryptMatchingSubmission(keyPair.privateKey, encrypted), payload);
 });
 
+test("alternates which matching player assigns first each round", () => {
+  assert.equal(getMatchingTurn(0, 0).playerIndex, 0);
+  assert.equal(getMatchingTurn(0, 1).playerIndex, 1);
+  assert.equal(getMatchingTurn(1, 0).playerIndex, 1);
+  assert.equal(getMatchingTurn(1, 1).playerIndex, 0);
+  assert.equal(getMatchingTurn(2, 0).playerIndex, 0);
+  assert.equal(getMatchingTurn(3, 0).playerIndex, 1);
+});
+
 test("rejects duplicate people in one matching assignment", () => {
   assert.equal(areMatchingValuesUnique(["Max", "Lisa", "Tom", "Mia"]), true);
   assert.equal(areMatchingValuesUnique(["Max", "Lisa", " max ", "Mia"]), false);
   assert.equal(areMatchingValuesUnique(["Max", "", "", ""]), true);
 });
 
-test("shares matching drafts only with the corresponding team", () => {
+test("shares matching drafts only with the player who entered them", () => {
   const assignments = [
     ["Max", "Lisa", "Tom", "Mia"],
     ["Tom", "Mia", "Max", "Lisa"]
   ];
-  assert.deepEqual(getPrivateMatchingAssignments(assignments, "blue"), [
-    ["Max", "Tom"],
-    ["Tom", "Max"]
-  ]);
-  assert.deepEqual(getPrivateMatchingAssignments(assignments, "red"), [
-    ["Lisa", "Mia"],
-    ["Mia", "Lisa"]
-  ]);
+  assert.deepEqual(getPrivateMatchingAssignments(assignments, 0), ["Max", "Tom"]);
+  assert.deepEqual(getPrivateMatchingAssignments(assignments, 1), ["Lisa", "Mia"]);
+  assert.deepEqual(getPrivateMatchingAssignments(assignments, 2), ["Tom", "Max"]);
+  assert.deepEqual(getPrivateMatchingAssignments(assignments, 3), ["Mia", "Lisa"]);
+  assert.deepEqual(getPrivateMatchingAssignments(assignments, -1), []);
 });
 
 test("contains nine complete price products without public prices", () => {

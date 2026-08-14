@@ -21,6 +21,7 @@ import {
   MATCHING_GAME_ROUNDS,
   MATCHING_TURNS,
   areMatchingValuesUnique,
+  getMatchingTurn,
   getPrivateMatchingAssignments,
   matchingGame
 } from "./games/matching-game.js";
@@ -57,7 +58,6 @@ let matchingPublicKey;
 let priceDrafts = emptyPriceDrafts();
 const pricePlayerKeys = new Map();
 let previousGameId = null;
-let previousGameStatus = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -228,24 +228,18 @@ async function initializeHost() {
   matchingKeyPair = await createMatchingKeyPair();
   matchingPublicKey = await exportMatchingPublicKey(matchingKeyPair.publicKey);
   previousGameId = state.game.id;
-  previousGameStatus = state.game.status;
   startRealtime();
   render();
 }
 
 function renderGameEffects() {
   const gameId = state.game.id;
-  const status = state.game.status;
 
   if (previousGameId && previousGameId !== gameId) {
     showGameTransition(gameId);
-  } else if (previousGameId === gameId && previousGameStatus !== "finished" &&
-      status === "finished" && state.game.winningTeam) {
-    showWinnerCelebration(state.game.winningTeam, state.players, gameId);
   }
 
   previousGameId = gameId;
-  previousGameStatus = status;
 }
 
 function render() {
@@ -318,6 +312,9 @@ function renderPriceGame() {
   $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
   $("next-price-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-price-round").disabled = moderatorActionPending;
+  $("celebrate-price-winner").classList.toggle(
+    "hidden", !isFinished || !game.winningTeam || game.winnerCelebrated
+  );
   $("price-round-result").classList.toggle("hidden", !isRevealed);
 
   if (!isRevealed) return;
@@ -375,6 +372,12 @@ function renderBuzzerGame() {
   $("correct-answer").disabled = moderatorActionPending;
   $("wrong-answer").disabled = moderatorActionPending;
   $("start-spotify-game").disabled = moderatorActionPending;
+  $("celebrate-buzzer-winner").classList.toggle(
+    "hidden", !isFinished || !state.game.winningTeam || state.game.winnerCelebrated
+  );
+  $("start-spotify-game").classList.toggle(
+    "hidden", isFinished && Boolean(state.game.winningTeam) && !state.game.winnerCelebrated
+  );
   $("answer-controls").classList.toggle("hidden", !winner || isFinished);
   $("buzzer-finished-controls").classList.toggle("hidden", !isFinished);
 
@@ -440,7 +443,12 @@ function renderSpotifyGame() {
       ? `${getTeamName(game.roundWinner)} gewinnt Liste ${roundNumber}.`
       : "";
   $("next-top20-round").classList.toggle("hidden", isFinished);
-  $("start-map-game").classList.toggle("hidden", !isFinished);
+  $("celebrate-spotify-winner").classList.toggle(
+    "hidden", !isFinished || !game.winningTeam || game.winnerCelebrated
+  );
+  $("start-map-game").classList.toggle(
+    "hidden", !isFinished || (Boolean(game.winningTeam) && !game.winnerCelebrated)
+  );
   $("next-top20-round").disabled = moderatorActionPending;
   $("start-map-game").disabled = moderatorActionPending;
 
@@ -483,12 +491,14 @@ function renderMapGame() {
   $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady;
   $("next-map-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-map-round").disabled = moderatorActionPending;
-  $("start-matching-game").classList.toggle("hidden", !isFinished);
+  $("start-matching-game").classList.toggle(
+    "hidden", !isFinished || (Boolean(game.winningTeam) && !game.winnerCelebrated)
+  );
   $("start-matching-game").disabled = moderatorActionPending ||
     state.players.filter((player) => player.team === "blue").length !== 2 ||
     state.players.filter((player) => player.team === "red").length !== 2;
   $("next-map-round").textContent = game.roundScores[game.roundWinner] >= GERMANY_MAP_ROUNDS_TO_WIN
-    ? "Spiel abschließen"
+    ? "Sieger feiern"
     : "Nächste Frage";
   $("map-result").classList.toggle("hidden", !isRevealed);
 
@@ -537,7 +547,9 @@ function renderMatchingAssignment(roundAssignments, imageIndex, assignerIndex, g
   const imageAssignments = roundAssignments[imageIndex];
   const assigner = MATCHING_ASSIGNERS[assignerIndex];
   const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
-  const turnIndex = Math.floor(assignerIndex / 2);
+  const turnIndex = [0, 1].findIndex((index) =>
+    getMatchingTurn(game.roundIndex, index).assignerIndexes[assigner.team] === assignerIndex
+  );
   const isActive = game.status === "assigning" && game.activeTurnIndex === turnIndex &&
     !game.submittedTeams[assigner.team];
   const isFuture = game.status === "assigning" && game.activeTurnIndex < turnIndex;
@@ -574,7 +586,7 @@ function renderMatchingGame() {
   const game = state.game;
   const round = MATCHING_GAME_ROUNDS[game.roundIndex];
   const roundAssignments = matchingAssignments[game.roundIndex] || emptyMatchingAssignments()[0];
-  const turn = MATCHING_TURNS[game.activeTurnIndex] || MATCHING_TURNS[0];
+  const turn = getMatchingTurn(game.roundIndex, game.activeTurnIndex);
   const bluePlayer = game.assignerOrder[turn.assignerIndexes.blue];
   const redPlayer = game.assignerOrder[turn.assignerIndexes.red];
   const isAssigning = game.status === "assigning";
@@ -623,7 +635,12 @@ function renderMatchingGame() {
   $("reveal-matching-all").disabled = moderatorActionPending;
   $("next-matching-round").classList.toggle("hidden", game.status !== "round-finished");
   $("next-matching-round").disabled = moderatorActionPending;
-  $("start-price-game").classList.toggle("hidden", !isFinished);
+  $("celebrate-matching-winner").classList.toggle(
+    "hidden", !isFinished || !game.winningTeam || game.winnerCelebrated
+  );
+  $("start-price-game").classList.toggle(
+    "hidden", !isFinished || (Boolean(game.winningTeam) && !game.winnerCelebrated)
+  );
   $("start-price-game").disabled = moderatorActionPending ||
     state.players.filter((player) => player.team === "blue").length !== 2 ||
     state.players.filter((player) => player.team === "red").length !== 2;
@@ -784,7 +801,7 @@ async function handleMatchingSubmission(payload) {
     );
     const player = state.players.find((item) => item.id === payload.playerId);
     const team = player?.team;
-    const turn = MATCHING_TURNS[state.game.activeTurnIndex];
+    const turn = getMatchingTurn(state.game.roundIndex, state.game.activeTurnIndex);
     const assignerIndex = turn?.assignerIndexes?.[team];
     const expectedPlayer = state.game.assignerOrder?.[assignerIndex];
     const values = submission?.values?.map((value) => String(value || "").trim());
@@ -844,9 +861,13 @@ async function sendMatchingPrivateState(playerId) {
 
   try {
     const roundAssignments = matchingAssignments[state.game.roundIndex] || [];
+    const assignerIndex = state.game.assignerOrder?.findIndex(
+      (assigner) => assigner.id === roomPlayer.id
+    );
     const encrypted = await encryptPrivatePayload(publicKey, {
       roundIndex: state.game.roundIndex,
-      assignments: getPrivateMatchingAssignments(roundAssignments, roomPlayer.team)
+      assignerIndex,
+      assignments: getPrivateMatchingAssignments(roundAssignments, assignerIndex)
     });
     await realtime.send("matching_private_state", { playerId, encrypted });
     return true;
@@ -953,6 +974,12 @@ async function handlePriceSubmission(payload) {
 }
 
 async function handleEvent(event, payload) {
+  if (event === "winner_celebration" && payload.gameId === state.game.id &&
+      payload.team === state.game.winningTeam) {
+    showWinnerCelebration(payload.team, state.players, payload.gameId);
+    return;
+  }
+
   if (event === "buzz_winner") {
     void playBuzzerSound();
     return;
@@ -1020,6 +1047,22 @@ function startRealtime() {
   });
 }
 
+async function celebrateFinishedGame(expectedGameId) {
+  const accepted = await runModeratorAction(() => {
+    if (state.game.id !== expectedGameId || state.game.status !== "finished" ||
+        !state.game.winningTeam || state.game.winnerCelebrated) return false;
+    state.game.winnerCelebrated = true;
+    return true;
+  });
+
+  if (accepted) {
+    await realtime.send("winner_celebration", {
+      gameId: expectedGameId,
+      team: state.game.winningTeam
+    });
+  }
+}
+
 $("open-buzzer").addEventListener("click", async () => {
   await runModeratorAction(() => buzzerGame.open(state));
 });
@@ -1042,6 +1085,10 @@ $("wrong-answer").addEventListener("click", async () => {
     if (state.game.status !== "finished") buzzerGame.reset(state);
     return true;
   });
+});
+
+$("celebrate-buzzer-winner").addEventListener("click", async () => {
+  await celebrateFinishedGame(buzzerGame.id);
 });
 
 $("start-spotify-game").addEventListener("click", async () => {
@@ -1078,6 +1125,10 @@ $("next-top20-round").addEventListener("click", async () => {
   await runModeratorAction(() => top20Game.startNextRound(state));
 });
 
+$("celebrate-spotify-winner").addEventListener("click", async () => {
+  await celebrateFinishedGame(top20Game.id);
+});
+
 $("start-map-game").addEventListener("click", async () => {
   await runModeratorAction(() => {
     if (state.game.id !== top20Game.id || state.game.status !== "finished") return false;
@@ -1090,7 +1141,10 @@ $("reveal-map-round").addEventListener("click", async () => {
 });
 
 $("next-map-round").addEventListener("click", async () => {
-  await runModeratorAction(() => germanyMapGame.startNextRound(state));
+  const accepted = await runModeratorAction(() => germanyMapGame.startNextRound(state));
+  if (accepted && state.game.status === "finished") {
+    await celebrateFinishedGame(germanyMapGame.id);
+  }
 });
 
 $("start-matching-game").addEventListener("click", async () => {
@@ -1142,7 +1196,7 @@ $("matching-board").addEventListener("change", async (event) => {
 $("save-matching-assignment").addEventListener("click", async () => {
   $("matching-error").textContent = "";
   const turnIndex = state.game.activeTurnIndex;
-  const turn = MATCHING_TURNS[turnIndex];
+  const turn = getMatchingTurn(state.game.roundIndex, turnIndex);
   const submissions = ["blue", "red"].map((team) => {
     const assignerIndex = turn.assignerIndexes[team];
     const inputs = [...document.querySelectorAll(`[data-matching-input="${assignerIndex}"]`)];
@@ -1213,6 +1267,10 @@ $("next-matching-round").addEventListener("click", async () => {
   if (accepted) await syncAllMatchingTeams();
 });
 
+$("celebrate-matching-winner").addEventListener("click", async () => {
+  await celebrateFinishedGame(matchingGame.id);
+});
+
 $("start-price-game").addEventListener("click", async () => {
   $("matching-next-game-error").textContent = "";
 
@@ -1257,6 +1315,10 @@ $("next-price-round").addEventListener("click", async () => {
     return true;
   });
   if (accepted) await syncAllPriceTeams();
+});
+
+$("celebrate-price-winner").addEventListener("click", async () => {
+  await celebrateFinishedGame(guessThePriceGame.id);
 });
 
 window.addEventListener("beforeunload", () => {

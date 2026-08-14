@@ -180,7 +180,15 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .versus { align-self: center; font-weight: 900; opacity: .45; }
 
 .host-page .topbar { margin-bottom: 18px; }
-.host-page .topbar h1 { font-size: clamp(1.55rem, 3vw, 2.25rem); }
+.host-page .host-room-title {
+  margin: 0;
+  font-size: .76rem;
+  line-height: 1.2;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: .75;
+}
 .host-page .scoreboard { gap: 13px; margin-bottom: 16px; }
 .host-page .team-card { min-height: 170px; padding: 18px 20px; border-radius: 20px; }
 .host-page .team-label { margin-bottom: 6px; }

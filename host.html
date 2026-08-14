@@ -9,10 +9,7 @@
 <body class="host-page">
   <main class="shell">
     <header class="topbar">
-      <div>
-        <p class="eyebrow">MODERATOR</p>
-        <h1>Raum <span id="room-code">----</span></h1>
-      </div>
+      <h1 class="host-room-title">Moderator <span aria-hidden="true">|</span> Raum <span id="room-code">----</span></h1>
       <div class="connection">
         <span id="connection-dot" class="dot"></span>
         <span id="connection-text">Verbinde…</span>
@@ -68,6 +65,7 @@
 
       <div id="buzzer-finished-controls" class="game-finished hidden">
         <p id="buzzer-winner-message"></p>
+        <button id="celebrate-buzzer-winner" class="button success">Sieger feiern</button>
         <button id="start-spotify-game" class="button primary">Top 20 starten</button>
       </div>
     </section>
@@ -104,6 +102,7 @@
       <div id="spotify-finished" class="game-finished hidden">
         <p id="spotify-winner-message"></p>
         <button id="next-top20-round" class="button primary">Nächste Liste starten</button>
+        <button id="celebrate-spotify-winner" class="button success hidden">Sieger feiern</button>
         <button id="start-map-game" class="button primary hidden">Deutschlandkarte starten</button>
       </div>
     </section>
@@ -175,6 +174,7 @@
         <button id="complete-matching-turn" class="button secondary hidden">Nächste Spieler</button>
         <button id="reveal-matching-all" class="button primary hidden">Alle Antworten aufdecken</button>
         <button id="next-matching-round" class="button primary hidden">Nächste Runde</button>
+        <button id="celebrate-matching-winner" class="button success hidden">Sieger feiern</button>
         <button id="start-price-game" class="button primary hidden">Preisratespiel starten</button>
       </div>
       <p id="matching-next-game-error" class="error"></p>
@@ -229,6 +229,7 @@
       <div class="controls">
         <button id="reveal-price-round" class="button primary">Preis aufdecken &amp; auswerten</button>
         <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
+        <button id="celebrate-price-winner" class="button success hidden">Sieger feiern</button>
       </div>
     </section>
 

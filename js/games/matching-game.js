@@ -10,6 +10,11 @@ export const MATCHING_TURNS = [
   { playerIndex: 1, assignerIndexes: { blue: 2, red: 3 }, label: "Spieler 2" }
 ];
 
+export function getMatchingTurn(roundIndex, activeTurnIndex) {
+  const order = Number(roundIndex) % 2 === 0 ? MATCHING_TURNS : [...MATCHING_TURNS].reverse();
+  return order[Number(activeTurnIndex) || 0] || order[0];
+}
+
 const IMAGE_ROOT = "./assets/images/matching%20game";
 
 export const MATCHING_GAME_ROUNDS = [
@@ -76,10 +81,10 @@ export function areMatchingValuesUnique(values) {
   return new Set(selected).size === selected.length;
 }
 
-export function getPrivateMatchingAssignments(roundAssignments, team) {
-  const indexes = team === "blue" ? [0, 2] : team === "red" ? [1, 3] : [];
+export function getPrivateMatchingAssignments(roundAssignments, assignerIndex) {
+  if (![0, 1, 2, 3].includes(Number(assignerIndex))) return [];
   return (roundAssignments || []).map((imageAssignments) =>
-    indexes.map((index) => String(imageAssignments?.[index] || ""))
+    String(imageAssignments?.[assignerIndex] || "")
   );
 }
 

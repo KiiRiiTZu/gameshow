@@ -11,8 +11,8 @@ import { createGermanyMap } from "./germany-map-view.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
-  MATCHING_TURNS,
-  areMatchingValuesUnique
+  areMatchingValuesUnique,
+  getMatchingTurn
 } from "./games/matching-game.js";
 import { encryptMatchingSubmission } from "./matching-crypto.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
@@ -54,14 +54,13 @@ let playerMap = null;
 let matchingSubmissionPending = false;
 let matchingDraft = { key: "", values: ["", "", "", ""] };
 let matchingDraftTimer = null;
-let matchingTeamState = { roundIndex: -1, assignments: Array.from({ length: 4 }, () => ["", ""]) };
+let matchingOwnState = { roundIndex: -1, assignerIndex: -1, assignments: ["", "", "", ""] };
 let priceKeyPair = null;
 let pricePublicKey = null;
 let priceDraft = { roundIndex: -1, amount: "", comment: "", locked: false };
 let priceDraftTimer = null;
 let priceSubmissionPending = false;
 let previousGameId = null;
-let previousGameStatus = null;
 
 function showPlayerGame() {
   if (!player) return;
@@ -105,7 +104,6 @@ async function initializePlayer() {
   const players = await getPlayers(room.id);
   roomState = createRoomStateFromRecords(roomCode, room, players);
   previousGameId = roomState.game.id;
-  previousGameStatus = roomState.game.status;
 
   const restoredPlayer = roomState.players.find((item) => item.id === playerId);
 
@@ -167,18 +165,12 @@ function currentMatchingAssignment() {
   if (!player || roomState?.game?.id !== MATCHING_GAME_ID ||
       roomState.game.status !== "assigning") return null;
 
-  const turn = MATCHING_TURNS[roomState.game.activeTurnIndex];
+  const turn = getMatchingTurn(roomState.game.roundIndex, roomState.game.activeTurnIndex);
   const assignerIndex = turn?.assignerIndexes?.[player.team];
   const expectedPlayer = roomState.game.assignerOrder?.[assignerIndex];
   if (expectedPlayer?.id !== playerId) return null;
 
   return { turn, assignerIndex };
-}
-
-function matchingPrivateIndex(assignerIndex) {
-  return player?.team === "blue"
-    ? assignerIndex === 0 ? 0 : 1
-    : assignerIndex === 1 ? 0 : 1;
 }
 
 function updateMatchingOptionAvailability() {
@@ -326,6 +318,12 @@ $("lock-price-guess").addEventListener("click", async () => {
 });
 
 async function handleEvent(event, payload) {
+  if (event === "winner_celebration" && payload.gameId === roomState?.game?.id &&
+      payload.team === roomState.game.winningTeam) {
+    showWinnerCelebration(payload.team, roomState.players, payload.gameId);
+    return;
+  }
+
   if (event === "buzz_winner") {
     void playBuzzerSound();
     return;
@@ -384,17 +382,15 @@ async function handleEvent(event, payload) {
       const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
       if (privateState.roundIndex !== roomState?.game?.roundIndex ||
           !Array.isArray(privateState.assignments)) return;
-      matchingTeamState = {
+      matchingOwnState = {
         roundIndex: privateState.roundIndex,
-        assignments: privateState.assignments.map((pair) => [
-          String(pair?.[0] || ""),
-          String(pair?.[1] || "")
-        ])
+        assignerIndex: Number(privateState.assignerIndex),
+        assignments: privateState.assignments.map((value) => String(value || ""))
       };
       const assignment = currentMatchingAssignment();
-      if (assignment && !roomState.game.submittedTeams?.[player.team]) {
-        const privateIndex = matchingPrivateIndex(assignment.assignerIndex);
-        matchingDraft.values = matchingTeamState.assignments.map((pair) => pair[privateIndex]);
+      if (assignment && assignment.assignerIndex === matchingOwnState.assignerIndex &&
+          !roomState.game.submittedTeams?.[player.team]) {
+        matchingDraft.values = [...matchingOwnState.assignments];
       }
       render();
     } catch (error) {
@@ -422,10 +418,11 @@ async function handleEvent(event, payload) {
     sendingBuzz = false;
     if (player) await registerPriceKey();
     if (roomState.game?.id === MATCHING_GAME_ID &&
-        matchingTeamState.roundIndex !== roomState.game.roundIndex) {
-      matchingTeamState = {
+        matchingOwnState.roundIndex !== roomState.game.roundIndex) {
+      matchingOwnState = {
         roundIndex: roomState.game.roundIndex,
-        assignments: Array.from({ length: 4 }, () => ["", ""])
+        assignerIndex: -1,
+        assignments: ["", "", "", ""]
       };
     }
     if (roomState.game?.id === PRICE_GAME_ID) {
@@ -446,15 +443,10 @@ function render() {
   if (!joined || !roomState) return;
 
   const currentGameId = roomState.game?.id;
-  const currentGameStatus = roomState.game?.status;
   if (previousGameId && previousGameId !== currentGameId) {
     showGameTransition(currentGameId);
-  } else if (previousGameId === currentGameId && previousGameStatus !== "finished" &&
-      currentGameStatus === "finished" && roomState.game.winningTeam) {
-    showWinnerCelebration(roomState.game.winningTeam, roomState.players, currentGameId);
   }
   previousGameId = currentGameId;
-  previousGameStatus = currentGameStatus;
 
   const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
   const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
@@ -651,29 +643,31 @@ function renderPlayerMatchingOverlays(game, imageIndex, assignment) {
   }
   if (game.revealedTeams?.blue || game.revealedTeams?.red) return overlays.join("");
 
-  const ownIndexes = player.team === "blue" ? [0, 2] : [1, 3];
-  ownIndexes.forEach((assignerIndex, privateIndex) => {
-    const editable = assignment?.assignerIndex === assignerIndex &&
-      !game.submittedTeams?.[player.team];
-    const value = editable
-      ? matchingDraft.values[imageIndex]
-      : matchingTeamState.assignments[imageIndex]?.[privateIndex] || "";
-    if (!editable && !value) return;
+  const ownAssignerIndex = game.assignerOrder?.findIndex((assigner) => assigner.id === player.id);
+  const editable = assignment?.assignerIndex === ownAssignerIndex &&
+    !game.submittedTeams?.[player.team];
+  const value = editable
+    ? matchingDraft.values[imageIndex]
+    : matchingOwnState.assignerIndex === ownAssignerIndex
+      ? matchingOwnState.assignments[imageIndex] || ""
+      : "";
+  if (editable || value) {
     overlays.push(renderPlayerMatchingBox(
       value,
-      assignerIndex,
+      ownAssignerIndex,
       imageIndex,
       editable,
       editable ? matchingDraft.values.filter(Boolean) : []
     ));
-  });
+  }
 
   return overlays.join("");
 }
 
 function matchingDraftValuesFor(assignerIndex) {
-  const privateIndex = matchingPrivateIndex(assignerIndex);
-  return matchingTeamState.assignments.map((pair) => pair?.[privateIndex] || "");
+  return matchingOwnState.assignerIndex === assignerIndex
+    ? [...matchingOwnState.assignments]
+    : ["", "", "", ""];
 }
 
 function ensureMatchingDraft(game, assignment) {
@@ -692,7 +686,7 @@ function ensureMatchingDraft(game, assignment) {
 function renderMatchingGame() {
   const game = roomState.game;
   const round = MATCHING_GAME_ROUNDS[game.roundIndex];
-  const turn = MATCHING_TURNS[game.activeTurnIndex] || MATCHING_TURNS[0];
+  const turn = getMatchingTurn(game.roundIndex, game.activeTurnIndex);
   const bluePlayer = game.assignerOrder?.[turn.assignerIndexes.blue];
   const redPlayer = game.assignerOrder?.[turn.assignerIndexes.red];
   const assignment = currentMatchingAssignment();
@@ -752,9 +746,10 @@ function renderMatchingGame() {
       game.revealedTeams.red ? "Team Rot" : "Noch kein Team";
     $("player-matching-result").textContent = `${revealed} ist aufgedeckt.`;
   } else if (ownSubmissionComplete) {
-    $("player-matching-result").textContent = "Eure Zuordnungen sind beim Moderator angekommen ✓";
+    $("player-matching-result").textContent = "Deine Zuordnungen sind beim Moderator angekommen ✓";
   } else if (assignment) {
-    $("player-matching-result").textContent = "Trage deine vier Zuordnungen ein. Das andere Team kann sie nicht lesen.";
+    $("player-matching-result").textContent =
+      "Trage deine vier Zuordnungen ein. Dein Teampartner und das andere Team können sie nicht lesen.";
   } else {
     $("player-matching-result").textContent = "Warte auf euren nächsten Zuordnungsdurchgang.";
   }
