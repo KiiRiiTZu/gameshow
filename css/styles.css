@@ -504,6 +504,46 @@ input:focus, select:focus { border-color: #8ca2ff; }
 
 .hidden { display: none !important; }
 
+@media (min-width: 900px) {
+  .shell.wide-game {
+    width: min(1400px, calc(100% - 48px));
+  }
+
+  .spotify-board,
+  .spotify-board.compact {
+    grid-template-columns: repeat(10, minmax(0, 1fr));
+    max-height: none;
+    overflow: visible;
+  }
+
+  .spotify-slot {
+    grid-template-columns: 1fr;
+    grid-template-rows: 36px 1fr;
+    min-height: 128px;
+    text-align: center;
+  }
+
+  .spotify-slot .rank {
+    min-height: 36px;
+  }
+
+  .spotify-slot .artist {
+    align-content: center;
+    padding: 9px 7px;
+    font-size: clamp(.7rem, .85vw, .88rem);
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .spotify-slot .value {
+    font-size: .7rem;
+  }
+
+  .player-map {
+    width: min(960px, 100%);
+  }
+}
+
 @media (max-width: 700px) {
   .shell { padding-top: 24px; }
   .hero-card { padding: 27px; }

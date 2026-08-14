@@ -117,6 +117,7 @@ function render() {
 
   const spotifyIsActive = state.game.id === top20Game.id;
   const mapIsActive = state.game.id === germanyMapGame.id;
+  document.querySelector(".shell").classList.toggle("wide-game", spotifyIsActive || mapIsActive);
   $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive || mapIsActive);
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
   $("map-game-panel").classList.toggle("hidden", !mapIsActive);
