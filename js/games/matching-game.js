@@ -48,8 +48,8 @@ export const MATCHING_GAME_ROUNDS = [
     title: "Gaming-Setups",
     images: [
       { id: "cheap", label: "Budget", src: `${IMAGE_ROOT}/setups/cheap.webp` },
-      { id: "clean", label: "Clean", src: `${IMAGE_ROOT}/setups/clean.webp`, focusLower: true },
-      { id: "pink", label: "Pink", src: `${IMAGE_ROOT}/setups/pink.webp`, focusLower: true },
+      { id: "rgb", label: "RGB", src: `${IMAGE_ROOT}/setups/rgb.webp` },
+      { id: "pink", label: "Pink", src: `${IMAGE_ROOT}/setups/pink.webp` },
       { id: "work", label: "Work", src: `${IMAGE_ROOT}/setups/work.webp` }
     ]
   }
@@ -225,6 +225,27 @@ export const matchingGame = {
 
     if (state.game.winningTeam) state.scores[state.game.winningTeam] += 1;
     return true;
+  },
+
+  revealAll(state, assignments) {
+    if (state.game.id !== this.id ||
+        !["ready-to-reveal", "revealing"].includes(state.game.status)) return false;
+
+    const validTeamAssignments = (teamAssignments) =>
+      Array.isArray(teamAssignments) && teamAssignments.length === 4 &&
+      teamAssignments.every((pair) => Array.isArray(pair) && pair.length === 2 &&
+        pair.every((value) => String(value || "").trim()));
+
+    if (!validTeamAssignments(assignments?.blue) ||
+        !validTeamAssignments(assignments?.red)) return false;
+
+    let changed = false;
+    for (const team of ["blue", "red"]) {
+      if (state.game.revealedTeams[team]) continue;
+      if (!this.revealTeam(state, team, assignments[team])) return false;
+      changed = true;
+    }
+    return changed;
   },
 
   startNextRound(state) {

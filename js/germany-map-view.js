@@ -72,9 +72,9 @@ function marker(position, type, label) {
   const point = project(position);
   return `
     <g class="map-marker ${type}" transform="translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})">
-      <circle r="12"></circle>
-      <circle r="4" class="marker-center"></circle>
-      <text y="-18" text-anchor="middle">${label}</text>
+      <circle r="6"></circle>
+      <circle r="2" class="marker-center"></circle>
+      <text y="-10" text-anchor="middle">${label}</text>
     </g>
   `;
 }

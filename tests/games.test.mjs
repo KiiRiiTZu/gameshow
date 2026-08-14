@@ -281,7 +281,7 @@ test("collects both teams in two parallel turns without leaking assignments", ()
   assert.equal("assignments" in state.game, false);
 });
 
-test("reveals and scores one matching team at a time", () => {
+test("reveals and scores all matching answers at once", () => {
   const state = createInitialRoomState("TEST");
   const players = MATCHING_ASSIGNERS.map((assigner, index) => ({
     id: String(index), name: `Spieler ${index + 1}`, team: assigner.team
@@ -291,14 +291,12 @@ test("reveals and scores one matching team at a time", () => {
   matchingGame.start(state, players);
   state.game.status = "ready-to-reveal";
 
-  assert.equal(matchingGame.revealTeam(state, "blue", blueAssignments), true);
-  assert.equal(state.game.status, "revealing");
-  assert.deepEqual(state.game.revealedTeams, { blue: true, red: false });
-  assert.equal(state.game.revealedAssignments.red, null);
-  assert.deepEqual(state.game.scores, { blue: 0, red: 0 });
-
-  assert.equal(matchingGame.revealTeam(state, "red", redAssignments), true);
+  assert.equal(matchingGame.revealAll(state, {
+    blue: blueAssignments,
+    red: redAssignments
+  }), true);
   assert.equal(state.game.status, "round-finished");
+  assert.deepEqual(state.game.revealedTeams, { blue: true, red: true });
   assert.deepEqual(state.game.scores, { blue: 3, red: 3 });
 });
 
@@ -321,8 +319,10 @@ test("finishes matching after four rounds and awards one match point", () => {
     matchingGame.submitTeam(state, "blue");
     matchingGame.submitTeam(state, "red");
     matchingGame.completeTurn(state);
-    matchingGame.revealTeam(state, "blue", perfect);
-    matchingGame.revealTeam(state, "red", roundIndex === 0 ? perfect : twoMatches);
+    matchingGame.revealAll(state, {
+      blue: perfect,
+      red: roundIndex === 0 ? perfect : twoMatches
+    });
     if (roundIndex < MATCHING_GAME_ROUNDS.length - 1) matchingGame.startNextRound(state);
   }
 
@@ -330,7 +330,7 @@ test("finishes matching after four rounds and awards one match point", () => {
   assert.equal(state.game.winningTeam, "blue");
   assert.deepEqual(state.game.scores, { blue: 16, red: 10 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(matchingGame.revealTeam(state, "blue", perfect), false);
+  assert.equal(matchingGame.revealAll(state, { blue: perfect, red: perfect }), false);
 });
 
 test("allows a draw in the matching game without awarding a match point", () => {
@@ -346,8 +346,10 @@ test("allows a draw in the matching game without awarding a match point", () => 
   state.game.scores = { blue: 8, red: 8 };
   const equalAssignments = Array.from({ length: 4 }, () => ["Max", "Max"]);
 
-  assert.equal(matchingGame.revealTeam(state, "blue", equalAssignments), true);
-  assert.equal(matchingGame.revealTeam(state, "red", equalAssignments), true);
+  assert.equal(matchingGame.revealAll(state, {
+    blue: equalAssignments,
+    red: equalAssignments
+  }), true);
   assert.equal(state.game.winningTeam, null);
   assert.deepEqual(state.scores, { blue: 0, red: 0 });
 });

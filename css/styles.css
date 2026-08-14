@@ -377,12 +377,12 @@ input:focus, select:focus { border-color: #8ca2ff; }
 
 .germany-map-svg.interactive .germany-outline:hover { fill: #303a49; }
 
-.map-marker circle { stroke: white; stroke-width: 3; }
+.map-marker circle { stroke: white; stroke-width: 1.5; }
 .map-marker.blue circle { fill: #5a72f6; }
 .map-marker.red circle { fill: #d23750; }
 .map-marker.target circle { fill: #f5b83d; }
 .map-marker .marker-center { fill: white; stroke: none; }
-.map-marker text { fill: white; font-size: 15px; font-weight: 900; paint-order: stroke; stroke: #0d0f17; stroke-width: 4px; }
+.map-marker text { fill: white; font-size: 10px; font-weight: 900; paint-order: stroke; stroke: #0d0f17; stroke-width: 3px; }
 
 .distance-line { stroke-width: 3; stroke-dasharray: 8 7; opacity: .8; }
 .distance-line.blue { stroke: #7f94ff; }
@@ -462,11 +462,6 @@ input:focus, select:focus { border-color: #8ca2ff; }
   object-fit: contain;
 }
 
-.matching-image-frame img.focus-lower {
-  object-fit: cover;
-  object-position: center 72%;
-}
-
 .matching-assignment {
   position: absolute;
   z-index: 1;
@@ -478,7 +473,8 @@ input:focus, select:focus { border-color: #8ca2ff; }
 .matching-assignment.bottom-left { bottom: 10px; left: 10px; }
 .matching-assignment.bottom-right { right: 10px; bottom: 10px; }
 
-.matching-assignment input {
+.matching-assignment select {
+  width: 100%;
   padding: 9px 11px;
   border-width: 2px;
   border-radius: 10px;
@@ -488,12 +484,12 @@ input:focus, select:focus { border-color: #8ca2ff; }
   box-shadow: 0 4px 18px rgba(0,0,0,.42);
 }
 
-.matching-assignment.blue input { border-color: #7187ff; }
-.matching-assignment.red input { border-color: #ee6076; }
+.matching-assignment.blue select { border-color: #7187ff; }
+.matching-assignment.red select { border-color: #ee6076; }
 .matching-assignment.future { opacity: .32; }
-.matching-assignment.active input { box-shadow: 0 0 0 3px rgba(255,255,255,.24), 0 4px 18px rgba(0,0,0,.5); }
-.matching-assignment.matched input { border-color: #35d08a; }
-.matching-assignment.missed input { border-color: #ffb24d; }
+.matching-assignment.active select { box-shadow: 0 0 0 3px rgba(255,255,255,.24), 0 4px 18px rgba(0,0,0,.5); }
+.matching-assignment.matched select { border-color: #35d08a; }
+.matching-assignment.missed select { border-color: #ffb24d; }
 
 .player-matching-board .matching-card { min-width: 0; }
 

@@ -168,7 +168,12 @@ $("submit-matching-assignment").addEventListener("click", async () => {
     return;
   }
   if (values.some((value) => !value)) {
-    $("player-matching-error").textContent = "Bitte für alle vier Bilder einen Namen eintragen.";
+    $("player-matching-error").textContent = "Bitte für alle vier Bilder einen Spieler auswählen.";
+    return;
+  }
+  const registeredNames = new Set(roomState.players.map((roomPlayer) => roomPlayer.name));
+  if (values.some((value) => !registeredNames.has(value))) {
+    $("player-matching-error").textContent = "Bitte ausschließlich registrierte Spieler auswählen.";
     return;
   }
 
@@ -389,13 +394,20 @@ function renderPlayerMatchingBox(value, assignerIndex, imageIndex, editable = fa
   const assigner = MATCHING_ASSIGNERS[assignerIndex];
   const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
   const attributes = editable
-    ? `data-player-matching-input data-image-index="${imageIndex}" list="player-matching-names"`
+    ? `data-player-matching-input data-image-index="${imageIndex}"`
     : "disabled";
+  const options = [
+    `<option value="">Spieler wählen</option>`,
+    ...roomState.players.map((roomPlayer) =>
+      `<option value="${escapeHtml(roomPlayer.name)}"${roomPlayer.name === value ? " selected" : ""}>${escapeHtml(roomPlayer.name)}</option>`
+    )
+  ].join("");
 
   return `
     <label class="matching-assignment ${positions[assignerIndex]} ${assigner.team}${editable ? " active" : " revealed"}">
-      <input type="text" maxlength="30" value="${escapeHtml(value || "")}"
-        placeholder="Spielername" aria-label="${escapeHtml(assigner.label)}" ${attributes}>
+      <select aria-label="${escapeHtml(assigner.label)}" ${attributes}>
+        ${options}
+      </select>
     </label>
   `;
 }
@@ -450,13 +462,10 @@ function renderMatchingGame() {
     `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
   $("player-matching-blue-score").textContent = game.scores.blue;
   $("player-matching-red-score").textContent = game.scores.red;
-  $("player-matching-names").innerHTML = roomState.players
-    .map((roomPlayer) => `<option value="${escapeHtml(roomPlayer.name)}"></option>`)
-    .join("");
   $("player-matching-board").innerHTML = round.images.map((image, imageIndex) => `
     <article class="matching-card">
       <div class="matching-image-frame">
-        <img class="${image.focusLower ? "focus-lower" : ""}" src="${image.src}" alt="${escapeHtml(image.label)}">
+        <img src="${image.src}" alt="${escapeHtml(image.label)}">
         ${renderPlayerMatchingOverlays(game, imageIndex, assignment)}
       </div>
     </article>
@@ -468,7 +477,7 @@ function renderMatchingGame() {
       ? "Alle Runden sind ausgewertet."
       : isRoundFinished
         ? `Runde ${game.roundIndex + 1} ist beendet.`
-        : "Der Moderator deckt die Teams nacheinander auf.";
+        : "Der Moderator deckt gleich alle Antworten auf.";
   } else {
     $("player-matching-turn").className = "matching-turn split";
     $("player-matching-turn").textContent =
