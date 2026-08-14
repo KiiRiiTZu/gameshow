@@ -16,10 +16,17 @@ import { top20Game } from "./games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
 import { GERMANY_MAP_QUESTIONS, GERMANY_MAP_ROUNDS_TO_WIN, germanyMapGame } from "./games/germany-map.js";
 import { createGermanyMap } from "./germany-map-view.js";
+import {
+  MATCHING_ASSIGNERS,
+  MATCHING_GAME_ROUNDS,
+  matchingGame,
+  scoreMatchingAssignments
+} from "./games/matching-game.js";
 
 registerGame(buzzerGame);
 registerGame(top20Game);
 registerGame(germanyMapGame);
+registerGame(matchingGame);
 
 let roomCode;
 let roomRecord;
@@ -28,11 +35,51 @@ let realtime;
 let supportsRemoteGameState = true;
 let moderatorActionPending = false;
 let hostMap;
+let matchingAssignments = [];
 
 const $ = (id) => document.getElementById(id);
 
 function gameStorageKey() {
   return `gameshow-game-state-${roomRecord.id}`;
+}
+
+function matchingStorageKey() {
+  return `gameshow-matching-assignments-${roomRecord.id}`;
+}
+
+function emptyMatchingAssignments() {
+  return MATCHING_GAME_ROUNDS.map(() =>
+    Array.from({ length: 4 }, () => Array(MATCHING_ASSIGNERS.length).fill(""))
+  );
+}
+
+function saveMatchingAssignments() {
+  try {
+    localStorage.setItem(matchingStorageKey(), JSON.stringify(matchingAssignments));
+  } catch (error) {
+    console.warn("Private matching assignments could not be saved:", error);
+  }
+}
+
+function restoreMatchingAssignments() {
+  matchingAssignments = emptyMatchingAssignments();
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(matchingStorageKey()));
+    if (!Array.isArray(saved)) return false;
+
+    matchingAssignments = matchingAssignments.map((round, roundIndex) =>
+      round.map((image, imageIndex) =>
+        image.map((_, assignerIndex) =>
+          String(saved?.[roundIndex]?.[imageIndex]?.[assignerIndex] || "")
+        )
+      )
+    );
+    return true;
+  } catch (error) {
+    console.warn("Private matching assignments could not be restored:", error);
+    return false;
+  }
 }
 
 function saveLocalGameState() {
@@ -101,6 +148,13 @@ async function initializeHost() {
 
   if (state.game.id === top20Game.id) top20Game.normalize(state);
   if (state.game.id === germanyMapGame.id) germanyMapGame.normalize(state);
+  if (state.game.id === matchingGame.id) {
+    matchingGame.normalize(state);
+    const assignmentsRestored = restoreMatchingAssignments();
+    if (!assignmentsRestored && state.game.status === "assigning") {
+      state.game.activeAssignerIndex = 0;
+    }
+  }
 
   $("room-code").textContent = roomCode;
   hostMap = createGermanyMap($("host-germany-map"));
@@ -117,12 +171,18 @@ function render() {
 
   const spotifyIsActive = state.game.id === top20Game.id;
   const mapIsActive = state.game.id === germanyMapGame.id;
-  document.querySelector(".shell").classList.toggle("wide-game", spotifyIsActive || mapIsActive);
-  $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive || mapIsActive);
+  const matchingIsActive = state.game.id === matchingGame.id;
+  document.querySelector(".shell").classList.toggle(
+    "wide-game",
+    spotifyIsActive || mapIsActive || matchingIsActive
+  );
+  $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive || mapIsActive || matchingIsActive);
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
   $("map-game-panel").classList.toggle("hidden", !mapIsActive);
+  $("matching-game-panel").classList.toggle("hidden", !matchingIsActive);
 
-  if (mapIsActive) renderMapGame();
+  if (matchingIsActive) renderMatchingGame();
+  else if (mapIsActive) renderMapGame();
   else if (spotifyIsActive) renderSpotifyGame();
   else renderBuzzerGame();
 }
@@ -260,6 +320,10 @@ function renderMapGame() {
   $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady;
   $("next-map-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-map-round").disabled = moderatorActionPending;
+  $("start-matching-game").classList.toggle("hidden", !isFinished);
+  $("start-matching-game").disabled = moderatorActionPending ||
+    state.players.filter((player) => player.team === "blue").length !== 2 ||
+    state.players.filter((player) => player.team === "red").length !== 2;
   $("next-map-round").textContent = game.roundScores[game.roundWinner] >= GERMANY_MAP_ROUNDS_TO_WIN
     ? "Spiel abschließen"
     : "Nächste Frage";
@@ -273,6 +337,113 @@ function renderMapGame() {
       <strong>${escapeHtml(question.answer)} · ${winner} ist näher!</strong>
       <span>Team Blau: ${blueDistance} km · Team Rot: ${redDistance} km</span>
       ${isFinished ? `<p>🏆 ${getTeamName(game.winningTeam)} gewinnt das Kartenspiel!</p>` : ""}
+    `;
+  }
+}
+
+function getMatchingAssignerOrder() {
+  return MATCHING_ASSIGNERS.map((assigner) =>
+    state.players.filter((player) => player.team === assigner.team)[assigner.playerIndex]
+  );
+}
+
+function normalizedMatchingValue(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
+}
+
+function matchingResultClass(imageAssignments, assignerIndex, hasResult) {
+  if (!hasResult) return "";
+  const otherIndex = assignerIndex === 0 ? 2 : assignerIndex === 2 ? 0 : assignerIndex === 1 ? 3 : 1;
+  const ownValue = normalizedMatchingValue(imageAssignments[assignerIndex]);
+  const otherValue = normalizedMatchingValue(imageAssignments[otherIndex]);
+  return ownValue && ownValue === otherValue ? " matched" : " missed";
+}
+
+function renderMatchingAssignment(imageAssignments, assignerIndex, game, hasResult) {
+  const assigner = MATCHING_ASSIGNERS[assignerIndex];
+  const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  const isActive = game.status === "assigning" && game.activeAssignerIndex === assignerIndex;
+  const isFuture = game.status === "assigning" && game.activeAssignerIndex < assignerIndex;
+  const disabled = isActive ? "" : " disabled";
+  const value = escapeHtml(imageAssignments[assignerIndex] || "");
+
+  return `
+    <label class="matching-assignment ${positions[assignerIndex]} ${assigner.team}${isActive ? " active" : ""}${isFuture ? " future" : ""}${matchingResultClass(imageAssignments, assignerIndex, hasResult)}">
+      <input type="text" maxlength="30" list="matching-player-names"
+        data-matching-input="${assignerIndex}" value="${value}"
+        placeholder="${escapeHtml(assigner.label)}" aria-label="${escapeHtml(assigner.label)}"${disabled}>
+    </label>
+  `;
+}
+
+function renderMatchingBoard(round, game, roundAssignments) {
+  const hasResult = game.status === "round-finished" || game.status === "finished";
+
+  return round.images.map((image, imageIndex) => `
+    <article class="matching-card">
+      <div class="matching-image-frame">
+        <img src="${image.src}" alt="${escapeHtml(image.label)}">
+        ${MATCHING_ASSIGNERS.map((_, assignerIndex) =>
+          renderMatchingAssignment(roundAssignments[imageIndex], assignerIndex, game, hasResult)
+        ).join("")}
+      </div>
+      <p class="matching-image-label">${escapeHtml(image.label)}</p>
+    </article>
+  `).join("");
+}
+
+function renderMatchingGame() {
+  const game = state.game;
+  const round = MATCHING_GAME_ROUNDS[game.roundIndex];
+  const roundAssignments = matchingAssignments[game.roundIndex] || emptyMatchingAssignments()[0];
+  const activePlayer = game.assignerOrder[game.activeAssignerIndex];
+  const activeAssigner = MATCHING_ASSIGNERS[game.activeAssignerIndex];
+  const isAssigning = game.status === "assigning";
+  const isFinished = game.status === "finished";
+  const result = game.roundResults[game.roundIndex];
+
+  $("matching-round-label").textContent =
+    `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
+  $("matching-blue-score").textContent = game.scores.blue;
+  $("matching-red-score").textContent = game.scores.red;
+  $("matching-status").textContent = isFinished
+    ? "Spiel beendet"
+    : isAssigning ? "Zuordnen" : "Runde beendet";
+  $("matching-status").className = `status-pill ${isAssigning ? "open" : "closed"}`;
+  $("matching-player-names").innerHTML = state.players
+    .map((player) => `<option value="${escapeHtml(player.name)}"></option>`)
+    .join("");
+  $("matching-board").innerHTML = renderMatchingBoard(round, game, roundAssignments);
+
+  if (isAssigning) {
+    $("matching-turn").className = `matching-turn ${activeAssigner.team}`;
+    $("matching-turn").textContent =
+      `${activeAssigner.label}: ${activePlayer?.name || "Spieler fehlt"} ordnet jetzt zu.`;
+  } else {
+    $("matching-turn").className = "matching-turn finished";
+    $("matching-turn").textContent = isFinished
+      ? "Alle vier Runden sind ausgewertet."
+      : `Runde ${game.roundIndex + 1} ist ausgewertet.`;
+  }
+
+  $("save-matching-assignment").classList.toggle("hidden", !isAssigning);
+  $("save-matching-assignment").disabled = moderatorActionPending;
+  $("save-matching-assignment").textContent = game.activeAssignerIndex === MATCHING_ASSIGNERS.length - 1
+    ? "Zuordnungen auswerten"
+    : "Zuordnung speichern & nächste Person";
+  $("next-matching-round").classList.toggle("hidden", game.status !== "round-finished");
+  $("next-matching-round").disabled = moderatorActionPending;
+  $("matching-round-result").classList.toggle("hidden", !result);
+
+  if (result) {
+    const conclusion = isFinished
+      ? game.winningTeam
+        ? `🏆 ${getTeamName(game.winningTeam)} gewinnt das Zuordnungsspiel!`
+        : "Das Zuordnungsspiel endet unentschieden."
+      : "Bereit für die nächste Runde.";
+    $("matching-round-result").innerHTML = `
+      <strong>Runde ${game.roundIndex + 1}: Blau ${result.blue} · ${result.red} Rot</strong>
+      <span>${conclusion}</span>
     `;
   }
 }
@@ -525,6 +696,59 @@ $("reveal-map-round").addEventListener("click", async () => {
 
 $("next-map-round").addEventListener("click", async () => {
   await runModeratorAction(() => germanyMapGame.startNextRound(state));
+});
+
+$("start-matching-game").addEventListener("click", async () => {
+  $("map-next-game-error").textContent = "";
+  const assignerOrder = getMatchingAssignerOrder();
+
+  if (assignerOrder.some((player) => !player)) {
+    $("map-next-game-error").textContent =
+      "Für das Zuordnungsspiel müssen zwei Spieler pro Team im Raum sein.";
+    return;
+  }
+
+  await runModeratorAction(() => {
+    if (state.game.id !== germanyMapGame.id || state.game.status !== "finished") return false;
+    if (!matchingGame.start(state, assignerOrder)) return false;
+    matchingAssignments = emptyMatchingAssignments();
+    saveMatchingAssignments();
+    return true;
+  });
+});
+
+$("save-matching-assignment").addEventListener("click", async () => {
+  $("matching-error").textContent = "";
+  const assignerIndex = state.game.activeAssignerIndex;
+  const inputs = [...document.querySelectorAll(`[data-matching-input="${assignerIndex}"]`)];
+  const values = inputs.map((input) => input.value.trim());
+
+  if (values.length !== 4 || values.some((value) => !value)) {
+    $("matching-error").textContent = "Bitte für alle vier Bilder einen Namen eintragen.";
+    return;
+  }
+
+  await runModeratorAction(() => {
+    if (state.game.id !== matchingGame.id || state.game.status !== "assigning" ||
+        state.game.activeAssignerIndex !== assignerIndex) return false;
+
+    const roundAssignments = matchingAssignments[state.game.roundIndex];
+    values.forEach((value, imageIndex) => {
+      roundAssignments[imageIndex][assignerIndex] = value;
+    });
+
+    const completed = assignerIndex === MATCHING_ASSIGNERS.length - 1
+      ? matchingGame.completeRound(state, scoreMatchingAssignments(roundAssignments))
+      : matchingGame.advanceAssigner(state);
+
+    if (completed) saveMatchingAssignments();
+    return completed;
+  });
+});
+
+$("next-matching-round").addEventListener("click", async () => {
+  $("matching-error").textContent = "";
+  await runModeratorAction(() => matchingGame.startNextRound(state));
 });
 
 window.addEventListener("beforeunload", () => {

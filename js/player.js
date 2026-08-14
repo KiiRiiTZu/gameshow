@@ -8,10 +8,12 @@ import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
 import { createGermanyMap } from "./germany-map-view.js";
+import { MATCHING_GAME_ROUNDS } from "./games/matching-game.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
 const TOP_20_SLOT_COUNT = 20;
 const GERMANY_MAP_GAME_ID = "germany-map";
+const MATCHING_GAME_ID = "matching-game";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -170,10 +172,20 @@ function render() {
 
   const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
   const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
-  document.querySelector(".player-shell").classList.toggle("wide-game", spotifyIsActive || mapIsActive);
-  $("player-buzzer-game").classList.toggle("hidden", spotifyIsActive || mapIsActive);
+  const matchingIsActive = roomState.game?.id === MATCHING_GAME_ID;
+  document.querySelector(".player-shell").classList.toggle(
+    "wide-game",
+    spotifyIsActive || mapIsActive || matchingIsActive
+  );
+  $("player-buzzer-game").classList.toggle("hidden", spotifyIsActive || mapIsActive || matchingIsActive);
   $("player-spotify-game").classList.toggle("hidden", !spotifyIsActive);
   $("player-map-game").classList.toggle("hidden", !mapIsActive);
+  $("player-matching-game").classList.toggle("hidden", !matchingIsActive);
+
+  if (matchingIsActive) {
+    renderMatchingGame();
+    return;
+  }
 
   if (mapIsActive) {
     renderMapGame();
@@ -301,6 +313,53 @@ function renderMapGame() {
     $("player-map-result").textContent = ownPin
       ? "Pin gesetzt ✓ Wartet auf das andere Team und den Moderator."
       : "Euer Team hat noch keinen Pin gesetzt.";
+  }
+}
+
+function renderMatchingGame() {
+  const game = roomState.game;
+  const round = MATCHING_GAME_ROUNDS[game.roundIndex];
+  const activePlayer = game.assignerOrder?.[game.activeAssignerIndex];
+  const isFinished = game.status === "finished";
+  const isRoundFinished = game.status === "round-finished";
+  const result = game.roundResults?.[game.roundIndex];
+
+  $("player-matching-round").textContent =
+    `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
+  $("player-matching-blue-score").textContent = game.scores.blue;
+  $("player-matching-red-score").textContent = game.scores.red;
+  $("player-matching-board").innerHTML = round.images.map((image) => `
+    <article class="matching-card">
+      <div class="matching-image-frame">
+        <img src="${image.src}" alt="${escapeHtml(image.label)}">
+      </div>
+      <p class="matching-image-label">${escapeHtml(image.label)}</p>
+    </article>
+  `).join("");
+
+  if (isFinished || isRoundFinished) {
+    $("player-matching-turn").className = "matching-turn finished";
+    $("player-matching-turn").textContent = isFinished
+      ? "Alle Runden sind ausgewertet."
+      : `Runde ${game.roundIndex + 1} ist beendet.`;
+  } else {
+    const ownTurn = activePlayer?.id === playerId;
+    $("player-matching-turn").className = `matching-turn ${activePlayer?.team || "blue"}`;
+    $("player-matching-turn").textContent = ownTurn
+      ? "Du bist jetzt dran – nenne dem Moderator deine vier Zuordnungen."
+      : `${activePlayer?.name || "Ein Spieler"} ordnet jetzt zu.`;
+  }
+
+  if (isFinished) {
+    $("player-matching-result").textContent = game.winningTeam
+      ? `🏆 ${getTeamName(game.winningTeam)} gewinnt das Zuordnungsspiel!`
+      : "Das Zuordnungsspiel endet unentschieden.";
+  } else if (isRoundFinished) {
+    $("player-matching-result").textContent =
+      `Runde ${game.roundIndex + 1}: Blau ${result.blue} · ${result.red} Rot. Wartet auf die nächste Runde.`;
+  } else {
+    $("player-matching-result").textContent =
+      "Die Zuordnungen sind nur beim Moderator sichtbar.";
   }
 }
 

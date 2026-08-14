@@ -143,6 +143,37 @@
       <div class="controls">
         <button id="reveal-map-round" class="button primary">Ziel aufdecken &amp; auswerten</button>
         <button id="next-map-round" class="button primary hidden">Nächste Frage</button>
+        <button id="start-matching-game" class="button primary hidden">Zuordnungsspiel starten</button>
+      </div>
+      <p id="map-next-game-error" class="error"></p>
+    </section>
+
+    <section id="matching-game-panel" class="card game-panel hidden">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 4 · 4 RUNDEN</p>
+          <h2>Wer passt zu wem?</h2>
+          <p id="matching-round-label" class="muted">Runde 1 von 4</p>
+        </div>
+        <span id="matching-status" class="status-pill open">Zuordnen</span>
+      </div>
+
+      <div class="round-score" aria-label="Punktestand im Zuordnungsspiel">
+        <span>Blau <strong id="matching-blue-score">0</strong></span>
+        <span>Übereinstimmungen</span>
+        <span><strong id="matching-red-score">0</strong> Rot</span>
+      </div>
+
+      <div id="matching-turn" class="matching-turn blue"></div>
+      <p class="muted small">Die Namen bleiben ausschließlich in dieser Moderatoransicht.</p>
+      <datalist id="matching-player-names"></datalist>
+      <div id="matching-board" class="matching-board"></div>
+      <p id="matching-error" class="error"></p>
+
+      <div id="matching-round-result" class="map-result hidden"></div>
+      <div class="controls">
+        <button id="save-matching-assignment" class="button primary">Zuordnung speichern &amp; nächste Person</button>
+        <button id="next-matching-round" class="button primary hidden">Nächste Runde</button>
       </div>
     </section>
 

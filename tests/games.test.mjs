@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 
 import { BUZZER_WINNING_SCORE, buzzerGame } from "../js/games/buzzer.js";
 import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/spotify-top-artists.js";
@@ -10,6 +11,12 @@ import {
   distanceInKilometers,
   germanyMapGame
 } from "../js/games/germany-map.js";
+import {
+  MATCHING_ASSIGNERS,
+  MATCHING_GAME_ROUNDS,
+  matchingGame,
+  scoreMatchingAssignments
+} from "../js/games/matching-game.js";
 import { createInitialRoomState } from "../js/room.js";
 
 test("finishes the buzzer game when a team reaches five points", () => {
@@ -221,4 +228,82 @@ test("finishes the best of eleven map game at six points", () => {
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
   assert.equal(germanyMapGame.startNextRound(state), false);
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
+});
+
+test("contains four complete matching rounds", () => {
+  assert.equal(MATCHING_GAME_ROUNDS.length, 4);
+  assert.ok(MATCHING_GAME_ROUNDS.every((round) => round.images.length === 4));
+  assert.ok(MATCHING_GAME_ROUNDS.flatMap((round) => round.images)
+    .every((image) => image.label && image.src.endsWith(".webp")));
+  assert.ok(MATCHING_GAME_ROUNDS.flatMap((round) => round.images).every((image) =>
+    existsSync(new URL(`../${image.src.replace("./", "")}`, import.meta.url))
+  ));
+});
+
+test("scores matching names without leaking assignments into room state", () => {
+  const state = createInitialRoomState("TEST");
+  const players = [
+    { id: "b1", name: "Max", team: "blue" },
+    { id: "r1", name: "Lisa", team: "red" },
+    { id: "b2", name: "Tom", team: "blue" },
+    { id: "r2", name: "Mia", team: "red" }
+  ];
+  const assignments = [
+    ["Max", "Lisa", " max ", "Lisa"],
+    ["Tom", "Mia", "Max", "Mia"],
+    ["Lisa", "Tom", "Lisa", "Lisa"],
+    ["Mia", "Max", "Mia", "Max"]
+  ];
+
+  assert.equal(matchingGame.start(state, players), true);
+  assert.equal("assignments" in state.game, false);
+  assert.deepEqual(scoreMatchingAssignments(assignments), { blue: 3, red: 3 });
+
+  for (let index = 1; index < MATCHING_ASSIGNERS.length; index += 1) {
+    assert.equal(matchingGame.advanceAssigner(state), true);
+  }
+  assert.equal(matchingGame.completeRound(state, { blue: 3, red: 3 }), true);
+  assert.equal(state.game.status, "round-finished");
+  assert.deepEqual(state.game.scores, { blue: 3, red: 3 });
+});
+
+test("finishes matching after four rounds and awards one match point", () => {
+  const state = createInitialRoomState("TEST");
+  const players = MATCHING_ASSIGNERS.map((assigner, index) => ({
+    id: String(index),
+    name: `Spieler ${index + 1}`,
+    team: assigner.team
+  }));
+  matchingGame.start(state, players);
+
+  for (let roundIndex = 0; roundIndex < MATCHING_GAME_ROUNDS.length; roundIndex += 1) {
+    matchingGame.advanceAssigner(state);
+    matchingGame.advanceAssigner(state);
+    matchingGame.advanceAssigner(state);
+    matchingGame.completeRound(state, { blue: 4, red: roundIndex === 0 ? 4 : 2 });
+    if (roundIndex < MATCHING_GAME_ROUNDS.length - 1) matchingGame.startNextRound(state);
+  }
+
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "blue");
+  assert.deepEqual(state.game.scores, { blue: 16, red: 10 });
+  assert.deepEqual(state.scores, { blue: 1, red: 0 });
+  assert.equal(matchingGame.completeRound(state, { blue: 4, red: 0 }), false);
+});
+
+test("allows a draw in the matching game without awarding a match point", () => {
+  const state = createInitialRoomState("TEST");
+  const players = MATCHING_ASSIGNERS.map((assigner, index) => ({
+    id: String(index),
+    name: `Spieler ${index + 1}`,
+    team: assigner.team
+  }));
+  matchingGame.start(state, players);
+  state.game.roundIndex = MATCHING_GAME_ROUNDS.length - 1;
+  state.game.activeAssignerIndex = MATCHING_ASSIGNERS.length - 1;
+  state.game.scores = { blue: 8, red: 8 };
+
+  assert.equal(matchingGame.completeRound(state, { blue: 2, red: 2 }), true);
+  assert.equal(state.game.winningTeam, null);
+  assert.deepEqual(state.scores, { blue: 0, red: 0 });
 });
