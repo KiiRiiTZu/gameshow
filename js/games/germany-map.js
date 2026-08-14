@@ -7,9 +7,9 @@ export const GERMANY_MAP_QUESTIONS = [
     target: { lat: 48.1315, lng: 11.5497 }
   },
   {
-    prompt: "In welcher Stadt befinden sich die Herrenhäuser Gärten?",
+    prompt: "Hannover",
     answer: "Hannover",
-    target: { lat: 52.3903, lng: 9.6966 }
+    target: { lat: 52.3759, lng: 9.7320 }
   },
   {
     prompt: "Wo wurde Ludwig van Beethoven geboren?",
@@ -17,7 +17,7 @@ export const GERMANY_MAP_QUESTIONS = [
     target: { lat: 50.7374, lng: 7.0982 }
   },
   {
-    prompt: "In welcher Stadt steht die berühmte Semperoper?",
+    prompt: "Dresden",
     answer: "Dresden",
     target: { lat: 51.0542, lng: 13.7353 }
   },
@@ -27,7 +27,7 @@ export const GERMANY_MAP_QUESTIONS = [
     target: { lat: 47.5576, lng: 10.7498 }
   },
   {
-    prompt: "Welche Landeshauptstadt liegt an der Saar nahe der französischen Grenze?",
+    prompt: "Saarbrücken",
     answer: "Saarbrücken",
     target: { lat: 49.2402, lng: 6.9969 }
   },
@@ -37,8 +37,8 @@ export const GERMANY_MAP_QUESTIONS = [
     target: { lat: 49.4094, lng: 8.6947 }
   },
   {
-    prompt: "Welche Stadt ist für ihr Münster und die kleinen Bächle in der Altstadt bekannt?",
-    answer: "Freiburg im Breisgau",
+    prompt: "Freiburg",
+    answer: "Freiburg",
     target: { lat: 47.9959, lng: 7.8522 }
   },
   {
@@ -47,8 +47,8 @@ export const GERMANY_MAP_QUESTIONS = [
     target: { lat: 52.5163, lng: 13.3777 }
   },
   {
-    prompt: "In welcher Stadt befindet sich die längste durchgehend mit Häusern bebaute Brücke Europas?",
-    answer: "Krämerbrücke · Erfurt",
+    prompt: "Erfurt",
+    answer: "Erfurt",
     target: { lat: 50.9781, lng: 11.0292 }
   },
   {

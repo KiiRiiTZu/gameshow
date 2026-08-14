@@ -174,6 +174,13 @@ test("contains eleven prepared Germany map questions", () => {
   ));
 });
 
+test("mixes full map questions with city-only rounds", () => {
+  assert.deepEqual(
+    [1, 3, 5, 7, 9].map((index) => GERMANY_MAP_QUESTIONS[index].prompt),
+    ["Hannover", "Dresden", "Saarbrücken", "Freiburg", "Erfurt"]
+  );
+});
+
 test("calculates geographic distances in kilometers", () => {
   const berlin = { lat: 52.5200, lng: 13.4050 };
   const hamburg = { lat: 53.5511, lng: 9.9937 };
