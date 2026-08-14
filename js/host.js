@@ -19,9 +19,14 @@ import { createGermanyMap } from "./germany-map-view.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
-  matchingGame,
-  scoreMatchingAssignments
+  MATCHING_TURNS,
+  matchingGame
 } from "./games/matching-game.js";
+import {
+  createMatchingKeyPair,
+  decryptMatchingSubmission,
+  exportMatchingPublicKey
+} from "./matching-crypto.js";
 
 registerGame(buzzerGame);
 registerGame(top20Game);
@@ -36,6 +41,8 @@ let supportsRemoteGameState = true;
 let moderatorActionPending = false;
 let hostMap;
 let matchingAssignments = [];
+let matchingKeyPair;
+let matchingPublicKey;
 
 const $ = (id) => document.getElementById(id);
 
@@ -152,12 +159,15 @@ async function initializeHost() {
     matchingGame.normalize(state);
     const assignmentsRestored = restoreMatchingAssignments();
     if (!assignmentsRestored && state.game.status === "assigning") {
-      state.game.activeAssignerIndex = 0;
+      state.game.activeTurnIndex = 0;
+      state.game.submittedTeams = { blue: false, red: false };
     }
   }
 
   $("room-code").textContent = roomCode;
   hostMap = createGermanyMap($("host-germany-map"));
+  matchingKeyPair = await createMatchingKeyPair();
+  matchingPublicKey = await exportMatchingPublicKey(matchingKeyPair.publicKey);
   startRealtime();
   render();
 }
@@ -362,8 +372,9 @@ function matchingResultClass(imageAssignments, assignerIndex, hasResult) {
 function renderMatchingAssignment(imageAssignments, assignerIndex, game, hasResult) {
   const assigner = MATCHING_ASSIGNERS[assignerIndex];
   const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
-  const isActive = game.status === "assigning" && game.activeAssignerIndex === assignerIndex;
-  const isFuture = game.status === "assigning" && game.activeAssignerIndex < assignerIndex;
+  const turnIndex = Math.floor(assignerIndex / 2);
+  const isActive = game.status === "assigning" && game.activeTurnIndex === turnIndex;
+  const isFuture = game.status === "assigning" && game.activeTurnIndex < turnIndex;
   const disabled = isActive ? "" : " disabled";
   const value = escapeHtml(imageAssignments[assignerIndex] || "");
 
@@ -382,12 +393,11 @@ function renderMatchingBoard(round, game, roundAssignments) {
   return round.images.map((image, imageIndex) => `
     <article class="matching-card">
       <div class="matching-image-frame">
-        <img src="${image.src}" alt="${escapeHtml(image.label)}">
+        <img class="${image.focusLower ? "focus-lower" : ""}" src="${image.src}" alt="${escapeHtml(image.label)}">
         ${MATCHING_ASSIGNERS.map((_, assignerIndex) =>
           renderMatchingAssignment(roundAssignments[imageIndex], assignerIndex, game, hasResult)
         ).join("")}
       </div>
-      <p class="matching-image-label">${escapeHtml(image.label)}</p>
     </article>
   `).join("");
 }
@@ -396,9 +406,11 @@ function renderMatchingGame() {
   const game = state.game;
   const round = MATCHING_GAME_ROUNDS[game.roundIndex];
   const roundAssignments = matchingAssignments[game.roundIndex] || emptyMatchingAssignments()[0];
-  const activePlayer = game.assignerOrder[game.activeAssignerIndex];
-  const activeAssigner = MATCHING_ASSIGNERS[game.activeAssignerIndex];
+  const turn = MATCHING_TURNS[game.activeTurnIndex] || MATCHING_TURNS[0];
+  const bluePlayer = game.assignerOrder[turn.assignerIndexes.blue];
+  const redPlayer = game.assignerOrder[turn.assignerIndexes.red];
   const isAssigning = game.status === "assigning";
+  const isRevealing = ["ready-to-reveal", "revealing"].includes(game.status);
   const isFinished = game.status === "finished";
   const result = game.roundResults[game.roundIndex];
 
@@ -408,7 +420,7 @@ function renderMatchingGame() {
   $("matching-red-score").textContent = game.scores.red;
   $("matching-status").textContent = isFinished
     ? "Spiel beendet"
-    : isAssigning ? "Zuordnen" : "Runde beendet";
+    : isAssigning ? "Zuordnen" : isRevealing ? "Aufdecken" : "Runde beendet";
   $("matching-status").className = `status-pill ${isAssigning ? "open" : "closed"}`;
   $("matching-player-names").innerHTML = state.players
     .map((player) => `<option value="${escapeHtml(player.name)}"></option>`)
@@ -416,9 +428,19 @@ function renderMatchingGame() {
   $("matching-board").innerHTML = renderMatchingBoard(round, game, roundAssignments);
 
   if (isAssigning) {
-    $("matching-turn").className = `matching-turn ${activeAssigner.team}`;
+    const blueReady = game.submittedTeams.blue ? " ✓" : "";
+    const redReady = game.submittedTeams.red ? " ✓" : "";
+    $("matching-turn").className = "matching-turn split";
     $("matching-turn").textContent =
-      `${activeAssigner.label}: ${activePlayer?.name || "Spieler fehlt"} ordnet jetzt zu.`;
+      `${turn.label}: ${bluePlayer?.name || "Blau fehlt"} (Blau${blueReady}) und ` +
+      `${redPlayer?.name || "Rot fehlt"} (Rot${redReady}) ordnen gleichzeitig zu.`;
+  } else if (isRevealing) {
+    const revealedTeam = game.revealedTeams.blue ? "Team Blau" :
+      game.revealedTeams.red ? "Team Rot" : null;
+    $("matching-turn").className = "matching-turn finished";
+    $("matching-turn").textContent = revealedTeam
+      ? `${revealedTeam} ist aufgedeckt. Jetzt das andere Team aufdecken.`
+      : "Wähle, welches Team zuerst aufgedeckt wird.";
   } else {
     $("matching-turn").className = "matching-turn finished";
     $("matching-turn").textContent = isFinished
@@ -428,9 +450,24 @@ function renderMatchingGame() {
 
   $("save-matching-assignment").classList.toggle("hidden", !isAssigning);
   $("save-matching-assignment").disabled = moderatorActionPending;
-  $("save-matching-assignment").textContent = game.activeAssignerIndex === MATCHING_ASSIGNERS.length - 1
-    ? "Zuordnungen auswerten"
-    : "Zuordnung speichern & nächste Person";
+  $("complete-matching-turn").classList.toggle(
+    "hidden",
+    !isAssigning || !game.submittedTeams.blue || !game.submittedTeams.red
+  );
+  $("complete-matching-turn").disabled = moderatorActionPending;
+  $("complete-matching-turn").textContent = game.activeTurnIndex === MATCHING_TURNS.length - 1
+    ? "Antworten aufdecken"
+    : "Nächste Spieler";
+  $("reveal-matching-blue").classList.toggle(
+    "hidden",
+    !isRevealing || game.revealedTeams.blue
+  );
+  $("reveal-matching-red").classList.toggle(
+    "hidden",
+    !isRevealing || game.revealedTeams.red
+  );
+  $("reveal-matching-blue").disabled = moderatorActionPending;
+  $("reveal-matching-red").disabled = moderatorActionPending;
   $("next-matching-round").classList.toggle("hidden", game.status !== "round-finished");
   $("next-matching-round").disabled = moderatorActionPending;
   $("matching-round-result").classList.toggle("hidden", !result);
@@ -501,7 +538,11 @@ function escapeHtml(value) {
 }
 
 async function broadcastState() {
-  await realtime.send("room_state", structuredClone(state));
+  const publicState = structuredClone(state);
+  if (state.game.id === matchingGame.id) {
+    publicState.matchingSubmissionKey = matchingPublicKey;
+  }
+  await realtime.send("room_state", publicState);
 }
 
 async function persistRenderAndBroadcast() {
@@ -572,6 +613,54 @@ async function handlePlayerJoin(incomingPlayer) {
   await broadcastState();
 }
 
+async function handleMatchingSubmission(payload) {
+  if (state.game.id !== matchingGame.id || state.game.status !== "assigning" ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+
+  try {
+    const submission = await decryptMatchingSubmission(
+      matchingKeyPair.privateKey,
+      payload.encrypted
+    );
+    const player = state.players.find((item) => item.id === payload.playerId);
+    const team = player?.team;
+    const turn = MATCHING_TURNS[state.game.activeTurnIndex];
+    const assignerIndex = turn?.assignerIndexes?.[team];
+    const expectedPlayer = state.game.assignerOrder?.[assignerIndex];
+    const values = submission?.values?.map((value) => String(value || "").trim());
+    const valid = player && expectedPlayer?.id === player.id &&
+      submission.playerId === player.id &&
+      submission.roundIndex === state.game.roundIndex &&
+      submission.turnIndex === state.game.activeTurnIndex &&
+      Array.isArray(values) && values.length === 4 &&
+      values.every((value) => value && value.length <= 30);
+
+    if (!valid || !matchingGame.submitTeam(state, team)) {
+      await realtime.send("matching_submission_result", {
+        playerId: payload.playerId,
+        accepted: false
+      });
+      return;
+    }
+
+    values.forEach((value, imageIndex) => {
+      matchingAssignments[state.game.roundIndex][imageIndex][assignerIndex] = value;
+    });
+    saveMatchingAssignments();
+    await realtime.send("matching_submission_result", {
+      playerId: player.id,
+      accepted: true
+    });
+    await persistRenderAndBroadcast();
+  } catch (error) {
+    console.warn("Encrypted matching submission could not be processed:", error);
+    await realtime.send("matching_submission_result", {
+      playerId: payload.playerId,
+      accepted: false
+    });
+  }
+}
+
 async function handleEvent(event, payload) {
   if (event === "buzz_winner") {
     void playBuzzerSound();
@@ -585,6 +674,11 @@ async function handleEvent(event, payload) {
 
   if (event === "request_state") {
     await broadcastState();
+    return;
+  }
+
+  if (event === "matching_assignment") {
+    await handleMatchingSubmission(payload);
     return;
   }
 
@@ -719,31 +813,62 @@ $("start-matching-game").addEventListener("click", async () => {
 
 $("save-matching-assignment").addEventListener("click", async () => {
   $("matching-error").textContent = "";
-  const assignerIndex = state.game.activeAssignerIndex;
-  const inputs = [...document.querySelectorAll(`[data-matching-input="${assignerIndex}"]`)];
-  const values = inputs.map((input) => input.value.trim());
+  const turnIndex = state.game.activeTurnIndex;
+  const turn = MATCHING_TURNS[turnIndex];
+  const submissions = ["blue", "red"].map((team) => {
+    const assignerIndex = turn.assignerIndexes[team];
+    const inputs = [...document.querySelectorAll(`[data-matching-input="${assignerIndex}"]`)];
+    return { team, assignerIndex, values: inputs.map((input) => input.value.trim()) };
+  });
+  const partialSubmission = submissions.some(({ values }) =>
+    values.some(Boolean) && (values.length !== 4 || values.some((value) => !value))
+  );
+  const completeSubmissions = submissions.filter(({ values }) =>
+    values.length === 4 && values.every(Boolean)
+  );
 
-  if (values.length !== 4 || values.some((value) => !value)) {
-    $("matching-error").textContent = "Bitte für alle vier Bilder einen Namen eintragen.";
+  if (partialSubmission || !completeSubmissions.length) {
+    $("matching-error").textContent =
+      "Bitte pro Team entweder alle vier Namen oder noch keinen Namen eintragen.";
     return;
   }
 
   await runModeratorAction(() => {
     if (state.game.id !== matchingGame.id || state.game.status !== "assigning" ||
-        state.game.activeAssignerIndex !== assignerIndex) return false;
+        state.game.activeTurnIndex !== turnIndex) return false;
 
     const roundAssignments = matchingAssignments[state.game.roundIndex];
-    values.forEach((value, imageIndex) => {
-      roundAssignments[imageIndex][assignerIndex] = value;
+    completeSubmissions.forEach(({ team, assignerIndex, values }) => {
+      values.forEach((value, imageIndex) => {
+        roundAssignments[imageIndex][assignerIndex] = value;
+      });
+      if (!state.game.submittedTeams[team]) matchingGame.submitTeam(state, team);
     });
-
-    const completed = assignerIndex === MATCHING_ASSIGNERS.length - 1
-      ? matchingGame.completeRound(state, scoreMatchingAssignments(roundAssignments))
-      : matchingGame.advanceAssigner(state);
-
-    if (completed) saveMatchingAssignments();
-    return completed;
+    saveMatchingAssignments();
+    return true;
   });
+});
+
+$("complete-matching-turn").addEventListener("click", async () => {
+  $("matching-error").textContent = "";
+  await runModeratorAction(() => matchingGame.completeTurn(state));
+});
+
+async function revealMatchingTeam(team) {
+  $("matching-error").textContent = "";
+  const indexes = team === "blue" ? [0, 2] : [1, 3];
+  const teamAssignments = matchingAssignments[state.game.roundIndex].map((imageAssignments) =>
+    indexes.map((index) => imageAssignments[index])
+  );
+  await runModeratorAction(() => matchingGame.revealTeam(state, team, teamAssignments));
+}
+
+$("reveal-matching-blue").addEventListener("click", async () => {
+  await revealMatchingTeam("blue");
+});
+
+$("reveal-matching-red").addEventListener("click", async () => {
+  await revealMatchingTeam("red");
 });
 
 $("next-matching-round").addEventListener("click", async () => {

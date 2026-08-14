@@ -427,6 +427,9 @@ input:focus, select:focus { border-color: #8ca2ff; }
 
 .matching-turn.blue { background: rgba(55,90,210,.26); }
 .matching-turn.red { background: rgba(210,55,80,.24); }
+.matching-turn.split {
+  background: linear-gradient(90deg, rgba(55,90,210,.26), rgba(210,55,80,.24));
+}
 .matching-turn.finished { background: rgba(53,208,138,.10); }
 
 .matching-board {
@@ -459,11 +462,9 @@ input:focus, select:focus { border-color: #8ca2ff; }
   object-fit: contain;
 }
 
-.matching-image-label {
-  margin: 0;
-  padding: 12px 14px;
-  text-align: center;
-  font-weight: 900;
+.matching-image-frame img.focus-lower {
+  object-fit: cover;
+  object-position: center 72%;
 }
 
 .matching-assignment {

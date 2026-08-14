@@ -8,7 +8,12 @@ import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
 import { createGermanyMap } from "./germany-map-view.js";
-import { MATCHING_GAME_ROUNDS } from "./games/matching-game.js";
+import {
+  MATCHING_ASSIGNERS,
+  MATCHING_GAME_ROUNDS,
+  MATCHING_TURNS
+} from "./games/matching-game.js";
+import { encryptMatchingSubmission } from "./matching-crypto.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
 const TOP_20_SLOT_COUNT = 20;
@@ -35,6 +40,8 @@ let joined = false;
 let sendingBuzz = false;
 let realtime = null;
 let playerMap = null;
+let matchingSubmissionPending = false;
+let matchingDraft = { key: "", values: ["", "", "", ""] };
 
 function showPlayerGame() {
   if (!player) return;
@@ -131,6 +138,59 @@ $("buzzer").addEventListener("click", async () => {
   });
 });
 
+function currentMatchingAssignment() {
+  if (!player || roomState?.game?.id !== MATCHING_GAME_ID ||
+      roomState.game.status !== "assigning") return null;
+
+  const turn = MATCHING_TURNS[roomState.game.activeTurnIndex];
+  const assignerIndex = turn?.assignerIndexes?.[player.team];
+  const expectedPlayer = roomState.game.assignerOrder?.[assignerIndex];
+  if (expectedPlayer?.id !== playerId) return null;
+
+  return { turn, assignerIndex };
+}
+
+$("player-matching-board").addEventListener("input", (event) => {
+  const input = event.target.closest("[data-player-matching-input]");
+  if (!input) return;
+  matchingDraft.values[Number(input.dataset.imageIndex)] = input.value;
+});
+
+$("submit-matching-assignment").addEventListener("click", async () => {
+  $("player-matching-error").textContent = "";
+  const assignment = currentMatchingAssignment();
+  const values = matchingDraft.values.map((value) => value.trim());
+
+  if (!assignment || matchingSubmissionPending ||
+      roomState.game.submittedTeams?.[player.team]) return;
+  if (!roomState.matchingSubmissionKey) {
+    $("player-matching-error").textContent = "Die sichere Verbindung zum Moderator wird noch aufgebaut.";
+    return;
+  }
+  if (values.some((value) => !value)) {
+    $("player-matching-error").textContent = "Bitte für alle vier Bilder einen Namen eintragen.";
+    return;
+  }
+
+  matchingSubmissionPending = true;
+  render();
+
+  try {
+    const encrypted = await encryptMatchingSubmission(roomState.matchingSubmissionKey, {
+      playerId,
+      roundIndex: roomState.game.roundIndex,
+      turnIndex: roomState.game.activeTurnIndex,
+      values
+    });
+    await realtime.send("matching_assignment", { playerId, encrypted });
+  } catch (error) {
+    console.error("Matching submission could not be encrypted:", error);
+    matchingSubmissionPending = false;
+    $("player-matching-error").textContent = "Die Zuordnungen konnten nicht gesendet werden.";
+    render();
+  }
+});
+
 async function handleEvent(event, payload) {
   if (event === "buzz_winner") {
     void playBuzzerSound();
@@ -151,6 +211,15 @@ async function handleEvent(event, payload) {
 
     player = payload.player || player;
     showPlayerGame();
+    render();
+    return;
+  }
+
+  if (event === "matching_submission_result" && payload.playerId === playerId) {
+    matchingSubmissionPending = false;
+    $("player-matching-error").textContent = payload.accepted
+      ? "Zuordnungen sicher an den Moderator gesendet."
+      : "Die Zuordnungen konnten nicht übernommen werden. Bitte erneut versuchen.";
     render();
     return;
   }
@@ -316,39 +385,105 @@ function renderMapGame() {
   }
 }
 
+function renderPlayerMatchingBox(value, assignerIndex, imageIndex, editable = false) {
+  const assigner = MATCHING_ASSIGNERS[assignerIndex];
+  const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  const attributes = editable
+    ? `data-player-matching-input data-image-index="${imageIndex}" list="player-matching-names"`
+    : "disabled";
+
+  return `
+    <label class="matching-assignment ${positions[assignerIndex]} ${assigner.team}${editable ? " active" : " revealed"}">
+      <input type="text" maxlength="30" value="${escapeHtml(value || "")}"
+        placeholder="Spielername" aria-label="${escapeHtml(assigner.label)}" ${attributes}>
+    </label>
+  `;
+}
+
+function renderPlayerMatchingOverlays(game, imageIndex, assignment) {
+  const overlays = [];
+
+  if (game.revealedTeams?.blue) {
+    const values = game.revealedAssignments.blue[imageIndex];
+    overlays.push(renderPlayerMatchingBox(values[0], 0, imageIndex));
+    overlays.push(renderPlayerMatchingBox(values[1], 2, imageIndex));
+  }
+  if (game.revealedTeams?.red) {
+    const values = game.revealedAssignments.red[imageIndex];
+    overlays.push(renderPlayerMatchingBox(values[0], 1, imageIndex));
+    overlays.push(renderPlayerMatchingBox(values[1], 3, imageIndex));
+  }
+  if (assignment && !game.submittedTeams?.[player.team]) {
+    overlays.push(renderPlayerMatchingBox(
+      matchingDraft.values[imageIndex],
+      assignment.assignerIndex,
+      imageIndex,
+      true
+    ));
+  }
+
+  return overlays.join("");
+}
+
 function renderMatchingGame() {
   const game = roomState.game;
   const round = MATCHING_GAME_ROUNDS[game.roundIndex];
-  const activePlayer = game.assignerOrder?.[game.activeAssignerIndex];
+  const turn = MATCHING_TURNS[game.activeTurnIndex] || MATCHING_TURNS[0];
+  const bluePlayer = game.assignerOrder?.[turn.assignerIndexes.blue];
+  const redPlayer = game.assignerOrder?.[turn.assignerIndexes.red];
+  const assignment = currentMatchingAssignment();
+  const draftKey = assignment
+    ? `${game.roundIndex}-${game.activeTurnIndex}-${assignment.assignerIndex}`
+    : "";
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
+  const isRevealing = ["ready-to-reveal", "revealing"].includes(game.status);
   const result = game.roundResults?.[game.roundIndex];
+
+  if (draftKey && matchingDraft.key !== draftKey) {
+    matchingDraft = { key: draftKey, values: ["", "", "", ""] };
+    matchingSubmissionPending = false;
+    $("player-matching-error").textContent = "";
+  }
 
   $("player-matching-round").textContent =
     `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
   $("player-matching-blue-score").textContent = game.scores.blue;
   $("player-matching-red-score").textContent = game.scores.red;
-  $("player-matching-board").innerHTML = round.images.map((image) => `
+  $("player-matching-names").innerHTML = roomState.players
+    .map((roomPlayer) => `<option value="${escapeHtml(roomPlayer.name)}"></option>`)
+    .join("");
+  $("player-matching-board").innerHTML = round.images.map((image, imageIndex) => `
     <article class="matching-card">
       <div class="matching-image-frame">
-        <img src="${image.src}" alt="${escapeHtml(image.label)}">
+        <img class="${image.focusLower ? "focus-lower" : ""}" src="${image.src}" alt="${escapeHtml(image.label)}">
+        ${renderPlayerMatchingOverlays(game, imageIndex, assignment)}
       </div>
-      <p class="matching-image-label">${escapeHtml(image.label)}</p>
     </article>
   `).join("");
 
-  if (isFinished || isRoundFinished) {
+  if (isFinished || isRoundFinished || isRevealing) {
     $("player-matching-turn").className = "matching-turn finished";
     $("player-matching-turn").textContent = isFinished
       ? "Alle Runden sind ausgewertet."
-      : `Runde ${game.roundIndex + 1} ist beendet.`;
+      : isRoundFinished
+        ? `Runde ${game.roundIndex + 1} ist beendet.`
+        : "Der Moderator deckt die Teams nacheinander auf.";
   } else {
-    const ownTurn = activePlayer?.id === playerId;
-    $("player-matching-turn").className = `matching-turn ${activePlayer?.team || "blue"}`;
-    $("player-matching-turn").textContent = ownTurn
-      ? "Du bist jetzt dran – nenne dem Moderator deine vier Zuordnungen."
-      : `${activePlayer?.name || "Ein Spieler"} ordnet jetzt zu.`;
+    $("player-matching-turn").className = "matching-turn split";
+    $("player-matching-turn").textContent =
+      `${turn.label}: ${bluePlayer?.name || "Blau fehlt"} und ${redPlayer?.name || "Rot fehlt"} ordnen gleichzeitig zu.`;
   }
+
+  const ownSubmissionComplete = Boolean(game.submittedTeams?.[player.team]);
+  $("submit-matching-assignment").classList.toggle(
+    "hidden",
+    !assignment || ownSubmissionComplete || game.status !== "assigning"
+  );
+  $("submit-matching-assignment").disabled = matchingSubmissionPending;
+  $("submit-matching-assignment").textContent = matchingSubmissionPending
+    ? "Wird sicher gesendet…"
+    : "Meine Zuordnungen senden";
 
   if (isFinished) {
     $("player-matching-result").textContent = game.winningTeam
@@ -357,9 +492,16 @@ function renderMatchingGame() {
   } else if (isRoundFinished) {
     $("player-matching-result").textContent =
       `Runde ${game.roundIndex + 1}: Blau ${result.blue} · ${result.red} Rot. Wartet auf die nächste Runde.`;
+  } else if (isRevealing) {
+    const revealed = game.revealedTeams.blue ? "Team Blau" :
+      game.revealedTeams.red ? "Team Rot" : "Noch kein Team";
+    $("player-matching-result").textContent = `${revealed} ist aufgedeckt.`;
+  } else if (ownSubmissionComplete) {
+    $("player-matching-result").textContent = "Eure Zuordnungen sind beim Moderator angekommen ✓";
+  } else if (assignment) {
+    $("player-matching-result").textContent = "Trage deine vier Zuordnungen ein. Das andere Team kann sie nicht lesen.";
   } else {
-    $("player-matching-result").textContent =
-      "Die Zuordnungen sind nur beim Moderator sichtbar.";
+    $("player-matching-result").textContent = "Warte auf euren nächsten Zuordnungsdurchgang.";
   }
 }
 

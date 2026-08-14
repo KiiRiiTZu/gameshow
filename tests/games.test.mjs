@@ -14,9 +14,16 @@ import {
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
+  MATCHING_TURNS,
   matchingGame,
   scoreMatchingAssignments
 } from "../js/games/matching-game.js";
+import {
+  createMatchingKeyPair,
+  decryptMatchingSubmission,
+  encryptMatchingSubmission,
+  exportMatchingPublicKey
+} from "../js/matching-crypto.js";
 import { createInitialRoomState } from "../js/room.js";
 
 test("finishes the buzzer game when a team reaches five points", () => {
@@ -240,7 +247,7 @@ test("contains four complete matching rounds", () => {
   ));
 });
 
-test("scores matching names without leaking assignments into room state", () => {
+test("collects both teams in two parallel turns without leaking assignments", () => {
   const state = createInitialRoomState("TEST");
   const players = [
     { id: "b1", name: "Max", team: "blue" },
@@ -259,10 +266,38 @@ test("scores matching names without leaking assignments into room state", () => 
   assert.equal("assignments" in state.game, false);
   assert.deepEqual(scoreMatchingAssignments(assignments), { blue: 3, red: 3 });
 
-  for (let index = 1; index < MATCHING_ASSIGNERS.length; index += 1) {
-    assert.equal(matchingGame.advanceAssigner(state), true);
-  }
-  assert.equal(matchingGame.completeRound(state, { blue: 3, red: 3 }), true);
+  assert.equal(MATCHING_TURNS.length, 2);
+  assert.equal(matchingGame.submitTeam(state, "blue"), true);
+  assert.equal(matchingGame.completeTurn(state), false);
+  assert.equal(matchingGame.submitTeam(state, "red"), true);
+  assert.equal(matchingGame.completeTurn(state), true);
+  assert.equal(state.game.activeTurnIndex, 1);
+  assert.deepEqual(state.game.submittedTeams, { blue: false, red: false });
+
+  matchingGame.submitTeam(state, "blue");
+  matchingGame.submitTeam(state, "red");
+  assert.equal(matchingGame.completeTurn(state), true);
+  assert.equal(state.game.status, "ready-to-reveal");
+  assert.equal("assignments" in state.game, false);
+});
+
+test("reveals and scores one matching team at a time", () => {
+  const state = createInitialRoomState("TEST");
+  const players = MATCHING_ASSIGNERS.map((assigner, index) => ({
+    id: String(index), name: `Spieler ${index + 1}`, team: assigner.team
+  }));
+  const blueAssignments = [["Max", "Max"], ["Tom", "Max"], ["Lisa", "Lisa"], ["Mia", "Mia"]];
+  const redAssignments = [["Lisa", "Lisa"], ["Mia", "Mia"], ["Tom", "Lisa"], ["Max", "Max"]];
+  matchingGame.start(state, players);
+  state.game.status = "ready-to-reveal";
+
+  assert.equal(matchingGame.revealTeam(state, "blue", blueAssignments), true);
+  assert.equal(state.game.status, "revealing");
+  assert.deepEqual(state.game.revealedTeams, { blue: true, red: false });
+  assert.equal(state.game.revealedAssignments.red, null);
+  assert.deepEqual(state.game.scores, { blue: 0, red: 0 });
+
+  assert.equal(matchingGame.revealTeam(state, "red", redAssignments), true);
   assert.equal(state.game.status, "round-finished");
   assert.deepEqual(state.game.scores, { blue: 3, red: 3 });
 });
@@ -276,11 +311,18 @@ test("finishes matching after four rounds and awards one match point", () => {
   }));
   matchingGame.start(state, players);
 
+  const perfect = Array.from({ length: 4 }, () => ["Max", "Max"]);
+  const twoMatches = [["Max", "Max"], ["Max", "Tom"], ["Lisa", "Lisa"], ["Mia", "Tom"]];
+
   for (let roundIndex = 0; roundIndex < MATCHING_GAME_ROUNDS.length; roundIndex += 1) {
-    matchingGame.advanceAssigner(state);
-    matchingGame.advanceAssigner(state);
-    matchingGame.advanceAssigner(state);
-    matchingGame.completeRound(state, { blue: 4, red: roundIndex === 0 ? 4 : 2 });
+    matchingGame.submitTeam(state, "blue");
+    matchingGame.submitTeam(state, "red");
+    matchingGame.completeTurn(state);
+    matchingGame.submitTeam(state, "blue");
+    matchingGame.submitTeam(state, "red");
+    matchingGame.completeTurn(state);
+    matchingGame.revealTeam(state, "blue", perfect);
+    matchingGame.revealTeam(state, "red", roundIndex === 0 ? perfect : twoMatches);
     if (roundIndex < MATCHING_GAME_ROUNDS.length - 1) matchingGame.startNextRound(state);
   }
 
@@ -288,7 +330,7 @@ test("finishes matching after four rounds and awards one match point", () => {
   assert.equal(state.game.winningTeam, "blue");
   assert.deepEqual(state.game.scores, { blue: 16, red: 10 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(matchingGame.completeRound(state, { blue: 4, red: 0 }), false);
+  assert.equal(matchingGame.revealTeam(state, "blue", perfect), false);
 });
 
 test("allows a draw in the matching game without awarding a match point", () => {
@@ -300,10 +342,27 @@ test("allows a draw in the matching game without awarding a match point", () => 
   }));
   matchingGame.start(state, players);
   state.game.roundIndex = MATCHING_GAME_ROUNDS.length - 1;
-  state.game.activeAssignerIndex = MATCHING_ASSIGNERS.length - 1;
+  state.game.status = "ready-to-reveal";
   state.game.scores = { blue: 8, red: 8 };
+  const equalAssignments = Array.from({ length: 4 }, () => ["Max", "Max"]);
 
-  assert.equal(matchingGame.completeRound(state, { blue: 2, red: 2 }), true);
+  assert.equal(matchingGame.revealTeam(state, "blue", equalAssignments), true);
+  assert.equal(matchingGame.revealTeam(state, "red", equalAssignments), true);
   assert.equal(state.game.winningTeam, null);
   assert.deepEqual(state.scores, { blue: 0, red: 0 });
+});
+
+test("encrypts player assignments so only the moderator key can read them", async () => {
+  const keyPair = await createMatchingKeyPair();
+  const publicKey = await exportMatchingPublicKey(keyPair.publicKey);
+  const payload = {
+    playerId: "blue-1",
+    roundIndex: 0,
+    turnIndex: 0,
+    values: ["Max", "Lisa", "Tom", "Mia"]
+  };
+  const encrypted = await encryptMatchingSubmission(publicKey, payload);
+
+  assert.equal(JSON.stringify(encrypted).includes("Max"), false);
+  assert.deepEqual(await decryptMatchingSubmission(keyPair.privateKey, encrypted), payload);
 });
