@@ -14,9 +14,24 @@ import { registerGame } from "./games/game-engine.js";
 import { BUZZER_WINNING_SCORE, buzzerGame } from "./games/buzzer.js";
 import { top20Game } from "./games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
+import { GERMANY_MAP_QUESTIONS, GERMANY_MAP_ROUNDS_TO_WIN, germanyMapGame } from "./games/germany-map.js";
+import { createGermanyMap } from "./germany-map-view.js";
+import {
+  MATCHING_ASSIGNERS,
+  MATCHING_GAME_ROUNDS,
+  MATCHING_TURNS,
+  matchingGame
+} from "./games/matching-game.js";
+import {
+  createMatchingKeyPair,
+  decryptMatchingSubmission,
+  exportMatchingPublicKey
+} from "./matching-crypto.js";
 
 registerGame(buzzerGame);
 registerGame(top20Game);
+registerGame(germanyMapGame);
+registerGame(matchingGame);
 
 let roomCode;
 let roomRecord;
@@ -24,11 +39,54 @@ let state;
 let realtime;
 let supportsRemoteGameState = true;
 let moderatorActionPending = false;
+let hostMap;
+let matchingAssignments = [];
+let matchingKeyPair;
+let matchingPublicKey;
 
 const $ = (id) => document.getElementById(id);
 
 function gameStorageKey() {
   return `gameshow-game-state-${roomRecord.id}`;
+}
+
+function matchingStorageKey() {
+  return `gameshow-matching-assignments-${roomRecord.id}`;
+}
+
+function emptyMatchingAssignments() {
+  return MATCHING_GAME_ROUNDS.map(() =>
+    Array.from({ length: 4 }, () => Array(MATCHING_ASSIGNERS.length).fill(""))
+  );
+}
+
+function saveMatchingAssignments() {
+  try {
+    localStorage.setItem(matchingStorageKey(), JSON.stringify(matchingAssignments));
+  } catch (error) {
+    console.warn("Private matching assignments could not be saved:", error);
+  }
+}
+
+function restoreMatchingAssignments() {
+  matchingAssignments = emptyMatchingAssignments();
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(matchingStorageKey()));
+    if (!Array.isArray(saved)) return false;
+
+    matchingAssignments = matchingAssignments.map((round, roundIndex) =>
+      round.map((image, imageIndex) =>
+        image.map((_, assignerIndex) =>
+          String(saved?.[roundIndex]?.[imageIndex]?.[assignerIndex] || "")
+        )
+      )
+    );
+    return true;
+  } catch (error) {
+    console.warn("Private matching assignments could not be restored:", error);
+    return false;
+  }
 }
 
 function saveLocalGameState() {
@@ -96,8 +154,20 @@ async function initializeHost() {
   restoreLocalGameState();
 
   if (state.game.id === top20Game.id) top20Game.normalize(state);
+  if (state.game.id === germanyMapGame.id) germanyMapGame.normalize(state);
+  if (state.game.id === matchingGame.id) {
+    matchingGame.normalize(state);
+    const assignmentsRestored = restoreMatchingAssignments();
+    if (!assignmentsRestored && state.game.status === "assigning") {
+      state.game.activeTurnIndex = 0;
+      state.game.submittedTeams = { blue: false, red: false };
+    }
+  }
 
   $("room-code").textContent = roomCode;
+  hostMap = createGermanyMap($("host-germany-map"));
+  matchingKeyPair = await createMatchingKeyPair();
+  matchingPublicKey = await exportMatchingPublicKey(matchingKeyPair.publicKey);
   startRealtime();
   render();
 }
@@ -110,10 +180,20 @@ function render() {
   renderPlayers("red");
 
   const spotifyIsActive = state.game.id === top20Game.id;
-  $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive);
+  const mapIsActive = state.game.id === germanyMapGame.id;
+  const matchingIsActive = state.game.id === matchingGame.id;
+  document.querySelector(".shell").classList.toggle(
+    "wide-game",
+    spotifyIsActive || mapIsActive || matchingIsActive
+  );
+  $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive || mapIsActive || matchingIsActive);
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
+  $("map-game-panel").classList.toggle("hidden", !mapIsActive);
+  $("matching-game-panel").classList.toggle("hidden", !matchingIsActive);
 
-  if (spotifyIsActive) renderSpotifyGame();
+  if (matchingIsActive) renderMatchingGame();
+  else if (mapIsActive) renderMapGame();
+  else if (spotifyIsActive) renderSpotifyGame();
   else renderBuzzerGame();
 }
 
@@ -207,9 +287,197 @@ function renderSpotifyGame() {
       ? `${getTeamName(game.roundWinner)} gewinnt Liste ${roundNumber}.`
       : "";
   $("next-top20-round").classList.toggle("hidden", isFinished);
+  $("start-map-game").classList.toggle("hidden", !isFinished);
   $("next-top20-round").disabled = moderatorActionPending;
+  $("start-map-game").disabled = moderatorActionPending;
 
   $("spotify-miss").disabled = interactionLocked || moderatorActionPending;
+}
+
+function renderMapGame() {
+  const game = state.game;
+  const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
+  const isRevealed = game.status === "revealed" || game.status === "finished";
+  const isFinished = game.status === "finished";
+  const bothPinsReady = Boolean(game.pins?.blue && game.pins?.red);
+
+  $("map-round-label").textContent = `Frage ${game.roundIndex + 1} von ${GERMANY_MAP_QUESTIONS.length}`;
+  $("map-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
+  $("map-question").textContent = question.prompt;
+  $("map-blue-score").textContent = game.roundScores.blue;
+  $("map-red-score").textContent = game.roundScores.red;
+  $("map-status").textContent = isFinished
+    ? "Spiel beendet"
+    : isRevealed
+      ? "Ziel aufgedeckt"
+      : "Pins setzen";
+  $("map-status").className = `status-pill ${isRevealed ? "closed" : "open"}`;
+
+  hostMap.render({
+    pins: game.pins,
+    target: question.target,
+    revealed: isRevealed,
+    locked: true
+  });
+
+  $("target-legend").classList.toggle("hidden", !isRevealed);
+  $("map-pin-status").innerHTML = `
+    <span class="${game.pins?.blue ? "ready" : ""}">Blau: ${game.pins?.blue ? "Pin gesetzt ✓" : "wartet…"}</span>
+    <span class="${game.pins?.red ? "ready" : ""}">Rot: ${game.pins?.red ? "Pin gesetzt ✓" : "wartet…"}</span>
+  `;
+
+  $("reveal-map-round").classList.toggle("hidden", isRevealed);
+  $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady;
+  $("next-map-round").classList.toggle("hidden", !isRevealed || isFinished);
+  $("next-map-round").disabled = moderatorActionPending;
+  $("start-matching-game").classList.toggle("hidden", !isFinished);
+  $("start-matching-game").disabled = moderatorActionPending ||
+    state.players.filter((player) => player.team === "blue").length !== 2 ||
+    state.players.filter((player) => player.team === "red").length !== 2;
+  $("next-map-round").textContent = game.roundScores[game.roundWinner] >= GERMANY_MAP_ROUNDS_TO_WIN
+    ? "Spiel abschließen"
+    : "Nächste Frage";
+  $("map-result").classList.toggle("hidden", !isRevealed);
+
+  if (isRevealed) {
+    const blueDistance = Math.round(game.distances.blue);
+    const redDistance = Math.round(game.distances.red);
+    const winner = getTeamName(game.roundWinner || game.winningTeam);
+    $("map-result").innerHTML = `
+      <strong>${escapeHtml(question.answer)} · ${winner} ist näher!</strong>
+      <span>Team Blau: ${blueDistance} km · Team Rot: ${redDistance} km</span>
+      ${isFinished ? `<p>🏆 ${getTeamName(game.winningTeam)} gewinnt das Kartenspiel!</p>` : ""}
+    `;
+  }
+}
+
+function getMatchingAssignerOrder() {
+  return MATCHING_ASSIGNERS.map((assigner) =>
+    state.players.filter((player) => player.team === assigner.team)[assigner.playerIndex]
+  );
+}
+
+function normalizedMatchingValue(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
+}
+
+function matchingResultClass(imageAssignments, assignerIndex, hasResult) {
+  if (!hasResult) return "";
+  const otherIndex = assignerIndex === 0 ? 2 : assignerIndex === 2 ? 0 : assignerIndex === 1 ? 3 : 1;
+  const ownValue = normalizedMatchingValue(imageAssignments[assignerIndex]);
+  const otherValue = normalizedMatchingValue(imageAssignments[otherIndex]);
+  return ownValue && ownValue === otherValue ? " matched" : " missed";
+}
+
+function renderMatchingPlayerOptions(selectedValue = "") {
+  return [
+    `<option value="">Spieler wählen</option>`,
+    ...state.players.map((player) =>
+      `<option value="${escapeHtml(player.name)}"${player.name === selectedValue ? " selected" : ""}>${escapeHtml(player.name)}</option>`
+    )
+  ].join("");
+}
+
+function renderMatchingAssignment(imageAssignments, assignerIndex, game, hasResult) {
+  const assigner = MATCHING_ASSIGNERS[assignerIndex];
+  const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  const turnIndex = Math.floor(assignerIndex / 2);
+  const isActive = game.status === "assigning" && game.activeTurnIndex === turnIndex;
+  const isFuture = game.status === "assigning" && game.activeTurnIndex < turnIndex;
+  const disabled = isActive ? "" : " disabled";
+  const value = imageAssignments[assignerIndex] || "";
+
+  return `
+    <label class="matching-assignment ${positions[assignerIndex]} ${assigner.team}${isActive ? " active" : ""}${isFuture ? " future" : ""}${matchingResultClass(imageAssignments, assignerIndex, hasResult)}">
+      <select data-matching-input="${assignerIndex}"
+        aria-label="${escapeHtml(assigner.label)}"${disabled}>
+        ${renderMatchingPlayerOptions(value)}
+      </select>
+    </label>
+  `;
+}
+
+function renderMatchingBoard(round, game, roundAssignments) {
+  const hasResult = game.status === "round-finished" || game.status === "finished";
+
+  return round.images.map((image, imageIndex) => `
+    <article class="matching-card">
+      <div class="matching-image-frame">
+        <img src="${image.src}" alt="${escapeHtml(image.label)}">
+        ${MATCHING_ASSIGNERS.map((_, assignerIndex) =>
+          renderMatchingAssignment(roundAssignments[imageIndex], assignerIndex, game, hasResult)
+        ).join("")}
+      </div>
+    </article>
+  `).join("");
+}
+
+function renderMatchingGame() {
+  const game = state.game;
+  const round = MATCHING_GAME_ROUNDS[game.roundIndex];
+  const roundAssignments = matchingAssignments[game.roundIndex] || emptyMatchingAssignments()[0];
+  const turn = MATCHING_TURNS[game.activeTurnIndex] || MATCHING_TURNS[0];
+  const bluePlayer = game.assignerOrder[turn.assignerIndexes.blue];
+  const redPlayer = game.assignerOrder[turn.assignerIndexes.red];
+  const isAssigning = game.status === "assigning";
+  const isRevealing = ["ready-to-reveal", "revealing"].includes(game.status);
+  const isFinished = game.status === "finished";
+  const result = game.roundResults[game.roundIndex];
+
+  $("matching-round-label").textContent =
+    `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
+  $("matching-blue-score").textContent = game.scores.blue;
+  $("matching-red-score").textContent = game.scores.red;
+  $("matching-status").textContent = isFinished
+    ? "Spiel beendet"
+    : isAssigning ? "Zuordnen" : isRevealing ? "Aufdecken" : "Runde beendet";
+  $("matching-status").className = `status-pill ${isAssigning ? "open" : "closed"}`;
+  $("matching-board").innerHTML = renderMatchingBoard(round, game, roundAssignments);
+
+  if (isAssigning) {
+    const blueReady = game.submittedTeams.blue ? " ✓" : "";
+    const redReady = game.submittedTeams.red ? " ✓" : "";
+    $("matching-turn").className = "matching-turn split";
+    $("matching-turn").textContent =
+      `${turn.label}: ${bluePlayer?.name || "Blau fehlt"} (Blau${blueReady}) und ` +
+      `${redPlayer?.name || "Rot fehlt"} (Rot${redReady}) ordnen gleichzeitig zu.`;
+  } else if (isRevealing) {
+    $("matching-turn").className = "matching-turn finished";
+    $("matching-turn").textContent = "Alle Antworten können jetzt gemeinsam aufgedeckt werden.";
+  } else {
+    $("matching-turn").className = "matching-turn finished";
+    $("matching-turn").textContent = isFinished
+      ? "Alle vier Runden sind ausgewertet."
+      : `Runde ${game.roundIndex + 1} ist ausgewertet.`;
+  }
+
+  $("save-matching-assignment").classList.toggle("hidden", !isAssigning);
+  $("save-matching-assignment").disabled = moderatorActionPending;
+  $("complete-matching-turn").classList.toggle(
+    "hidden",
+    !isAssigning || !game.submittedTeams.blue || !game.submittedTeams.red
+  );
+  $("complete-matching-turn").disabled = moderatorActionPending;
+  $("complete-matching-turn").textContent = game.activeTurnIndex === MATCHING_TURNS.length - 1
+    ? "Antworten aufdecken"
+    : "Nächste Spieler";
+  $("reveal-matching-all").classList.toggle("hidden", !isRevealing);
+  $("reveal-matching-all").disabled = moderatorActionPending;
+  $("next-matching-round").classList.toggle("hidden", game.status !== "round-finished");
+  $("next-matching-round").disabled = moderatorActionPending;
+  $("matching-round-result").classList.toggle("hidden", !result);
+
+  if (result) {
+    const conclusion = isFinished
+      ? game.winningTeam
+        ? `🏆 ${getTeamName(game.winningTeam)} gewinnt das Zuordnungsspiel!`
+        : "Das Zuordnungsspiel endet unentschieden."
+      : "Bereit für die nächste Runde.";
+    $("matching-round-result").innerHTML = `
+      <strong>Runde ${game.roundIndex + 1}: Blau ${result.blue} · ${result.red} Rot</strong>
+      <span>${conclusion}</span>
+    `;
+  }
 }
 
 function renderSpotifySlots(revealed, list, interactionLocked) {
@@ -265,7 +533,11 @@ function escapeHtml(value) {
 }
 
 async function broadcastState() {
-  await realtime.send("room_state", structuredClone(state));
+  const publicState = structuredClone(state);
+  if (state.game.id === matchingGame.id) {
+    publicState.matchingSubmissionKey = matchingPublicKey;
+  }
+  await realtime.send("room_state", publicState);
 }
 
 async function persistRenderAndBroadcast() {
@@ -336,6 +608,55 @@ async function handlePlayerJoin(incomingPlayer) {
   await broadcastState();
 }
 
+async function handleMatchingSubmission(payload) {
+  if (state.game.id !== matchingGame.id || state.game.status !== "assigning" ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+
+  try {
+    const submission = await decryptMatchingSubmission(
+      matchingKeyPair.privateKey,
+      payload.encrypted
+    );
+    const player = state.players.find((item) => item.id === payload.playerId);
+    const team = player?.team;
+    const turn = MATCHING_TURNS[state.game.activeTurnIndex];
+    const assignerIndex = turn?.assignerIndexes?.[team];
+    const expectedPlayer = state.game.assignerOrder?.[assignerIndex];
+    const values = submission?.values?.map((value) => String(value || "").trim());
+    const registeredNames = new Set(state.players.map((item) => item.name));
+    const valid = player && expectedPlayer?.id === player.id &&
+      submission.playerId === player.id &&
+      submission.roundIndex === state.game.roundIndex &&
+      submission.turnIndex === state.game.activeTurnIndex &&
+      Array.isArray(values) && values.length === 4 &&
+      values.every((value) => registeredNames.has(value));
+
+    if (!valid || !matchingGame.submitTeam(state, team)) {
+      await realtime.send("matching_submission_result", {
+        playerId: payload.playerId,
+        accepted: false
+      });
+      return;
+    }
+
+    values.forEach((value, imageIndex) => {
+      matchingAssignments[state.game.roundIndex][imageIndex][assignerIndex] = value;
+    });
+    saveMatchingAssignments();
+    await realtime.send("matching_submission_result", {
+      playerId: player.id,
+      accepted: true
+    });
+    await persistRenderAndBroadcast();
+  } catch (error) {
+    console.warn("Encrypted matching submission could not be processed:", error);
+    await realtime.send("matching_submission_result", {
+      playerId: payload.playerId,
+      accepted: false
+    });
+  }
+}
+
 async function handleEvent(event, payload) {
   if (event === "buzz_winner") {
     void playBuzzerSound();
@@ -349,6 +670,18 @@ async function handleEvent(event, payload) {
 
   if (event === "request_state") {
     await broadcastState();
+    return;
+  }
+
+  if (event === "matching_assignment") {
+    await handleMatchingSubmission(payload);
+    return;
+  }
+
+  if (event === "map_pin") {
+    const player = state.players.find((item) => item.id === payload.playerId);
+    if (!player || !germanyMapGame.placePin(state, player.team, payload.position)) return;
+    await persistRenderAndBroadcast();
     return;
   }
 
@@ -438,6 +771,104 @@ $("spotify-miss").addEventListener("click", async () => {
 $("next-top20-round").addEventListener("click", async () => {
   $("spotify-error").textContent = "";
   await runModeratorAction(() => top20Game.startNextRound(state));
+});
+
+$("start-map-game").addEventListener("click", async () => {
+  await runModeratorAction(() => {
+    if (state.game.id !== top20Game.id || state.game.status !== "finished") return false;
+    return germanyMapGame.start(state);
+  });
+});
+
+$("reveal-map-round").addEventListener("click", async () => {
+  await runModeratorAction(() => germanyMapGame.revealRound(state));
+});
+
+$("next-map-round").addEventListener("click", async () => {
+  await runModeratorAction(() => germanyMapGame.startNextRound(state));
+});
+
+$("start-matching-game").addEventListener("click", async () => {
+  $("map-next-game-error").textContent = "";
+  const assignerOrder = getMatchingAssignerOrder();
+
+  if (assignerOrder.some((player) => !player)) {
+    $("map-next-game-error").textContent =
+      "Für das Zuordnungsspiel müssen zwei Spieler pro Team im Raum sein.";
+    return;
+  }
+
+  await runModeratorAction(() => {
+    if (state.game.id !== germanyMapGame.id || state.game.status !== "finished") return false;
+    if (!matchingGame.start(state, assignerOrder)) return false;
+    matchingAssignments = emptyMatchingAssignments();
+    saveMatchingAssignments();
+    return true;
+  });
+});
+
+$("save-matching-assignment").addEventListener("click", async () => {
+  $("matching-error").textContent = "";
+  const turnIndex = state.game.activeTurnIndex;
+  const turn = MATCHING_TURNS[turnIndex];
+  const submissions = ["blue", "red"].map((team) => {
+    const assignerIndex = turn.assignerIndexes[team];
+    const inputs = [...document.querySelectorAll(`[data-matching-input="${assignerIndex}"]`)];
+    return { team, assignerIndex, values: inputs.map((input) => input.value.trim()) };
+  });
+  const partialSubmission = submissions.some(({ values }) =>
+    values.some(Boolean) && (values.length !== 4 || values.some((value) => !value))
+  );
+  const completeSubmissions = submissions.filter(({ values }) =>
+    values.length === 4 && values.every(Boolean)
+  );
+  const registeredNames = new Set(state.players.map((player) => player.name));
+  const hasUnknownName = completeSubmissions.some(({ values }) =>
+    values.some((value) => !registeredNames.has(value))
+  );
+
+  if (partialSubmission || !completeSubmissions.length || hasUnknownName) {
+    $("matching-error").textContent =
+      hasUnknownName
+        ? "Bitte ausschließlich registrierte Spieler auswählen."
+        : "Bitte pro Team entweder alle vier Namen oder noch keinen Namen auswählen.";
+    return;
+  }
+
+  await runModeratorAction(() => {
+    if (state.game.id !== matchingGame.id || state.game.status !== "assigning" ||
+        state.game.activeTurnIndex !== turnIndex) return false;
+
+    const roundAssignments = matchingAssignments[state.game.roundIndex];
+    completeSubmissions.forEach(({ team, assignerIndex, values }) => {
+      values.forEach((value, imageIndex) => {
+        roundAssignments[imageIndex][assignerIndex] = value;
+      });
+      if (!state.game.submittedTeams[team]) matchingGame.submitTeam(state, team);
+    });
+    saveMatchingAssignments();
+    return true;
+  });
+});
+
+$("complete-matching-turn").addEventListener("click", async () => {
+  $("matching-error").textContent = "";
+  await runModeratorAction(() => matchingGame.completeTurn(state));
+});
+
+$("reveal-matching-all").addEventListener("click", async () => {
+  $("matching-error").textContent = "";
+  const roundAssignments = matchingAssignments[state.game.roundIndex];
+  const assignments = {
+    blue: roundAssignments.map((imageAssignments) => [imageAssignments[0], imageAssignments[2]]),
+    red: roundAssignments.map((imageAssignments) => [imageAssignments[1], imageAssignments[3]])
+  };
+  await runModeratorAction(() => matchingGame.revealAll(state, assignments));
+});
+
+$("next-matching-round").addEventListener("click", async () => {
+  $("matching-error").textContent = "";
+  await runModeratorAction(() => matchingGame.startNextRound(state));
 });
 
 window.addEventListener("beforeunload", () => {

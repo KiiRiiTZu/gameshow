@@ -1,4 +1,4 @@
-# Gameshow V0.3
+# Gameshow V0.4
 
 Eine browserbasierte Multiplayer-Gameshow für einen Moderator und vier Spieler in zwei Teams. Räume, Spieler, Punkte und Spielzustände werden mit Supabase gespeichert und über Supabase Realtime synchronisiert.
 
@@ -26,6 +26,15 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Nach zwei Kreuzen verliert ein Team die aktuelle Runde.
 - Das erste Team mit zwei Rundensiegen gewinnt das Spiel und erhält einen Spielpunkt für die Gesamtwertung.
 
+### Spiel 3: Deutschlandkarte (Best of 11)
+
+- Elf vorbereitete Fragen führen zu Städten und Sehenswürdigkeiten in ganz Deutschland.
+- Beide Spieler eines Teams teilen sich einen gemeinsamen Pin und können ihn bis zur Auswertung verschieben.
+- Der Moderator sieht die Pins beider Teams in Echtzeit und deckt anschließend das Ziel auf.
+- Die Luftlinie zwischen Team-Pin und Ziel wird in Kilometern berechnet.
+- Das nähere Team erhält einen Kartenpunkt; das erste Team mit sechs Punkten gewinnt das Spiel.
+- Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
+
 ## Lokal starten
 
 Die App muss über einen Webserver geöffnet werden, nicht direkt per `file://`.
@@ -43,7 +52,7 @@ Die Browser-Konfiguration befindet sich in `js/config.js`. Dort darf ausschließ
 Für die Persistenz variabler Spielzustände muss die Migration aus
 `supabase/migrations/202608120001_add_room_game_state.sql` einmal im Supabase SQL Editor ausgeführt werden.
 
-Ohne diese Migration bleibt der Spielablauf funktionsfähig und der Moderator-Browser hält einen lokalen Recovery-Zustand. Eine geräteübergreifende Wiederherstellung des zweiten Spiels benötigt jedoch die Migration.
+Ohne diese Migration bleibt der Spielablauf funktionsfähig und der Moderator-Browser hält einen lokalen Recovery-Zustand. Eine geräteübergreifende Wiederherstellung der späteren Spiele benötigt jedoch die Migration.
 
 ## Projektstruktur
 
@@ -59,6 +68,8 @@ js/games/game-engine.js        Registry der Minispiele
 js/games/buzzer.js             Regeln des Buzzer Quiz
 js/games/spotify-top-artists.js Regeln des Top-20-Spiels
 js/games/top-20-lists.js       Vorbereitete Lösungen für alle drei Runden
+js/games/germany-map.js        Fragen, Ziele, Distanz- und Spielregeln
+js/germany-map-view.js         Interaktive SVG-Deutschlandkarte
 assets/audio/buzzer.mp3        Soundeffekt für den ersten gültigen Buzz
 supabase/migrations/           Versionierte Datenbankänderungen
 tests/                         Regeltests

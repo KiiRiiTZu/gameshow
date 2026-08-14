@@ -104,6 +104,77 @@
       <div id="spotify-finished" class="game-finished hidden">
         <p id="spotify-winner-message"></p>
         <button id="next-top20-round" class="button primary">Nächste Liste starten</button>
+        <button id="start-map-game" class="button primary hidden">Deutschlandkarte starten</button>
+      </div>
+    </section>
+
+    <section id="map-game-panel" class="card game-panel hidden">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 3 · BEST OF 11</p>
+          <h2>Deutschlandkarte</h2>
+          <p id="map-round-label" class="muted">Frage 1 von 11</p>
+        </div>
+        <span id="map-status" class="status-pill open">Pins setzen</span>
+      </div>
+
+      <div class="round-score" aria-label="Punktestand im Kartenspiel">
+        <span>Blau <strong id="map-blue-score">0</strong></span>
+        <span>Kartenpunkte</span>
+        <span><strong id="map-red-score">0</strong> Rot</span>
+      </div>
+
+      <div class="map-question-card">
+        <span id="map-question-number" class="eyebrow">FRAGE 1</span>
+        <h3 id="map-question"></h3>
+      </div>
+
+      <div id="host-germany-map" class="germany-map"></div>
+
+      <div class="map-legend" aria-label="Kartenlegende">
+        <span><i class="legend-dot blue"></i> Team Blau</span>
+        <span><i class="legend-dot red"></i> Team Rot</span>
+        <span id="target-legend" class="hidden"><i class="legend-dot target"></i> Ziel</span>
+      </div>
+
+      <div id="map-pin-status" class="map-pin-status"></div>
+      <div id="map-result" class="map-result hidden"></div>
+
+      <div class="controls">
+        <button id="reveal-map-round" class="button primary">Ziel aufdecken &amp; auswerten</button>
+        <button id="next-map-round" class="button primary hidden">Nächste Frage</button>
+        <button id="start-matching-game" class="button primary hidden">Zuordnungsspiel starten</button>
+      </div>
+      <p id="map-next-game-error" class="error"></p>
+    </section>
+
+    <section id="matching-game-panel" class="card game-panel hidden">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 4 · 4 RUNDEN</p>
+          <h2>Wer passt zu wem?</h2>
+          <p id="matching-round-label" class="muted">Runde 1 von 4</p>
+        </div>
+        <span id="matching-status" class="status-pill open">Zuordnen</span>
+      </div>
+
+      <div class="round-score" aria-label="Punktestand im Zuordnungsspiel">
+        <span>Blau <strong id="matching-blue-score">0</strong></span>
+        <span>Übereinstimmungen</span>
+        <span><strong id="matching-red-score">0</strong> Rot</span>
+      </div>
+
+      <div id="matching-turn" class="matching-turn blue"></div>
+      <p class="muted small">Die Namen bleiben ausschließlich in dieser Moderatoransicht.</p>
+      <div id="matching-board" class="matching-board"></div>
+      <p id="matching-error" class="error"></p>
+
+      <div id="matching-round-result" class="map-result hidden"></div>
+      <div class="controls">
+        <button id="save-matching-assignment" class="button primary">Moderator-Eingaben speichern</button>
+        <button id="complete-matching-turn" class="button secondary hidden">Nächste Spieler</button>
+        <button id="reveal-matching-all" class="button primary hidden">Alle Antworten aufdecken</button>
+        <button id="next-matching-round" class="button primary hidden">Nächste Runde</button>
       </div>
     </section>
 
