@@ -49,7 +49,12 @@
         <span><strong id="buzzer-red-score">0</strong> Rot</span>
       </div>
 
-      <div class="map-question-card buzzer-question-card">
+      <div id="buzzer-start-controls" class="game-finished">
+        <p>Bereit für das erste Spiel?</p>
+        <button id="start-buzzer-game" class="button primary">Spiel 1 starten</button>
+      </div>
+
+      <div id="buzzer-question-card" class="map-question-card buzzer-question-card">
         <span id="buzzer-question-number" class="eyebrow">FRAGE 1</span>
         <h3 id="buzzer-question"></h3>
       </div>
@@ -239,7 +244,7 @@
 
       <div id="price-round-result" class="map-result hidden"></div>
       <p id="price-error" class="error"></p>
-      <div class="controls">
+      <div id="buzzer-controls" class="controls">
         <button id="reveal-price-round" class="button primary">Preis aufdecken &amp; auswerten</button>
         <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
         <button id="start-top20-game" class="button primary hidden">Top 20 starten</button>

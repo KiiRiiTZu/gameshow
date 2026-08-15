@@ -9,7 +9,7 @@ export async function createRoom(roomCode) {
       blue_score: 0,
       red_score: 0,
       current_game: "buzzer",
-      game_status: "waiting"
+      game_status: "not-started"
     })
     .select()
     .single();

@@ -57,6 +57,7 @@ let priceDraft = { roundIndex: -1, amount: "", comment: "", locked: false };
 let priceDraftTimer = null;
 let priceSubmissionPending = false;
 let previousGameId = null;
+let previousBuzzerStatus = null;
 
 function showPlayerGame() {
   if (!player) return;
@@ -100,6 +101,7 @@ async function initializePlayer() {
   const players = await getPlayers(room.id);
   roomState = createRoomStateFromRecords(roomCode, room, players);
   previousGameId = roomState.game.id;
+  previousBuzzerStatus = roomState.game.id === "buzzer" ? roomState.game.status : null;
 
   const restoredPlayer = roomState.players.find((item) => item.id === playerId);
 
@@ -362,8 +364,12 @@ function render() {
   const currentGameId = roomState.game?.id;
   if (previousGameId && previousGameId !== currentGameId) {
     showGameTransition(currentGameId);
+  } else if (currentGameId === "buzzer" && previousBuzzerStatus === "not-started" &&
+      roomState.game.status !== "not-started") {
+    showGameTransition(currentGameId);
   }
   previousGameId = currentGameId;
+  previousBuzzerStatus = currentGameId === "buzzer" ? roomState.game.status : null;
 
   const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
   const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
@@ -410,7 +416,13 @@ function render() {
   $("player-buzzer-blue-score").textContent = gameScores.blue;
   $("player-buzzer-red-score").textContent = gameScores.red;
 
+  buzzer.classList.toggle("hidden", status === "not-started");
   buzzer.disabled = status !== "open";
+
+  if (status === "not-started") {
+    $("player-message").textContent = "Warte darauf, dass der Moderator Spiel 1 startet…";
+    return;
+  }
 
   if (status === "open") {
     $("player-message").textContent = "Buzzer ist offen!";

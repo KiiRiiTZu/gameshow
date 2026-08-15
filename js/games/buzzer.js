@@ -27,8 +27,14 @@ export const buzzerGame = {
   id: "buzzer",
   name: "Buzzer Quiz",
 
+  start(state) {
+    if (state.game.id !== this.id || state.game.status !== "not-started") return false;
+    state.game.status = "waiting";
+    return true;
+  },
+
   open(state) {
-    if (state.game.status === "finished") return false;
+    if (state.game.status !== "waiting") return false;
 
     const scores = currentGameScores(state);
 

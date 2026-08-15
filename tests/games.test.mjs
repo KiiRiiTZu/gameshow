@@ -78,6 +78,9 @@ test("keeps buzzer quiz points when the next question starts", () => {
   const state = createInitialRoomState("TEST");
   state.game.scores = { blue: 2, red: 1 };
 
+  assert.equal(state.game.status, "not-started");
+  assert.equal(buzzerGame.start(state), true);
+  assert.equal(state.game.status, "waiting");
   assert.equal(buzzerGame.open(state), true);
   assert.deepEqual(state.game.scores, { blue: 2, red: 1 });
   assert.equal(buzzerGame.reset(state), true);

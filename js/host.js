@@ -57,6 +57,7 @@ let top20Notes = emptyTop20Notes();
 let priceDrafts = emptyPriceDrafts();
 const pricePlayerKeys = new Map();
 let previousGameId = null;
+let previousBuzzerStatus = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -269,6 +270,7 @@ async function initializeHost() {
   matchingKeyPair = await createMatchingKeyPair();
   matchingPublicKey = await exportMatchingPublicKey(matchingKeyPair.publicKey);
   previousGameId = state.game.id;
+  previousBuzzerStatus = state.game.id === buzzerGame.id ? state.game.status : null;
   startRealtime();
   render();
 }
@@ -278,9 +280,13 @@ function renderGameEffects() {
 
   if (previousGameId && previousGameId !== gameId) {
     showGameTransition(gameId);
+  } else if (gameId === buzzerGame.id && previousBuzzerStatus === "not-started" &&
+      state.game.status !== "not-started") {
+    showGameTransition(gameId);
   }
 
   previousGameId = gameId;
+  previousBuzzerStatus = gameId === buzzerGame.id ? state.game.status : null;
 }
 
 function render() {
@@ -379,6 +385,7 @@ function renderPriceGame() {
 
 function renderBuzzerGame() {
   const status = state.game.status;
+  const isNotStarted = status === "not-started";
   const isOpen = status === "open";
   const isLocked = status === "locked";
   const isFinished = status === "finished";
@@ -398,7 +405,9 @@ function renderBuzzerGame() {
       ? "Buzzer gesperrt"
       : isFinished
         ? "Spiel beendet"
-        : "Buzzer geschlossen";
+        : isNotStarted
+          ? "Noch nicht gestartet"
+          : "Buzzer geschlossen";
   $("buzzer-status").className = `status-pill ${isOpen ? "open" : "closed"}`;
 
   $("open-buzzer").disabled = moderatorActionPending || status !== "waiting";
@@ -406,6 +415,11 @@ function renderBuzzerGame() {
   $("correct-answer").disabled = moderatorActionPending;
   $("wrong-answer").disabled = moderatorActionPending;
   $("start-price-game-after-buzzer").disabled = moderatorActionPending;
+  $("buzzer-start-controls").classList.toggle("hidden", !isNotStarted);
+  $("start-buzzer-game").disabled = moderatorActionPending;
+  $("buzzer-question-card").classList.toggle("hidden", isNotStarted);
+  $("buzz-result").classList.toggle("hidden", isNotStarted);
+  $("buzzer-controls").classList.toggle("hidden", isNotStarted);
   $("answer-controls").classList.toggle("hidden", !winner || isFinished);
   $("buzzer-finished-controls").classList.toggle("hidden", !isFinished);
 
@@ -1034,6 +1048,10 @@ $("correct-answer").addEventListener("click", async () => {
     if (state.game.status !== "finished") buzzerGame.advanceQuestion(state);
     return true;
   });
+});
+
+$("start-buzzer-game").addEventListener("click", async () => {
+  await runModeratorAction(() => buzzerGame.start(state));
 });
 
 $("wrong-answer").addEventListener("click", async () => {

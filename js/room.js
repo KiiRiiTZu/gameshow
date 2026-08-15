@@ -63,7 +63,7 @@ export function createInitialRoomState(roomCode) {
     players: [],
     game: {
       id: "buzzer",
-      status: "waiting",
+      status: "not-started",
       winner: null,
       winningTeam: null,
       scores: emptyTeamScores(),
