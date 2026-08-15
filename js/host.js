@@ -26,6 +26,7 @@ import {
 } from "./games/matching-game.js";
 import {
   formatEuroAmount,
+  formatSignedEuroDifference,
   guessThePriceGame,
   parseEuroAmount
 } from "./games/guess-the-price.js";
@@ -375,9 +376,9 @@ function renderPriceGame() {
       : "<p>Thrifty endet unentschieden.</p>"
     : "";
   $("price-round-result").innerHTML = `
-    <strong>Amazon-Preis: ${formatEuroAmount(result.actualPrice)}</strong>
-    <span>Blau: ${formatEuroAmount(result.guesses.blue)} (${formatEuroAmount(result.differences.blue)} entfernt)</span><br>
-    <span>Rot: ${formatEuroAmount(result.guesses.red)} (${formatEuroAmount(result.differences.red)} entfernt)</span>
+    <strong>Preis: ${formatEuroAmount(result.actualPrice)}</strong>
+    <span>Blau: ${formatSignedEuroDifference(result.actualPrice, result.guesses.blue)}</span><br>
+    <span>Rot: ${formatSignedEuroDifference(result.actualPrice, result.guesses.red)}</span>
     <p>${roundMessage}</p>
     ${finalMessage}
   `;
@@ -680,7 +681,7 @@ function renderMatchingGame() {
         : "Da seh ich dich endet unentschieden."
       : "Bereit für die nächste Runde.";
     $("matching-round-result").innerHTML = `
-      <strong>Runde ${game.roundIndex + 1}: Blau ${result.blue} · ${result.red} Rot</strong>
+      <strong>${result[game.activeTeam]} Punkte für ${getTeamName(game.activeTeam)}</strong>
       <span>${conclusion}</span>
       ${isFinished ? `<p><strong>${overallWinner
         ? `🎉 ${getTeamName(overallWinner)} gewinnt die gesamte Gameshow!`
@@ -696,7 +697,7 @@ function renderSpotifySlots(revealed, list, interactionLocked) {
     const teamClass = slot?.team || "empty";
     const answer = slot ? escapeHtml(slot.answer) : "Noch offen";
     const value = slot
-      ? `<span class="value">${escapeHtml(list.valueLabel)}: ${escapeHtml(slot.value)}</span>`
+      ? `<span class="value">${escapeHtml(slot.value)}</span>`
       : "";
     const rank = index + 1;
     const disabled = slot || interactionLocked || moderatorActionPending ? " disabled" : "";
@@ -1191,7 +1192,18 @@ $("save-matching-assignment").addEventListener("click", async () => {
 
 $("complete-matching-turn").addEventListener("click", async () => {
   $("matching-error").textContent = "";
-  await runModeratorAction(() => matchingGame.completeTurn(state));
+  const shouldReveal = state.game.activeTurnIndex === MATCHING_TURNS.length - 1;
+  await runModeratorAction(() => {
+    if (!matchingGame.completeTurn(state)) return false;
+    if (!shouldReveal) return true;
+
+    const roundAssignments = matchingAssignments[state.game.roundIndex];
+    const team = state.game.activeTeam;
+    const indexes = team === "blue" ? [0, 2] : [1, 3];
+    const assignments = { [team]: roundAssignments.map((imageAssignments) =>
+      indexes.map((index) => imageAssignments[index])) };
+    return matchingGame.revealAll(state, assignments);
+  });
 });
 
 $("reveal-matching-all").addEventListener("click", async () => {

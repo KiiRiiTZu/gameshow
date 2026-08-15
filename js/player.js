@@ -14,7 +14,7 @@ import {
   getMatchingTurn
 } from "./games/matching-game.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
-import { formatEuroAmount, parseEuroAmount } from "./euro.js";
+import { formatEuroAmount, formatSignedEuroDifference, parseEuroAmount } from "./euro.js";
 import {
   createEncryptionKeyPair,
   decryptPrivatePayload,
@@ -467,7 +467,7 @@ function renderSpotifyGame() {
   $("player-spotify-turn").className = `turn-card ${displayTeam}`;
   $("player-blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("player-red-strikes").textContent = renderStrikes(game.strikes?.red);
-  $("player-spotify-board").innerHTML = renderSpotifySlots(game.revealed, game.valueLabel);
+  $("player-spotify-board").innerHTML = renderSpotifySlots(game.revealed);
   const noteInput = $("player-top20-note");
   if (noteInput.value !== top20Note.text) noteInput.value = top20Note.text;
   noteInput.disabled = game.status !== "playing";
@@ -479,13 +479,13 @@ function renderSpotifyGame() {
       : "";
 }
 
-function renderSpotifySlots(revealed = [], valueLabel = "Wert") {
+function renderSpotifySlots(revealed = []) {
   return Array.from({ length: TOP_20_SLOT_COUNT }, (_, index) => {
     const slot = revealed[index];
     const teamClass = slot?.team || "empty";
     const answer = slot ? escapeHtml(slot.answer) : "Noch offen";
     const value = slot
-      ? `<span class="value">${escapeHtml(valueLabel)}: ${escapeHtml(slot.value)}</span>`
+      ? `<span class="value">${escapeHtml(slot.value)}</span>`
       : "";
 
     return `
@@ -624,7 +624,7 @@ function renderMatchingGame() {
         : "Die Gameshow endet insgesamt unentschieden."}`;
   } else if (isRoundFinished) {
     $("player-matching-result").textContent =
-      `Runde ${game.roundIndex + 1}: Blau ${result.blue} · ${result.red} Rot. Wartet auf die nächste Runde.`;
+      `${result[game.activeTeam]} Punkte für ${getTeamName(game.activeTeam)}. Wartet auf die nächste Runde.`;
   } else if (isRevealing) {
     const revealed = game.revealedTeams.blue ? "Team Blau" :
       game.revealedTeams.red ? "Team Rot" : "Noch kein Team";
@@ -671,8 +671,8 @@ function renderPriceGame() {
       : "Beide Teams liegen exakt gleich weit entfernt.";
     $("player-price-result").innerHTML = `
       <strong>Preis: ${formatEuroAmount(result.actualPrice)}</strong><br>
-      Blau: ${formatEuroAmount(result.guesses.blue)} (${formatEuroAmount(result.differences.blue)} entfernt)<br>
-      Rot: ${formatEuroAmount(result.guesses.red)} (${formatEuroAmount(result.differences.red)} entfernt)<br>
+      Blau: ${formatSignedEuroDifference(result.actualPrice, result.guesses.blue)}<br>
+      Rot: ${formatSignedEuroDifference(result.actualPrice, result.guesses.red)}<br>
       ${roundMessage}
       ${isFinished
         ? game.winningTeam

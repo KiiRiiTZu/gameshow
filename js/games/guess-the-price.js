@@ -1,5 +1,5 @@
 import { PRICE_PRODUCTS } from "./guess-the-price-products.js";
-export { formatEuroAmount, parseEuroAmount } from "../euro.js";
+export { formatEuroAmount, formatSignedEuroDifference, parseEuroAmount } from "../euro.js";
 
 export const PRICE_GAME_WINNING_SCORE = 5;
 

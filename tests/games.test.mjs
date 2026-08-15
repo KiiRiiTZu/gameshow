@@ -28,6 +28,7 @@ import {
 import {
   PRICE_GAME_WINNING_SCORE,
   formatEuroAmount,
+  formatSignedEuroDifference,
   guessThePriceGame,
   parseEuroAmount
 } from "../js/games/guess-the-price.js";
@@ -128,7 +129,7 @@ test("reveals prepared Top 20 entries and alternates teams", () => {
   assert.deepEqual(state.game.revealed[3], {
     team: "blue",
     answer: "The Weeknd",
-    value: "~96,7"
+    value: "84,8 Mrd."
   });
   assert.equal(state.game.currentTeam, "red");
   assert.equal(top20Game.reveal(state, 4), false);
@@ -190,6 +191,12 @@ test("starts the third list when the first two rounds are split", () => {
 test("contains three complete prepared Top 20 lists", () => {
   assert.equal(TOP_20_LISTS.length, 3);
   assert.ok(TOP_20_LISTS.every((list) => list.entries.length === TOP_20_SLOT_COUNT));
+  assert.deepEqual(TOP_20_LISTS[0].entries.map((entry) => entry.answer), [
+    "Taylor Swift", "Drake", "Bad Bunny", "The Weeknd", "Ariana Grande",
+    "Ed Sheeran", "Billie Eilish", "Eminem", "Kanye West", "BTS",
+    "Justin Bieber", "Bruno Mars", "Post Malone", "Rihanna", "Coldplay",
+    "Travis Scott", "Kendrick Lamar", "Dua Lipa", "J Balvin", "Imagine Dragons"
+  ]);
 });
 
 test("normalizes a persisted single-round Spotify state", () => {
@@ -434,6 +441,8 @@ test("parses German and common Euro inputs", () => {
   assert.equal(parseEuroAmount("-2,00"), null);
   assert.equal(parseEuroAmount("abc"), null);
   assert.equal(formatEuroAmount(2269), "2.269,00 €");
+  assert.equal(formatSignedEuroDifference(548, 34), "+514,00 €");
+  assert.equal(formatSignedEuroDifference(548, 803), "−255,00 €");
 });
 
 test("locks both teams and awards the closer price guess", () => {

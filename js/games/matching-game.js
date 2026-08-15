@@ -29,10 +29,10 @@ export const MATCHING_GAME_ROUNDS = [
     id: "valowaffen",
     title: "Valorant-Waffen",
     images: [
-      { id: "judge", label: "Judge", src: `${IMAGE_ROOT}/valowaffen/Judge.webp` },
-      { id: "operator", label: "Operator", src: `${IMAGE_ROOT}/valowaffen/operator.webp` },
+      { id: "classic", label: "Classic", src: `${IMAGE_ROOT}/valowaffen/Classic.webp` },
+      { id: "frenzy", label: "Frenzy", src: `${IMAGE_ROOT}/valowaffen/Frenzy.webp` },
+      { id: "ghost", label: "Ghost", src: `${IMAGE_ROOT}/valowaffen/Ghost.webp` },
       { id: "sheriff", label: "Sheriff", src: `${IMAGE_ROOT}/valowaffen/Sheriff.webp` },
-      { id: "vandal", label: "Vandal", src: `${IMAGE_ROOT}/valowaffen/vandal.webp` }
     ]
   },
   {
