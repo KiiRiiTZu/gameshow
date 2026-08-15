@@ -19,7 +19,7 @@ function cents(value) {
 
 export const guessThePriceGame = {
   id: "guess-the-price",
-  name: "Was kostet das?",
+  name: "Thrifty",
 
   start(state) {
     state.game = {

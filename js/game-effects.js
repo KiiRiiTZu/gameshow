@@ -1,9 +1,9 @@
 const GAME_PRESENTATIONS = {
   buzzer: { number: 1, name: "Buzzer Quiz" },
-  "spotify-top-artists": { number: 2, name: "Top 20" },
-  "germany-map": { number: 3, name: "Deutschlandkarte" },
-  "matching-game": { number: 4, name: "Wer passt zu wem?" },
-  "guess-the-price": { number: 5, name: "Was kostet das?" }
+  "guess-the-price": { number: 2, name: "Thrifty" },
+  "spotify-top-artists": { number: 3, name: "Top 20" },
+  "germany-map": { number: 4, name: "Kartenwissen" },
+  "matching-game": { number: 5, name: "Da seh ich dich" }
 };
 
 function removeEffect(selector) {

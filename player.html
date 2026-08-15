@@ -9,10 +9,7 @@
 <body>
   <main class="shell player-shell">
     <header class="topbar">
-      <div>
-        <p class="eyebrow">SPIELER</p>
-        <h1>Raum <span id="room-code">----</span></h1>
-      </div>
+      <h1 class="player-room-title">Spieler <span aria-hidden="true">|</span> Raum <span id="room-code">----</span></h1>
       <div class="connection">
         <span id="connection-dot" class="dot"></span>
         <span id="connection-text">Verbinde…</span>
@@ -64,7 +61,7 @@
       </div>
 
       <div id="player-spotify-game" class="hidden">
-        <p class="eyebrow">SPIEL 2 · BEST OF 3</p>
+        <p class="eyebrow">SPIEL 3 · BEST OF 3</p>
         <h2 id="player-top20-title">Top 20</h2>
         <p id="player-top20-description" class="muted"></p>
         <div id="player-spotify-turn" class="turn-card blue">Team Blau ist dran</div>
@@ -84,8 +81,8 @@
       </div>
 
       <div id="player-map-game" class="hidden">
-        <p class="eyebrow">SPIEL 3 · BEST OF 11</p>
-        <h2>Deutschlandkarte</h2>
+        <p class="eyebrow">SPIEL 4 · BEST OF 11</p>
+        <h2>Kartenwissen</h2>
         <div class="round-score" aria-label="Punktestand im Kartenspiel">
           <span>Blau <strong id="player-map-blue-score">0</strong></span>
           <span>Kartenpunkte</span>
@@ -97,12 +94,13 @@
         </div>
         <p id="player-map-instruction" class="muted">Tippt auf die Karte, um euren gemeinsamen Team-Pin zu setzen.</p>
         <div id="player-germany-map" class="germany-map player-map"></div>
+        <button id="lock-map-pin" class="button primary full">Antwort einloggen</button>
         <div id="player-map-result" class="player-message"></div>
       </div>
 
       <div id="player-matching-game" class="hidden">
-        <p class="eyebrow">SPIEL 4 · 4 RUNDEN</p>
-        <h2>Wer passt zu wem?</h2>
+        <p class="eyebrow">SPIEL 5 · 4 RUNDEN</p>
+        <h2>Da seh ich dich</h2>
         <p id="player-matching-round" class="muted"></p>
         <div class="round-score" aria-label="Punktestand im Zuordnungsspiel">
           <span>Blau <strong id="player-matching-blue-score">0</strong></span>
@@ -111,14 +109,13 @@
         </div>
         <div id="player-matching-turn" class="matching-turn blue"></div>
         <div id="player-matching-board" class="matching-board player-matching-board"></div>
-        <button id="submit-matching-assignment" class="button primary full hidden">Meine Zuordnungen senden</button>
         <p id="player-matching-error" class="error"></p>
         <div id="player-matching-result" class="player-message"></div>
       </div>
 
       <div id="player-price-game" class="hidden">
-        <p class="eyebrow">SPIEL 5 · BEST OF 9</p>
-        <h2>Was kostet das?</h2>
+        <p class="eyebrow">SPIEL 2 · BEST OF 9</p>
+        <h2>Thrifty</h2>
         <p id="player-price-round" class="muted">Produkt 1 von 9</p>
         <div class="round-score" aria-label="Punktestand im Preisratespiel">
           <span>Blau <strong id="player-price-blue-score">0</strong></span>

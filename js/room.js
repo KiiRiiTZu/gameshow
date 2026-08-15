@@ -67,6 +67,7 @@ export function createInitialRoomState(roomCode) {
       winner: null,
       winningTeam: null,
       scores: emptyTeamScores(),
+      questionIndex: 0,
       scoreSystemVersion: SCORE_SYSTEM_VERSION
     }
   };

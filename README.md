@@ -13,13 +13,23 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Der Moderator öffnet den Buzzer für eine Frage.
 - Der erste gültige Buzz wird angenommen.
 - Sobald der erste Buzz bestätigt ist, wird der Buzzer-Sound beim Moderator und bei allen verbundenen Spielern abgespielt.
-- Für eine richtige Antwort erhält das Team einen Quizpunkt.
-- Bei einer falschen Antwort erhält das Gegnerteam einen Quizpunkt.
-- Das erste Team mit fünf Punkten gewinnt das Spiel.
+- Der Moderator sieht die vorbereitete Frage vollständig, aber keine eingeblendete Antwort.
+- Für eine richtige Antwort erhält das Team drei Quizpunkte.
+- Bei einer falschen Antwort erhält das Gegnerteam einen Quizpunkt und der Buzzer wird für dieselbe Frage erneut geöffnet.
+- Das erste Team mit 20 Punkten gewinnt das Spiel.
 - Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
 - Danach kann der Moderator Spiel 2 starten.
 
-### Spiel 2: Top 20 (Best of 3)
+### Spiel 2: Thrifty (Best of 9)
+
+- Neun Amazon-Produkte werden nacheinander gezeigt.
+- Beide Spieler eines Teams bearbeiten einen gemeinsamen Euro-Tipp und eine live synchronisierte Team-Notiz.
+- Team-Tipp und Notiz sind nur für die beiden Teamspieler und den Moderator lesbar.
+- Beide Spieler können den gemeinsamen Preis einloggen.
+- Nach dem Einloggen beider Teams deckt der Moderator den echten Preis und die Abstände auf.
+- Das nähere Team gewinnt die Runde; das erste Team mit fünf Rundensiegen gewinnt das Spiel.
+
+### Spiel 3: Top 20 (Best of 3)
 
 - Gespielt werden drei vorbereitete Listen: Spotify-Stars, bevölkerungsreichste Länder und umsatzstärkste deutsche Unternehmen.
 - Team Blau und Team Rot nennen abwechselnd einen Eintrag.
@@ -29,34 +39,24 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Nach zwei Kreuzen verliert ein Team die aktuelle Runde.
 - Das erste Team mit zwei Rundensiegen gewinnt das Spiel und erhält einen Spielpunkt für die Gesamtwertung.
 
-### Spiel 3: Deutschlandkarte (Best of 11)
+### Spiel 4: Kartenwissen (Best of 11)
 
 - Elf vorbereitete Fragen führen zu Städten und Sehenswürdigkeiten in ganz Deutschland.
-- Beide Spieler eines Teams teilen sich einen gemeinsamen Pin und können ihn bis zur Auswertung verschieben.
+- Beide Spieler eines Teams teilen sich einen gemeinsamen Pin und können ihn bis zum Einloggen verschieben.
+- Beide Teampartner können die gemeinsame Antwort einloggen.
 - Der Moderator sieht die Pins beider Teams in Echtzeit und deckt anschließend das Ziel auf.
 - Die Luftlinie zwischen Team-Pin und Ziel wird in Kilometern berechnet.
 - Das nähere Team erhält einen Kartenpunkt; das erste Team mit sechs Punkten gewinnt das Spiel.
 - Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
 
-### Spiel 4: Wer passt zu wem? (4 Runden)
+### Spiel 5: Da seh ich dich (4 Runden)
 
-- Pro Runde ordnen beide Spieler jedes Teams vier Bilder den registrierten Spielern zu.
-- Spieler und Moderator wählen Namen ausschließlich über Dropdown-Felder aus.
-- Die Zuordnungen werden bis zum gemeinsamen Aufdecken verschlüsselt an den Moderator gesendet.
-- Der Moderator sieht die laufende Auswahl bereits vor dem Abschicken. Jeder Spieler sieht bis zum Aufdecken ausschließlich seine eigenen Zuordnungen.
-- Spieler 1 gibt in der ersten Runde vor, Spieler 2 in der zweiten; anschließend wechseln die Rollen weiter ab.
-- Jede registrierte Person darf pro Zuordnungsdurchgang nur einmal gewählt werden.
+- Pro Runde spielt nur ein Team: Blau in Runde 1 und 3, Rot in Runde 2 und 4.
+- Zuerst gibt Spieler 1 des aktiven Teams vier Zuordnungen vor, anschließend versucht Spieler 2 zu matchen.
+- Nur der Moderator trägt die Namen über Dropdown-Felder ein; die Spieler sehen die Zuordnungen erst beim Aufdecken.
+- Eine Person darf mehreren Bildern zugeordnet werden.
 - Jede Übereinstimmung innerhalb eines Teams zählt einen Punkt.
 - Nach vier Runden gewinnt das Team mit den meisten Übereinstimmungen einen Spielpunkt.
-
-### Spiel 5: Was kostet das? (Best of 9)
-
-- Neun Amazon-Produkte werden nacheinander gezeigt.
-- Beide Spieler eines Teams bearbeiten einen gemeinsamen Euro-Tipp und eine live synchronisierte Team-Notiz.
-- Team-Tipp und Notiz sind nur für die beiden Teamspieler und den Moderator lesbar.
-- Beide Spieler können den gemeinsamen Preis einloggen.
-- Nach dem Einloggen beider Teams deckt der Moderator den echten Preis und die Abstände auf.
-- Das nähere Team gewinnt die Runde; das erste Team mit fünf Rundensiegen gewinnt das Spiel.
 - Nach dem letzten Spiel wird der Gesamtsieger der Gameshow angezeigt.
 
 ## Lokal starten
@@ -90,12 +90,13 @@ js/audio.js                    Gemeinsame Soundeffekte
 js/room.js                     Gemeinsamer Raumzustand
 js/games/game-engine.js        Registry der Minispiele
 js/games/buzzer.js             Regeln des Buzzer Quiz
+js/games/buzzer-questions.js   Vorbereitete Buzzer-Fragen
 js/games/spotify-top-artists.js Regeln des Top-20-Spiels
 js/games/top-20-lists.js       Vorbereitete Lösungen für alle drei Runden
 js/games/germany-map.js        Fragen, Ziele, Distanz- und Spielregeln
 js/germany-map-view.js         Interaktive SVG-Deutschlandkarte
-js/games/matching-game.js      Regeln des Zuordnungsspiels
-js/games/guess-the-price.js    Regeln des Preisratespiels
+js/games/matching-game.js      Regeln von Da seh ich dich
+js/games/guess-the-price.js    Regeln von Thrifty
 js/private-channel-crypto.js   Verschlüsselte private Team-Payloads
 assets/audio/buzzer.mp3        Soundeffekt für den ersten gültigen Buzz
 supabase/migrations/           Versionierte Datenbankänderungen

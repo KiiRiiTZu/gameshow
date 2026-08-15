@@ -180,7 +180,8 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .versus { align-self: center; font-weight: 900; opacity: .45; }
 
 .host-page .topbar { margin-bottom: 18px; }
-.host-page .host-room-title {
+.host-page .host-room-title,
+.player-room-title {
   margin: 0;
   font-size: .76rem;
   line-height: 1.2;
@@ -333,9 +334,9 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .top20-team-note.blue { border-color: rgba(90,114,246,.48); }
 .top20-team-note.red { border-color: rgba(210,55,80,.48); }
-.top20-team-note p { min-height: 42px; margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.top20-team-note p { min-height: 64px; margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .top20-player-note { display: grid; gap: 8px; margin-top: 16px; }
-.top20-player-note textarea { min-height: 88px; }
+.top20-player-note textarea { min-height: 132px; }
 .top20-player-note p { margin: 0; }
 
 .spotify-board {
@@ -514,10 +515,11 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .matching-assignment.bottom-left { bottom: 10px; left: 10px; }
 .matching-assignment.bottom-right { right: 10px; bottom: 10px; }
 
-.matching-assignment select {
+.matching-assignment select,
+.matching-assignment span {
   width: 100%;
   padding: 9px 11px;
-  border-width: 2px;
+  border: 2px solid;
   border-radius: 10px;
   background: rgba(10,13,21,.94);
   font-size: .82rem;
@@ -525,8 +527,12 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   box-shadow: 0 4px 18px rgba(0,0,0,.42);
 }
 
-.matching-assignment.blue select { border-color: #7187ff; }
-.matching-assignment.red select { border-color: #ee6076; }
+.matching-assignment span { display: block; }
+
+.matching-assignment.blue select,
+.matching-assignment.blue span { border-color: #7187ff; }
+.matching-assignment.red select,
+.matching-assignment.red span { border-color: #ee6076; }
 .matching-assignment.future { opacity: .32; }
 .matching-assignment.active select { box-shadow: 0 0 0 3px rgba(255,255,255,.24), 0 4px 18px rgba(0,0,0,.5); }
 .matching-assignment.matched select { border-color: #35d08a; }
