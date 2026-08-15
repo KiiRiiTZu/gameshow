@@ -85,7 +85,7 @@ export function distanceInKilometers(first, second) {
 
 export const germanyMapGame = {
   id: "germany-map",
-  name: "Deutschlandkarte",
+  name: "Kartenwissen",
 
   start(state) {
     state.game = {
@@ -94,6 +94,7 @@ export const germanyMapGame = {
       roundIndex: 0,
       roundScores: { blue: 0, red: 0 },
       pins: emptyPins(),
+      lockedTeams: { blue: false, red: false },
       distances: emptyDistances(),
       roundWinner: null,
       winningTeam: null,
@@ -113,6 +114,10 @@ export const germanyMapGame = {
       red: Number(state.game.roundScores?.red) || 0
     };
     state.game.pins ||= emptyPins();
+    state.game.lockedTeams = {
+      blue: Boolean(state.game.lockedTeams?.blue),
+      red: Boolean(state.game.lockedTeams?.red)
+    };
     state.game.distances ||= emptyDistances();
     state.game.roundWinner ||= null;
     state.game.winningTeam ||= null;
@@ -122,7 +127,7 @@ export const germanyMapGame = {
 
   placePin(state, team, position) {
     if (state.game.id !== this.id || state.game.status !== "placing") return false;
-    if (!["blue", "red"].includes(team)) return false;
+    if (!["blue", "red"].includes(team) || state.game.lockedTeams?.[team]) return false;
 
     const lat = Number(position?.lat);
     const lng = Number(position?.lng);
@@ -133,9 +138,18 @@ export const germanyMapGame = {
     return true;
   },
 
+  lockTeam(state, team) {
+    if (state.game.id !== this.id || state.game.status !== "placing") return false;
+    if (!["blue", "red"].includes(team) || state.game.lockedTeams?.[team]) return false;
+    if (!state.game.pins?.[team]) return false;
+    state.game.lockedTeams[team] = true;
+    return true;
+  },
+
   revealRound(state) {
     if (state.game.id !== this.id || state.game.status !== "placing") return false;
-    if (!state.game.pins.blue || !state.game.pins.red) return false;
+    if (!state.game.pins.blue || !state.game.pins.red ||
+        !state.game.lockedTeams.blue || !state.game.lockedTeams.red) return false;
 
     const question = GERMANY_MAP_QUESTIONS[state.game.roundIndex];
     const blueDistance = distanceInKilometers(state.game.pins.blue, question.target);
@@ -168,6 +182,7 @@ export const germanyMapGame = {
     state.game.roundIndex += 1;
     state.game.status = "placing";
     state.game.pins = emptyPins();
+    state.game.lockedTeams = { blue: false, red: false };
     state.game.distances = emptyDistances();
     state.game.roundWinner = null;
     return true;

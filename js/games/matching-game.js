@@ -6,9 +6,21 @@ export const MATCHING_ASSIGNERS = [
 ];
 
 export const MATCHING_TURNS = [
-  { playerIndex: 0, assignerIndexes: { blue: 0, red: 1 }, label: "Spieler 1" },
-  { playerIndex: 1, assignerIndexes: { blue: 2, red: 3 }, label: "Spieler 2" }
+  { playerIndex: 0, label: "Spieler 1" },
+  { playerIndex: 1, label: "Spieler 2" }
 ];
+
+export function getMatchingRoundTeam(roundIndex) {
+  return Number(roundIndex) % 2 === 0 ? "blue" : "red";
+}
+
+export function getMatchingTurn(roundIndex, activeTurnIndex) {
+  const team = getMatchingRoundTeam(roundIndex);
+  const turnIndex = Math.min(Math.max(Number(activeTurnIndex) || 0, 0), 1);
+  const playerIndex = MATCHING_TURNS[turnIndex].playerIndex;
+  const assignerIndex = team === "blue" ? playerIndex * 2 : playerIndex * 2 + 1;
+  return { ...MATCHING_TURNS[turnIndex], team, assignerIndex };
+}
 
 const IMAGE_ROOT = "./assets/images/matching%20game";
 
@@ -17,10 +29,10 @@ export const MATCHING_GAME_ROUNDS = [
     id: "valowaffen",
     title: "Valorant-Waffen",
     images: [
-      { id: "judge", label: "Judge", src: `${IMAGE_ROOT}/valowaffen/Judge.webp` },
-      { id: "operator", label: "Operator", src: `${IMAGE_ROOT}/valowaffen/operator.webp` },
+      { id: "classic", label: "Classic", src: `${IMAGE_ROOT}/valowaffen/Classic.webp` },
+      { id: "frenzy", label: "Frenzy", src: `${IMAGE_ROOT}/valowaffen/Frenzy.webp` },
+      { id: "ghost", label: "Ghost", src: `${IMAGE_ROOT}/valowaffen/Ghost.webp` },
       { id: "sheriff", label: "Sheriff", src: `${IMAGE_ROOT}/valowaffen/Sheriff.webp` },
-      { id: "vandal", label: "Vandal", src: `${IMAGE_ROOT}/valowaffen/vandal.webp` }
     ]
   },
   {
@@ -59,16 +71,24 @@ function emptyScores() {
   return { blue: 0, red: 0 };
 }
 
-function emptyTeamFlags() {
-  return { blue: false, red: false };
-}
-
 function emptyRevealedAssignments() {
   return { blue: null, red: null };
 }
 
 function normalizeName(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
+}
+
+export function areMatchingValuesUnique(values) {
+  const selected = (values || []).map(normalizeName).filter(Boolean);
+  return new Set(selected).size === selected.length;
+}
+
+export function getPrivateMatchingAssignments(roundAssignments, assignerIndex) {
+  if (![0, 1, 2, 3].includes(Number(assignerIndex))) return [];
+  return (roundAssignments || []).map((imageAssignments) =>
+    String(imageAssignments?.[assignerIndex] || "")
+  );
 }
 
 export function scoreMatchingAssignments(assignments) {
@@ -89,7 +109,7 @@ export function scoreMatchingAssignments(assignments) {
 
 export const matchingGame = {
   id: "matching-game",
-  name: "Wer passt zu wem?",
+  name: "Da seh ich dich",
 
   start(state, assignerOrder) {
     if (!Array.isArray(assignerOrder) || assignerOrder.length !== MATCHING_ASSIGNERS.length) {
@@ -101,8 +121,9 @@ export const matchingGame = {
       status: "assigning",
       roundIndex: 0,
       activeTurnIndex: 0,
-      submittedTeams: emptyTeamFlags(),
-      revealedTeams: emptyTeamFlags(),
+      activeTeam: "blue",
+      turnSubmitted: false,
+      revealedTeams: { blue: false, red: false },
       revealedAssignments: emptyRevealedAssignments(),
       scores: emptyScores(),
       roundResults: [],
@@ -125,15 +146,13 @@ export const matchingGame = {
       MATCHING_GAME_ROUNDS.length - 1
     );
     state.game.activeTurnIndex = Math.min(
-      Math.max(Number(state.game.activeTurnIndex) ||
-        Math.floor((Number(state.game.activeAssignerIndex) || 0) / 2), 0),
+      Math.max(Number(state.game.activeTurnIndex) || 0, 0),
       MATCHING_TURNS.length - 1
     );
     delete state.game.activeAssignerIndex;
-    state.game.submittedTeams = {
-      blue: Boolean(state.game.submittedTeams?.blue),
-      red: Boolean(state.game.submittedTeams?.red)
-    };
+    state.game.activeTeam = getMatchingRoundTeam(state.game.roundIndex);
+    state.game.turnSubmitted = Boolean(state.game.turnSubmitted);
+    delete state.game.submittedTeams;
     state.game.revealedTeams = {
       blue: Boolean(state.game.revealedTeams?.blue),
       red: Boolean(state.game.revealedTeams?.red)
@@ -161,31 +180,30 @@ export const matchingGame = {
 
   submitTeam(state, team) {
     if (state.game.id !== this.id || state.game.status !== "assigning") return false;
-    if (!["blue", "red"].includes(team) || state.game.submittedTeams[team]) return false;
+    if (team !== getMatchingRoundTeam(state.game.roundIndex) || state.game.turnSubmitted) return false;
 
-    state.game.submittedTeams[team] = true;
+    state.game.turnSubmitted = true;
     return true;
   },
 
   completeTurn(state) {
     if (state.game.id !== this.id || state.game.status !== "assigning") return false;
-    if (!state.game.submittedTeams.blue || !state.game.submittedTeams.red) return false;
+    if (!state.game.turnSubmitted) return false;
 
     if (state.game.activeTurnIndex < MATCHING_TURNS.length - 1) {
       state.game.activeTurnIndex += 1;
-      state.game.submittedTeams = emptyTeamFlags();
+      state.game.turnSubmitted = false;
       return true;
     }
 
     state.game.status = "ready-to-reveal";
-    state.game.submittedTeams = emptyTeamFlags();
+    state.game.turnSubmitted = false;
     return true;
   },
 
   revealTeam(state, team, teamAssignments) {
-    if (state.game.id !== this.id ||
-        !["ready-to-reveal", "revealing"].includes(state.game.status)) return false;
-    if (!["blue", "red"].includes(team) || state.game.revealedTeams[team]) return false;
+    if (state.game.id !== this.id || state.game.status !== "ready-to-reveal") return false;
+    if (team !== getMatchingRoundTeam(state.game.roundIndex) || state.game.revealedTeams[team]) return false;
     if (!Array.isArray(teamAssignments) || teamAssignments.length !== 4 ||
         teamAssignments.some((pair) => !Array.isArray(pair) || pair.length !== 2 ||
           pair.some((value) => !String(value || "").trim()))) return false;
@@ -194,20 +212,11 @@ export const matchingGame = {
       pair.map((value) => String(value).trim())
     );
     state.game.revealedTeams[team] = true;
-
-    if (!state.game.revealedTeams.blue || !state.game.revealedTeams.red) {
-      state.game.status = "revealing";
-      return true;
-    }
-
-    const roundScores = {
-      blue: state.game.revealedAssignments.blue.filter(([first, second]) =>
-        normalizeName(first) === normalizeName(second)
-      ).length,
-      red: state.game.revealedAssignments.red.filter(([first, second]) =>
-        normalizeName(first) === normalizeName(second)
-      ).length
-    };
+    const matches = state.game.revealedAssignments[team].filter(([first, second]) =>
+      normalizeName(first) === normalizeName(second)
+    ).length;
+    const roundScores = { blue: 0, red: 0 };
+    roundScores[team] = matches;
 
     state.game.scores.blue += roundScores.blue;
     state.game.scores.red += roundScores.red;
@@ -228,24 +237,8 @@ export const matchingGame = {
   },
 
   revealAll(state, assignments) {
-    if (state.game.id !== this.id ||
-        !["ready-to-reveal", "revealing"].includes(state.game.status)) return false;
-
-    const validTeamAssignments = (teamAssignments) =>
-      Array.isArray(teamAssignments) && teamAssignments.length === 4 &&
-      teamAssignments.every((pair) => Array.isArray(pair) && pair.length === 2 &&
-        pair.every((value) => String(value || "").trim()));
-
-    if (!validTeamAssignments(assignments?.blue) ||
-        !validTeamAssignments(assignments?.red)) return false;
-
-    let changed = false;
-    for (const team of ["blue", "red"]) {
-      if (state.game.revealedTeams[team]) continue;
-      if (!this.revealTeam(state, team, assignments[team])) return false;
-      changed = true;
-    }
-    return changed;
+    const team = getMatchingRoundTeam(state.game.roundIndex);
+    return this.revealTeam(state, team, assignments?.[team]);
   },
 
   startNextRound(state) {
@@ -254,8 +247,9 @@ export const matchingGame = {
 
     state.game.roundIndex += 1;
     state.game.activeTurnIndex = 0;
-    state.game.submittedTeams = emptyTeamFlags();
-    state.game.revealedTeams = emptyTeamFlags();
+    state.game.activeTeam = getMatchingRoundTeam(state.game.roundIndex);
+    state.game.turnSubmitted = false;
+    state.game.revealedTeams = { blue: false, red: false };
     state.game.revealedAssignments = emptyRevealedAssignments();
     state.game.status = "assigning";
     return true;

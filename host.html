@@ -6,13 +6,10 @@
   <title>Gameshow · Moderator</title>
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
-<body>
+<body class="host-page">
   <main class="shell">
     <header class="topbar">
-      <div>
-        <p class="eyebrow">MODERATOR</p>
-        <h1>Raum <span id="room-code">----</span></h1>
-      </div>
+      <h1 class="host-room-title">Moderator <span aria-hidden="true">|</span> Raum <span id="room-code">----</span></h1>
       <div class="connection">
         <span id="connection-dot" class="dot"></span>
         <span id="connection-text">Verbinde…</span>
@@ -52,6 +49,16 @@
         <span><strong id="buzzer-red-score">0</strong> Rot</span>
       </div>
 
+      <div id="buzzer-start-controls" class="game-finished">
+        <p>Bereit für das erste Spiel?</p>
+        <button id="start-buzzer-game" class="button primary">Spiel 1 starten</button>
+      </div>
+
+      <div id="buzzer-question-card" class="map-question-card buzzer-question-card">
+        <span id="buzzer-question-number" class="eyebrow">FRAGE 1</span>
+        <h3 id="buzzer-question"></h3>
+      </div>
+
       <div id="buzz-result" class="buzz-result">
         <span class="muted">Öffne den Buzzer, sobald du die Frage gestellt hast.</span>
       </div>
@@ -62,20 +69,21 @@
       </div>
 
       <div id="answer-controls" class="answer-controls hidden">
-        <button id="correct-answer" class="button success">✓ Richtig · +1 Quizpunkt</button>
+        <button id="correct-answer" class="button success">✓ Richtig · +3 Quizpunkte</button>
         <button id="wrong-answer" class="button danger">✕ Falsch · +1 Gegner</button>
       </div>
 
       <div id="buzzer-finished-controls" class="game-finished hidden">
         <p id="buzzer-winner-message"></p>
-        <button id="start-spotify-game" class="button primary">Top 20 starten</button>
+        <button id="start-price-game-after-buzzer" class="button primary">Thrifty starten</button>
       </div>
+      <p id="buzzer-next-game-error" class="error"></p>
     </section>
 
     <section id="spotify-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 2 · BEST OF 3</p>
+          <p class="eyebrow">SPIEL 3 · BEST OF 3</p>
           <h2 id="top20-title">Top 20</h2>
           <p id="top20-description" class="muted"></p>
         </div>
@@ -98,21 +106,32 @@
         <button id="spotify-miss" class="button danger" type="button">✕ Nicht dabei</button>
       </div>
 
+      <div class="top20-team-notes">
+        <article class="top20-team-note blue">
+          <strong>Team Blau · interne Notiz</strong>
+          <p id="top20-blue-note">Noch keine Eingabe</p>
+        </article>
+        <article class="top20-team-note red">
+          <strong>Team Rot · interne Notiz</strong>
+          <p id="top20-red-note">Noch keine Eingabe</p>
+        </article>
+      </div>
+
       <p id="spotify-error" class="error"></p>
       <div id="spotify-board" class="spotify-board"></div>
 
       <div id="spotify-finished" class="game-finished hidden">
         <p id="spotify-winner-message"></p>
         <button id="next-top20-round" class="button primary">Nächste Liste starten</button>
-        <button id="start-map-game" class="button primary hidden">Deutschlandkarte starten</button>
+        <button id="start-map-game" class="button primary hidden">Kartenwissen starten</button>
       </div>
     </section>
 
     <section id="map-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 3 · BEST OF 11</p>
-          <h2>Deutschlandkarte</h2>
+          <p class="eyebrow">SPIEL 4 · BEST OF 11</p>
+          <h2>Kartenwissen</h2>
           <p id="map-round-label" class="muted">Frage 1 von 11</p>
         </div>
         <span id="map-status" class="status-pill open">Pins setzen</span>
@@ -143,7 +162,7 @@
       <div class="controls">
         <button id="reveal-map-round" class="button primary">Ziel aufdecken &amp; auswerten</button>
         <button id="next-map-round" class="button primary hidden">Nächste Frage</button>
-        <button id="start-matching-game" class="button primary hidden">Zuordnungsspiel starten</button>
+        <button id="start-matching-game" class="button primary hidden">Da seh ich dich starten</button>
       </div>
       <p id="map-next-game-error" class="error"></p>
     </section>
@@ -151,8 +170,8 @@
     <section id="matching-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 4 · 4 RUNDEN</p>
-          <h2>Wer passt zu wem?</h2>
+          <p class="eyebrow">SPIEL 5 · 4 RUNDEN</p>
+          <h2>Da seh ich dich</h2>
           <p id="matching-round-label" class="muted">Runde 1 von 4</p>
         </div>
         <span id="matching-status" class="status-pill open">Zuordnen</span>
@@ -165,7 +184,7 @@
       </div>
 
       <div id="matching-turn" class="matching-turn blue"></div>
-      <p class="muted small">Die Namen bleiben ausschließlich in dieser Moderatoransicht.</p>
+      <p class="muted small">Pro Runde spielt nur ein Team. Alle Zuordnungen werden vom Moderator eingetragen.</p>
       <div id="matching-board" class="matching-board"></div>
       <p id="matching-error" class="error"></p>
 
@@ -173,8 +192,62 @@
       <div class="controls">
         <button id="save-matching-assignment" class="button primary">Moderator-Eingaben speichern</button>
         <button id="complete-matching-turn" class="button secondary hidden">Nächste Spieler</button>
-        <button id="reveal-matching-all" class="button primary hidden">Alle Antworten aufdecken</button>
+        <button id="reveal-matching-all" class="button primary hidden">Antworten aufdecken</button>
         <button id="next-matching-round" class="button primary hidden">Nächste Runde</button>
+      </div>
+      <p id="matching-next-game-error" class="error"></p>
+    </section>
+
+    <section id="price-game-panel" class="card game-panel hidden">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 2 · BEST OF 9</p>
+          <h2>Thrifty</h2>
+          <p id="price-round-label" class="muted">Produkt 1 von 9</p>
+        </div>
+        <span id="price-status" class="status-pill open">Teams beraten sich</span>
+      </div>
+
+      <div class="round-score" aria-label="Punktestand im Preisratespiel">
+        <span>Blau <strong id="price-blue-score">0</strong></span>
+        <span>Rundensiege</span>
+        <span><strong id="price-red-score">0</strong> Rot</span>
+      </div>
+
+      <div class="price-host-layout">
+        <article class="price-product-card">
+          <div class="price-product-image">
+            <img id="price-product-image" src="" alt="">
+          </div>
+          <h3 id="price-product-name"></h3>
+        </article>
+
+        <div class="price-team-drafts">
+          <article class="price-team-draft blue">
+            <div class="price-team-heading">
+              <strong>Team Blau</strong>
+              <span id="price-blue-lock" class="status-pill">Offen</span>
+            </div>
+            <div id="price-blue-guess" class="price-guess-value">Noch keine Eingabe</div>
+            <p id="price-blue-comment" class="price-comment-preview">Noch kein Kommentar</p>
+          </article>
+          <article class="price-team-draft red">
+            <div class="price-team-heading">
+              <strong>Team Rot</strong>
+              <span id="price-red-lock" class="status-pill">Offen</span>
+            </div>
+            <div id="price-red-guess" class="price-guess-value">Noch keine Eingabe</div>
+            <p id="price-red-comment" class="price-comment-preview">Noch kein Kommentar</p>
+          </article>
+        </div>
+      </div>
+
+      <div id="price-round-result" class="map-result hidden"></div>
+      <p id="price-error" class="error"></p>
+      <div id="buzzer-controls" class="controls">
+        <button id="reveal-price-round" class="button primary">Preis aufdecken &amp; auswerten</button>
+        <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
+        <button id="start-top20-game" class="button primary hidden">Top 20 starten</button>
       </div>
     </section>
 

@@ -12,6 +12,7 @@ import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { registerGame } from "./games/game-engine.js";
 import { BUZZER_WINNING_SCORE, buzzerGame } from "./games/buzzer.js";
+import { BUZZER_QUESTIONS, getBuzzerQuestion } from "./games/buzzer-questions.js";
 import { top20Game } from "./games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
 import { GERMANY_MAP_QUESTIONS, GERMANY_MAP_ROUNDS_TO_WIN, germanyMapGame } from "./games/germany-map.js";
@@ -20,18 +21,28 @@ import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
   MATCHING_TURNS,
+  getMatchingTurn,
   matchingGame
 } from "./games/matching-game.js";
 import {
+  formatEuroAmount,
+  formatSignedEuroDifference,
+  guessThePriceGame,
+  parseEuroAmount
+} from "./games/guess-the-price.js";
+import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
+import {
   createMatchingKeyPair,
-  decryptMatchingSubmission,
   exportMatchingPublicKey
 } from "./matching-crypto.js";
+import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
+import { showGameTransition } from "./game-effects.js";
 
 registerGame(buzzerGame);
 registerGame(top20Game);
 registerGame(germanyMapGame);
 registerGame(matchingGame);
+registerGame(guessThePriceGame);
 
 let roomCode;
 let roomRecord;
@@ -43,6 +54,11 @@ let hostMap;
 let matchingAssignments = [];
 let matchingKeyPair;
 let matchingPublicKey;
+let top20Notes = emptyTop20Notes();
+let priceDrafts = emptyPriceDrafts();
+const pricePlayerKeys = new Map();
+let previousGameId = null;
+let previousBuzzerStatus = null;
 
 const $ = (id) => document.getElementById(id);
 
@@ -52,6 +68,85 @@ function gameStorageKey() {
 
 function matchingStorageKey() {
   return `gameshow-matching-assignments-${roomRecord.id}`;
+}
+
+function top20StorageKey() {
+  return `gameshow-top20-notes-${roomRecord.id}`;
+}
+
+function priceStorageKey() {
+  return `gameshow-price-drafts-${roomRecord.id}`;
+}
+
+function emptyTop20Notes(roundIndex = 0) {
+  return {
+    roundIndex,
+    blue: { text: "", updatedBy: null },
+    red: { text: "", updatedBy: null }
+  };
+}
+
+function saveTop20Notes() {
+  try {
+    localStorage.setItem(top20StorageKey(), JSON.stringify(top20Notes));
+  } catch (error) {
+    console.warn("Private Top 20 notes could not be saved:", error);
+  }
+}
+
+function restoreTop20Notes() {
+  top20Notes = emptyTop20Notes(state.game.roundIndex);
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(top20StorageKey()));
+    if (!saved || saved.roundIndex !== state.game.roundIndex) return false;
+    for (const team of ["blue", "red"]) {
+      top20Notes[team] = {
+        text: String(saved[team]?.text || "").slice(0, 280),
+        updatedBy: saved[team]?.updatedBy || null
+      };
+    }
+    return true;
+  } catch (error) {
+    console.warn("Private Top 20 notes could not be restored:", error);
+    return false;
+  }
+}
+
+function emptyPriceDrafts(roundIndex = 0) {
+  return {
+    roundIndex,
+    blue: { amount: "", comment: "", updatedBy: null },
+    red: { amount: "", comment: "", updatedBy: null }
+  };
+}
+
+function savePriceDrafts() {
+  try {
+    localStorage.setItem(priceStorageKey(), JSON.stringify(priceDrafts));
+  } catch (error) {
+    console.warn("Private price drafts could not be saved:", error);
+  }
+}
+
+function restorePriceDrafts() {
+  priceDrafts = emptyPriceDrafts(state.game.roundIndex);
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(priceStorageKey()));
+    if (!saved || saved.roundIndex !== state.game.roundIndex) return false;
+    for (const team of ["blue", "red"]) {
+      priceDrafts[team] = {
+        amount: String(saved[team]?.amount || "").slice(0, 40),
+        comment: String(saved[team]?.comment || "").slice(0, 280),
+        updatedBy: saved[team]?.updatedBy || null
+      };
+    }
+    return true;
+  } catch (error) {
+    console.warn("Private price drafts could not be restored:", error);
+    return false;
+  }
 }
 
 function emptyMatchingAssignments() {
@@ -153,26 +248,50 @@ async function initializeHost() {
   state = createRoomStateFromRecords(roomCode, roomRecord, players);
   restoreLocalGameState();
 
-  if (state.game.id === top20Game.id) top20Game.normalize(state);
+  if (state.game.id === top20Game.id) {
+    top20Game.normalize(state);
+    restoreTop20Notes();
+  }
   if (state.game.id === germanyMapGame.id) germanyMapGame.normalize(state);
   if (state.game.id === matchingGame.id) {
     matchingGame.normalize(state);
     const assignmentsRestored = restoreMatchingAssignments();
     if (!assignmentsRestored && state.game.status === "assigning") {
       state.game.activeTurnIndex = 0;
-      state.game.submittedTeams = { blue: false, red: false };
+      state.game.turnSubmitted = false;
     }
+  }
+  if (state.game.id === guessThePriceGame.id) {
+    guessThePriceGame.normalize(state);
+    restorePriceDrafts();
   }
 
   $("room-code").textContent = roomCode;
   hostMap = createGermanyMap($("host-germany-map"));
   matchingKeyPair = await createMatchingKeyPair();
   matchingPublicKey = await exportMatchingPublicKey(matchingKeyPair.publicKey);
+  previousGameId = state.game.id;
+  previousBuzzerStatus = state.game.id === buzzerGame.id ? state.game.status : null;
   startRealtime();
   render();
 }
 
+function renderGameEffects() {
+  const gameId = state.game.id;
+
+  if (previousGameId && previousGameId !== gameId) {
+    showGameTransition(gameId);
+  } else if (gameId === buzzerGame.id && previousBuzzerStatus === "not-started" &&
+      state.game.status !== "not-started") {
+    showGameTransition(gameId);
+  }
+
+  previousGameId = gameId;
+  previousBuzzerStatus = gameId === buzzerGame.id ? state.game.status : null;
+}
+
 function render() {
+  renderGameEffects();
   $("blue-score").textContent = state.scores.blue;
   $("red-score").textContent = state.scores.red;
 
@@ -182,31 +301,104 @@ function render() {
   const spotifyIsActive = state.game.id === top20Game.id;
   const mapIsActive = state.game.id === germanyMapGame.id;
   const matchingIsActive = state.game.id === matchingGame.id;
+  const priceIsActive = state.game.id === guessThePriceGame.id;
   document.querySelector(".shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || mapIsActive || matchingIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
   );
-  $("buzzer-game-panel").classList.toggle("hidden", spotifyIsActive || mapIsActive || matchingIsActive);
+  $("buzzer-game-panel").classList.toggle(
+    "hidden",
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
+  );
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
   $("map-game-panel").classList.toggle("hidden", !mapIsActive);
   $("matching-game-panel").classList.toggle("hidden", !matchingIsActive);
+  $("price-game-panel").classList.toggle("hidden", !priceIsActive);
 
-  if (matchingIsActive) renderMatchingGame();
+  if (priceIsActive) renderPriceGame();
+  else if (matchingIsActive) renderMatchingGame();
   else if (mapIsActive) renderMapGame();
   else if (spotifyIsActive) renderSpotifyGame();
   else renderBuzzerGame();
 }
 
+function renderPriceDraft(team) {
+  const draft = priceDrafts[team];
+  const parsedAmount = parseEuroAmount(draft.amount);
+  const locked = Boolean(state.game.lockedTeams?.[team]);
+  $(`price-${team}-guess`).textContent = parsedAmount === null
+    ? draft.amount || "Noch keine Eingabe"
+    : formatEuroAmount(parsedAmount);
+  $(`price-${team}-comment`).textContent = draft.comment || "Noch kein Kommentar";
+  $(`price-${team}-lock`).textContent = locked ? "Eingeloggt ✓" : "Offen";
+  $(`price-${team}-lock`).className = `status-pill ${locked ? "open" : ""}`;
+}
+
+function renderPriceGame() {
+  const game = state.game;
+  const product = getPriceProduct(game.roundIndex);
+  const isRevealed = ["revealed", "finished"].includes(game.status);
+  const isFinished = game.status === "finished";
+  const bothLocked = game.lockedTeams.blue && game.lockedTeams.red;
+
+  $("price-round-label").textContent =
+    `Produkt ${game.roundIndex + 1} von ${PRICE_PRODUCTS.length}`;
+  $("price-blue-score").textContent = game.roundScores.blue;
+  $("price-red-score").textContent = game.roundScores.red;
+  $("price-product-image").src = product.src;
+  $("price-product-image").alt = product.name;
+  $("price-product-name").textContent = product.name;
+  $("price-status").textContent = isFinished
+    ? "Spiel beendet"
+    : isRevealed ? "Preis aufgedeckt" : bothLocked ? "Bereit zum Aufdecken" : "Teams beraten sich";
+  $("price-status").className = `status-pill ${isRevealed ? "closed" : "open"}`;
+
+  renderPriceDraft("blue");
+  renderPriceDraft("red");
+
+  $("reveal-price-round").classList.toggle("hidden", isRevealed);
+  $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
+  $("next-price-round").classList.toggle("hidden", !isRevealed || isFinished);
+  $("next-price-round").disabled = moderatorActionPending;
+  $("start-top20-game").classList.toggle("hidden", !isFinished);
+  $("start-top20-game").disabled = moderatorActionPending;
+  $("price-round-result").classList.toggle("hidden", !isRevealed);
+
+  if (!isRevealed) return;
+
+  const result = game.revealed;
+  const roundMessage = result.roundWinner
+    ? `${getTeamName(result.roundWinner)} liegt näher.`
+    : "Beide Teams liegen exakt gleich weit entfernt.";
+  const finalMessage = isFinished
+    ? game.winningTeam
+      ? `<p>🏆 ${getTeamName(game.winningTeam)} gewinnt Thrifty mit ${game.roundScores[game.winningTeam]} Punkten!</p>`
+      : "<p>Thrifty endet unentschieden.</p>"
+    : "";
+  $("price-round-result").innerHTML = `
+    <strong>Preis: ${formatEuroAmount(result.actualPrice)}</strong>
+    <span>Blau: ${formatSignedEuroDifference(result.actualPrice, result.guesses.blue)}</span><br>
+    <span>Rot: ${formatSignedEuroDifference(result.actualPrice, result.guesses.red)}</span>
+    <p>${roundMessage}</p>
+    ${finalMessage}
+  `;
+}
+
 function renderBuzzerGame() {
   const status = state.game.status;
+  const isNotStarted = status === "not-started";
   const isOpen = status === "open";
   const isLocked = status === "locked";
   const isFinished = status === "finished";
   const winner = state.game.winner;
   const gameScores = state.game.scores || { blue: 0, red: 0 };
+  const questionIndex = Number(state.game.questionIndex) || 0;
+  const question = getBuzzerQuestion(questionIndex);
 
   $("buzzer-blue-score").textContent = gameScores.blue;
   $("buzzer-red-score").textContent = gameScores.red;
+  $("buzzer-question-number").textContent = `FRAGE ${questionIndex + 1} VON ${BUZZER_QUESTIONS.length}`;
+  $("buzzer-question").textContent = question.question;
 
   $("buzzer-status").textContent = isOpen
     ? "Buzzer offen"
@@ -214,21 +406,28 @@ function renderBuzzerGame() {
       ? "Buzzer gesperrt"
       : isFinished
         ? "Spiel beendet"
-        : "Buzzer geschlossen";
+        : isNotStarted
+          ? "Noch nicht gestartet"
+          : "Buzzer geschlossen";
   $("buzzer-status").className = `status-pill ${isOpen ? "open" : "closed"}`;
 
   $("open-buzzer").disabled = moderatorActionPending || status !== "waiting";
   $("reset-buzzer").disabled = moderatorActionPending || isFinished;
   $("correct-answer").disabled = moderatorActionPending;
   $("wrong-answer").disabled = moderatorActionPending;
-  $("start-spotify-game").disabled = moderatorActionPending;
+  $("start-price-game-after-buzzer").disabled = moderatorActionPending;
+  $("buzzer-start-controls").classList.toggle("hidden", !isNotStarted);
+  $("start-buzzer-game").disabled = moderatorActionPending;
+  $("buzzer-question-card").classList.toggle("hidden", isNotStarted);
+  $("buzz-result").classList.toggle("hidden", isNotStarted);
+  $("buzzer-controls").classList.toggle("hidden", isNotStarted);
   $("answer-controls").classList.toggle("hidden", !winner || isFinished);
   $("buzzer-finished-controls").classList.toggle("hidden", !isFinished);
 
   if (isFinished) {
     const winningTeam = state.game.winningTeam || (gameScores.blue >= BUZZER_WINNING_SCORE ? "blue" : "red");
     const teamName = getTeamName(winningTeam);
-    $("buzzer-winner-message").textContent = `🏆 ${teamName} gewinnt das Buzzer Quiz mit ${BUZZER_WINNING_SCORE} Punkten!`;
+    $("buzzer-winner-message").textContent = `🏆 ${teamName} gewinnt das Buzzer Quiz mit ${gameScores[winningTeam]} Punkten!`;
     $("buzz-result").classList.add("winner");
     $("buzz-result").innerHTML = `<strong>${teamName} gewinnt Spiel 1</strong>`;
     return;
@@ -280,6 +479,8 @@ function renderSpotifyGame() {
   $("blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("red-strikes").textContent = renderStrikes(game.strikes?.red);
   $("spotify-board").innerHTML = renderSpotifySlots(revealed, list, interactionLocked);
+  $("top20-blue-note").textContent = top20Notes.blue.text || "Noch keine Eingabe";
+  $("top20-red-note").textContent = top20Notes.red.text || "Noch keine Eingabe";
   $("spotify-finished").classList.toggle("hidden", !interactionLocked);
   $("spotify-winner-message").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20 mit ${game.roundWins[game.winningTeam]} Rundensiegen!`
@@ -300,6 +501,7 @@ function renderMapGame() {
   const isRevealed = game.status === "revealed" || game.status === "finished";
   const isFinished = game.status === "finished";
   const bothPinsReady = Boolean(game.pins?.blue && game.pins?.red);
+  const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
 
   $("map-round-label").textContent = `Frage ${game.roundIndex + 1} von ${GERMANY_MAP_QUESTIONS.length}`;
   $("map-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
@@ -322,12 +524,12 @@ function renderMapGame() {
 
   $("target-legend").classList.toggle("hidden", !isRevealed);
   $("map-pin-status").innerHTML = `
-    <span class="${game.pins?.blue ? "ready" : ""}">Blau: ${game.pins?.blue ? "Pin gesetzt ✓" : "wartet…"}</span>
-    <span class="${game.pins?.red ? "ready" : ""}">Rot: ${game.pins?.red ? "Pin gesetzt ✓" : "wartet…"}</span>
+    <span class="${game.lockedTeams?.blue ? "ready" : ""}">Blau: ${game.lockedTeams?.blue ? "eingeloggt ✓" : game.pins?.blue ? "Pin gesetzt" : "wartet…"}</span>
+    <span class="${game.lockedTeams?.red ? "ready" : ""}">Rot: ${game.lockedTeams?.red ? "eingeloggt ✓" : game.pins?.red ? "Pin gesetzt" : "wartet…"}</span>
   `;
 
   $("reveal-map-round").classList.toggle("hidden", isRevealed);
-  $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady;
+  $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady || !bothTeamsLocked;
   $("next-map-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-map-round").disabled = moderatorActionPending;
   $("start-matching-game").classList.toggle("hidden", !isFinished);
@@ -373,23 +575,26 @@ function renderMatchingPlayerOptions(selectedValue = "") {
   return [
     `<option value="">Spieler wählen</option>`,
     ...state.players.map((player) =>
-      `<option value="${escapeHtml(player.name)}"${player.name === selectedValue ? " selected" : ""}>${escapeHtml(player.name)}</option>`
+      `<option value="${escapeHtml(player.name)}"${player.name === selectedValue ? " selected" : ""}>` +
+      `${escapeHtml(player.name)}</option>`
     )
   ].join("");
 }
 
-function renderMatchingAssignment(imageAssignments, assignerIndex, game, hasResult) {
+function renderMatchingAssignment(roundAssignments, imageIndex, assignerIndex, game, hasResult) {
+  const imageAssignments = roundAssignments[imageIndex];
   const assigner = MATCHING_ASSIGNERS[assignerIndex];
   const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
-  const turnIndex = Math.floor(assignerIndex / 2);
-  const isActive = game.status === "assigning" && game.activeTurnIndex === turnIndex;
+  const turnIndex = assigner.playerIndex;
+  const isActive = game.status === "assigning" && game.activeTurnIndex === turnIndex &&
+    !game.turnSubmitted;
   const isFuture = game.status === "assigning" && game.activeTurnIndex < turnIndex;
   const disabled = isActive ? "" : " disabled";
   const value = imageAssignments[assignerIndex] || "";
 
   return `
     <label class="matching-assignment ${positions[assignerIndex]} ${assigner.team}${isActive ? " active" : ""}${isFuture ? " future" : ""}${matchingResultClass(imageAssignments, assignerIndex, hasResult)}">
-      <select data-matching-input="${assignerIndex}"
+      <select data-matching-input="${assignerIndex}" data-image-index="${imageIndex}"
         aria-label="${escapeHtml(assigner.label)}"${disabled}>
         ${renderMatchingPlayerOptions(value)}
       </select>
@@ -399,13 +604,15 @@ function renderMatchingAssignment(imageAssignments, assignerIndex, game, hasResu
 
 function renderMatchingBoard(round, game, roundAssignments) {
   const hasResult = game.status === "round-finished" || game.status === "finished";
+  const activeTeam = game.activeTeam || (game.roundIndex % 2 === 0 ? "blue" : "red");
+  const assignerIndexes = activeTeam === "blue" ? [0, 2] : [1, 3];
 
   return round.images.map((image, imageIndex) => `
     <article class="matching-card">
       <div class="matching-image-frame">
         <img src="${image.src}" alt="${escapeHtml(image.label)}">
-        ${MATCHING_ASSIGNERS.map((_, assignerIndex) =>
-          renderMatchingAssignment(roundAssignments[imageIndex], assignerIndex, game, hasResult)
+        ${assignerIndexes.map((assignerIndex) =>
+          renderMatchingAssignment(roundAssignments, imageIndex, assignerIndex, game, hasResult)
         ).join("")}
       </div>
     </article>
@@ -416,9 +623,8 @@ function renderMatchingGame() {
   const game = state.game;
   const round = MATCHING_GAME_ROUNDS[game.roundIndex];
   const roundAssignments = matchingAssignments[game.roundIndex] || emptyMatchingAssignments()[0];
-  const turn = MATCHING_TURNS[game.activeTurnIndex] || MATCHING_TURNS[0];
-  const bluePlayer = game.assignerOrder[turn.assignerIndexes.blue];
-  const redPlayer = game.assignerOrder[turn.assignerIndexes.red];
+  const turn = getMatchingTurn(game.roundIndex, game.activeTurnIndex);
+  const activePlayer = game.assignerOrder[turn.assignerIndex];
   const isAssigning = game.status === "assigning";
   const isRevealing = ["ready-to-reveal", "revealing"].includes(game.status);
   const isFinished = game.status === "finished";
@@ -435,15 +641,13 @@ function renderMatchingGame() {
   $("matching-board").innerHTML = renderMatchingBoard(round, game, roundAssignments);
 
   if (isAssigning) {
-    const blueReady = game.submittedTeams.blue ? " ✓" : "";
-    const redReady = game.submittedTeams.red ? " ✓" : "";
-    $("matching-turn").className = "matching-turn split";
+    const ready = game.turnSubmitted ? " ✓" : "";
+    $("matching-turn").className = `matching-turn ${turn.team}`;
     $("matching-turn").textContent =
-      `${turn.label}: ${bluePlayer?.name || "Blau fehlt"} (Blau${blueReady}) und ` +
-      `${redPlayer?.name || "Rot fehlt"} (Rot${redReady}) ordnen gleichzeitig zu.`;
+      `${getTeamName(turn.team)} spielt · ${turn.label}: ${activePlayer?.name || "Spieler fehlt"}${ready}`;
   } else if (isRevealing) {
     $("matching-turn").className = "matching-turn finished";
-    $("matching-turn").textContent = "Alle Antworten können jetzt gemeinsam aufgedeckt werden.";
+    $("matching-turn").textContent = `Die Antworten von ${getTeamName(game.activeTeam)} können aufgedeckt werden.`;
   } else {
     $("matching-turn").className = "matching-turn finished";
     $("matching-turn").textContent = isFinished
@@ -455,7 +659,7 @@ function renderMatchingGame() {
   $("save-matching-assignment").disabled = moderatorActionPending;
   $("complete-matching-turn").classList.toggle(
     "hidden",
-    !isAssigning || !game.submittedTeams.blue || !game.submittedTeams.red
+    !isAssigning || !game.turnSubmitted
   );
   $("complete-matching-turn").disabled = moderatorActionPending;
   $("complete-matching-turn").textContent = game.activeTurnIndex === MATCHING_TURNS.length - 1
@@ -468,14 +672,21 @@ function renderMatchingGame() {
   $("matching-round-result").classList.toggle("hidden", !result);
 
   if (result) {
+    const overallWinner = state.scores.blue === state.scores.red
+      ? null
+      : state.scores.blue > state.scores.red ? "blue" : "red";
     const conclusion = isFinished
       ? game.winningTeam
-        ? `🏆 ${getTeamName(game.winningTeam)} gewinnt das Zuordnungsspiel!`
-        : "Das Zuordnungsspiel endet unentschieden."
+        ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Da seh ich dich!`
+        : "Da seh ich dich endet unentschieden."
       : "Bereit für die nächste Runde.";
     $("matching-round-result").innerHTML = `
-      <strong>Runde ${game.roundIndex + 1}: Blau ${result.blue} · ${result.red} Rot</strong>
+      <strong>${result[game.activeTeam]} Punkte für ${getTeamName(game.activeTeam)}</strong>
       <span>${conclusion}</span>
+      ${isFinished ? `<p><strong>${overallWinner
+        ? `🎉 ${getTeamName(overallWinner)} gewinnt die gesamte Gameshow!`
+        : "Die Gameshow endet insgesamt unentschieden."}</strong><br>` +
+        `Gesamtstand: Blau ${state.scores.blue} · ${state.scores.red} Rot</p>` : ""}
     `;
   }
 }
@@ -486,7 +697,7 @@ function renderSpotifySlots(revealed, list, interactionLocked) {
     const teamClass = slot?.team || "empty";
     const answer = slot ? escapeHtml(slot.answer) : "Noch offen";
     const value = slot
-      ? `<span class="value">${escapeHtml(list.valueLabel)}: ${escapeHtml(slot.value)}</span>`
+      ? `<span class="value">${escapeHtml(slot.value)}</span>`
       : "";
     const rank = index + 1;
     const disabled = slot || interactionLocked || moderatorActionPending ? " disabled" : "";
@@ -534,8 +745,11 @@ function escapeHtml(value) {
 
 async function broadcastState() {
   const publicState = structuredClone(state);
-  if (state.game.id === matchingGame.id) {
-    publicState.matchingSubmissionKey = matchingPublicKey;
+  if (state.game.id === guessThePriceGame.id) {
+    publicState.priceSubmissionKey = matchingPublicKey;
+  }
+  if (state.game.id === top20Game.id) {
+    publicState.top20SubmissionKey = matchingPublicKey;
   }
   await realtime.send("room_state", publicState);
 }
@@ -608,52 +822,141 @@ async function handlePlayerJoin(incomingPlayer) {
   await broadcastState();
 }
 
-async function handleMatchingSubmission(payload) {
-  if (state.game.id !== matchingGame.id || state.game.status !== "assigning" ||
-      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+async function sendTop20PrivateState(playerId) {
+  if (state.game.id !== top20Game.id) return false;
+  const roomPlayer = state.players.find((item) => item.id === playerId);
+  const publicKey = pricePlayerKeys.get(playerId);
+  if (!roomPlayer || !publicKey) return false;
 
   try {
-    const submission = await decryptMatchingSubmission(
+    const encrypted = await encryptPrivatePayload(publicKey, {
+      roundIndex: state.game.roundIndex,
+      note: top20Notes[roomPlayer.team]
+    });
+    await realtime.send("top20_private_state", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.warn("Private Top 20 note could not be encrypted:", error);
+    return false;
+  }
+}
+
+async function syncTop20Team(team) {
+  const teamPlayers = state.players.filter((player) => player.team === team);
+  await Promise.all(teamPlayers.map((player) => sendTop20PrivateState(player.id)));
+}
+
+async function syncAllTop20Teams() {
+  await Promise.all([syncTop20Team("blue"), syncTop20Team("red")]);
+}
+
+async function handleTop20Submission(payload) {
+  if (state.game.id !== top20Game.id || state.game.status !== "playing" ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+
+  const player = state.players.find((item) => item.id === payload.playerId);
+  if (!player) return;
+
+  try {
+    const submission = await decryptPrivatePayload(matchingKeyPair.privateKey, payload.encrypted);
+    if (submission?.playerId !== player.id || submission.roundIndex !== state.game.roundIndex) return;
+
+    top20Notes[player.team] = {
+      text: String(submission.text || "").slice(0, 280),
+      updatedBy: player.id
+    };
+    saveTop20Notes();
+    render();
+    await syncTop20Team(player.team);
+  } catch (error) {
+    console.warn("Encrypted Top 20 note could not be processed:", error);
+  }
+}
+
+async function sendPricePrivateState(playerId) {
+  if (state.game.id !== guessThePriceGame.id) return false;
+  const roomPlayer = state.players.find((item) => item.id === playerId);
+  const publicKey = pricePlayerKeys.get(playerId);
+  if (!roomPlayer || !publicKey) return false;
+
+  try {
+    const encrypted = await encryptPrivatePayload(publicKey, {
+      roundIndex: state.game.roundIndex,
+      draft: priceDrafts[roomPlayer.team],
+      locked: Boolean(state.game.lockedTeams?.[roomPlayer.team])
+    });
+    await realtime.send("price_private_state", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.warn("Private price state could not be encrypted:", error);
+    return false;
+  }
+}
+
+async function syncPriceTeam(team) {
+  const teamPlayers = state.players.filter((player) => player.team === team);
+  await Promise.all(teamPlayers.map((player) => sendPricePrivateState(player.id)));
+}
+
+async function syncAllPriceTeams() {
+  await Promise.all([syncPriceTeam("blue"), syncPriceTeam("red")]);
+}
+
+async function handlePriceKeyRegistration(payload) {
+  const roomPlayer = state.players.find((item) => item.id === payload?.playerId);
+  if (!roomPlayer || !payload?.publicKey || payload.publicKey.kty !== "RSA") return;
+  pricePlayerKeys.set(roomPlayer.id, payload.publicKey);
+  if (state.game.id === top20Game.id) await sendTop20PrivateState(roomPlayer.id);
+  if (state.game.id === guessThePriceGame.id) await sendPricePrivateState(roomPlayer.id);
+}
+
+async function handlePriceSubmission(payload) {
+  if (state.game.id !== guessThePriceGame.id || state.game.status !== "guessing" ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+
+  const player = state.players.find((item) => item.id === payload.playerId);
+  if (!player || state.game.lockedTeams[player.team]) return;
+
+  try {
+    const submission = await decryptPrivatePayload(
       matchingKeyPair.privateKey,
       payload.encrypted
     );
-    const player = state.players.find((item) => item.id === payload.playerId);
-    const team = player?.team;
-    const turn = MATCHING_TURNS[state.game.activeTurnIndex];
-    const assignerIndex = turn?.assignerIndexes?.[team];
-    const expectedPlayer = state.game.assignerOrder?.[assignerIndex];
-    const values = submission?.values?.map((value) => String(value || "").trim());
-    const registeredNames = new Set(state.players.map((item) => item.name));
-    const valid = player && expectedPlayer?.id === player.id &&
-      submission.playerId === player.id &&
+    const valid = submission?.playerId === player.id &&
       submission.roundIndex === state.game.roundIndex &&
-      submission.turnIndex === state.game.activeTurnIndex &&
-      Array.isArray(values) && values.length === 4 &&
-      values.every((value) => registeredNames.has(value));
+      ["draft", "lock"].includes(submission.type);
+    if (!valid) return;
 
-    if (!valid || !matchingGame.submitTeam(state, team)) {
-      await realtime.send("matching_submission_result", {
-        playerId: payload.playerId,
-        accepted: false
+    const amount = String(submission.amount || "").slice(0, 40);
+    const comment = String(submission.comment || "").slice(0, 280);
+    priceDrafts[player.team] = { amount, comment, updatedBy: player.id };
+    savePriceDrafts();
+    render();
+
+    if (submission.type === "lock") {
+      const parsedAmount = parseEuroAmount(amount);
+      if (parsedAmount === null) {
+        await realtime.send("price_lock_result", {
+          playerId: player.id,
+          accepted: false,
+          reason: "Bitte gebt zuerst einen gültigen Euro-Betrag ein."
+        });
+        await syncPriceTeam(player.team);
+        return;
+      }
+
+      const accepted = guessThePriceGame.lockTeam(state, player.team);
+      await realtime.send("price_lock_result", {
+        playerId: player.id,
+        accepted,
+        reason: accepted ? "" : "Der Team-Preis konnte nicht eingeloggt werden."
       });
-      return;
+      if (accepted) await persistRenderAndBroadcast();
     }
 
-    values.forEach((value, imageIndex) => {
-      matchingAssignments[state.game.roundIndex][imageIndex][assignerIndex] = value;
-    });
-    saveMatchingAssignments();
-    await realtime.send("matching_submission_result", {
-      playerId: player.id,
-      accepted: true
-    });
-    await persistRenderAndBroadcast();
+    await syncPriceTeam(player.team);
   } catch (error) {
-    console.warn("Encrypted matching submission could not be processed:", error);
-    await realtime.send("matching_submission_result", {
-      playerId: payload.playerId,
-      accepted: false
-    });
+    console.warn("Encrypted price submission could not be processed:", error);
   }
 }
 
@@ -673,14 +976,31 @@ async function handleEvent(event, payload) {
     return;
   }
 
-  if (event === "matching_assignment") {
-    await handleMatchingSubmission(payload);
+  if (event === "price_key_registration") {
+    await handlePriceKeyRegistration(payload);
+    return;
+  }
+
+  if (event === "price_private_submission") {
+    await handlePriceSubmission(payload);
+    return;
+  }
+
+  if (event === "top20_private_submission") {
+    await handleTop20Submission(payload);
     return;
   }
 
   if (event === "map_pin") {
     const player = state.players.find((item) => item.id === payload.playerId);
     if (!player || !germanyMapGame.placePin(state, player.team, payload.position)) return;
+    await persistRenderAndBroadcast();
+    return;
+  }
+
+  if (event === "map_lock") {
+    const player = state.players.find((item) => item.id === payload.playerId);
+    if (!player || !germanyMapGame.lockTeam(state, player.team)) return;
     await persistRenderAndBroadcast();
     return;
   }
@@ -726,25 +1046,36 @@ $("reset-buzzer").addEventListener("click", async () => {
 $("correct-answer").addEventListener("click", async () => {
   await runModeratorAction(() => {
     if (!buzzerGame.awardPoint(state)) return false;
-    if (state.game.status !== "finished") buzzerGame.reset(state);
+    if (state.game.status !== "finished") buzzerGame.advanceQuestion(state);
     return true;
   });
+});
+
+$("start-buzzer-game").addEventListener("click", async () => {
+  await runModeratorAction(() => buzzerGame.start(state));
 });
 
 $("wrong-answer").addEventListener("click", async () => {
   await runModeratorAction(() => {
-    if (!buzzerGame.awardOpponentPoint(state)) return false;
-    if (state.game.status !== "finished") buzzerGame.reset(state);
-    return true;
+    return buzzerGame.awardOpponentPoint(state);
   });
 });
 
-$("start-spotify-game").addEventListener("click", async () => {
-  await runModeratorAction(() => {
+$("start-price-game-after-buzzer").addEventListener("click", async () => {
+  $("buzzer-next-game-error").textContent = "";
+  if (state.players.length !== 4) {
+    $("buzzer-next-game-error").textContent = "Für Thrifty müssen alle vier Spieler im Raum sein.";
+    return;
+  }
+
+  const accepted = await runModeratorAction(() => {
     if (state.game.id !== "buzzer" || state.game.status !== "finished") return false;
-    top20Game.start(state);
+    guessThePriceGame.start(state);
+    priceDrafts = emptyPriceDrafts(0);
+    savePriceDrafts();
     return true;
   });
+  if (accepted) await syncAllPriceTeams();
 });
 
 $("spotify-board").addEventListener("click", async (event) => {
@@ -770,7 +1101,14 @@ $("spotify-miss").addEventListener("click", async () => {
 
 $("next-top20-round").addEventListener("click", async () => {
   $("spotify-error").textContent = "";
-  await runModeratorAction(() => top20Game.startNextRound(state));
+  const nextRoundIndex = state.game.roundIndex + 1;
+  const accepted = await runModeratorAction(() => {
+    if (!top20Game.startNextRound(state)) return false;
+    top20Notes = emptyTop20Notes(nextRoundIndex);
+    saveTop20Notes();
+    return true;
+  });
+  if (accepted) await syncAllTop20Teams();
 });
 
 $("start-map-game").addEventListener("click", async () => {
@@ -798,7 +1136,7 @@ $("start-matching-game").addEventListener("click", async () => {
     return;
   }
 
-  await runModeratorAction(() => {
+  const accepted = await runModeratorAction(() => {
     if (state.game.id !== germanyMapGame.id || state.game.status !== "finished") return false;
     if (!matchingGame.start(state, assignerOrder)) return false;
     matchingAssignments = emptyMatchingAssignments();
@@ -807,45 +1145,46 @@ $("start-matching-game").addEventListener("click", async () => {
   });
 });
 
+$("matching-board").addEventListener("change", async (event) => {
+  const select = event.target.closest("[data-matching-input][data-image-index]");
+  if (!select || select.disabled || state.game.id !== matchingGame.id ||
+      state.game.status !== "assigning") return;
+
+  const assignerIndex = Number(select.dataset.matchingInput);
+  const imageIndex = Number(select.dataset.imageIndex);
+  const roundAssignments = matchingAssignments[state.game.roundIndex];
+  $("matching-error").textContent = "";
+  roundAssignments[imageIndex][assignerIndex] = select.value;
+  saveMatchingAssignments();
+  renderMatchingGame();
+});
+
 $("save-matching-assignment").addEventListener("click", async () => {
   $("matching-error").textContent = "";
   const turnIndex = state.game.activeTurnIndex;
-  const turn = MATCHING_TURNS[turnIndex];
-  const submissions = ["blue", "red"].map((team) => {
-    const assignerIndex = turn.assignerIndexes[team];
-    const inputs = [...document.querySelectorAll(`[data-matching-input="${assignerIndex}"]`)];
-    return { team, assignerIndex, values: inputs.map((input) => input.value.trim()) };
-  });
-  const partialSubmission = submissions.some(({ values }) =>
-    values.some(Boolean) && (values.length !== 4 || values.some((value) => !value))
-  );
-  const completeSubmissions = submissions.filter(({ values }) =>
-    values.length === 4 && values.every(Boolean)
-  );
+  const turn = getMatchingTurn(state.game.roundIndex, turnIndex);
+  const assignerIndex = turn.assignerIndex;
+  const inputs = [...document.querySelectorAll(`[data-matching-input="${assignerIndex}"]`)];
+  const values = inputs.map((input) => input.value.trim());
   const registeredNames = new Set(state.players.map((player) => player.name));
-  const hasUnknownName = completeSubmissions.some(({ values }) =>
-    values.some((value) => !registeredNames.has(value))
-  );
-
-  if (partialSubmission || !completeSubmissions.length || hasUnknownName) {
+  const hasUnknownName = values.some((value) => value && !registeredNames.has(value));
+  if (values.length !== 4 || values.some((value) => !value) || hasUnknownName) {
     $("matching-error").textContent =
       hasUnknownName
         ? "Bitte ausschließlich registrierte Spieler auswählen."
-        : "Bitte pro Team entweder alle vier Namen oder noch keinen Namen auswählen.";
+        : "Bitte für alle vier Bilder einen Namen auswählen.";
     return;
   }
 
-  await runModeratorAction(() => {
+  const accepted = await runModeratorAction(() => {
     if (state.game.id !== matchingGame.id || state.game.status !== "assigning" ||
         state.game.activeTurnIndex !== turnIndex) return false;
 
     const roundAssignments = matchingAssignments[state.game.roundIndex];
-    completeSubmissions.forEach(({ team, assignerIndex, values }) => {
-      values.forEach((value, imageIndex) => {
-        roundAssignments[imageIndex][assignerIndex] = value;
-      });
-      if (!state.game.submittedTeams[team]) matchingGame.submitTeam(state, team);
+    values.forEach((value, imageIndex) => {
+      roundAssignments[imageIndex][assignerIndex] = value;
     });
+    if (!matchingGame.submitTeam(state, turn.team)) return false;
     saveMatchingAssignments();
     return true;
   });
@@ -853,22 +1192,71 @@ $("save-matching-assignment").addEventListener("click", async () => {
 
 $("complete-matching-turn").addEventListener("click", async () => {
   $("matching-error").textContent = "";
-  await runModeratorAction(() => matchingGame.completeTurn(state));
+  const shouldReveal = state.game.activeTurnIndex === MATCHING_TURNS.length - 1;
+  await runModeratorAction(() => {
+    if (!matchingGame.completeTurn(state)) return false;
+    if (!shouldReveal) return true;
+
+    const roundAssignments = matchingAssignments[state.game.roundIndex];
+    const team = state.game.activeTeam;
+    const indexes = team === "blue" ? [0, 2] : [1, 3];
+    const assignments = { [team]: roundAssignments.map((imageAssignments) =>
+      indexes.map((index) => imageAssignments[index])) };
+    return matchingGame.revealAll(state, assignments);
+  });
 });
 
 $("reveal-matching-all").addEventListener("click", async () => {
   $("matching-error").textContent = "";
   const roundAssignments = matchingAssignments[state.game.roundIndex];
-  const assignments = {
-    blue: roundAssignments.map((imageAssignments) => [imageAssignments[0], imageAssignments[2]]),
-    red: roundAssignments.map((imageAssignments) => [imageAssignments[1], imageAssignments[3]])
-  };
+  const team = state.game.activeTeam;
+  const indexes = team === "blue" ? [0, 2] : [1, 3];
+  const assignments = { [team]: roundAssignments.map((imageAssignments) =>
+    indexes.map((index) => imageAssignments[index])) };
   await runModeratorAction(() => matchingGame.revealAll(state, assignments));
 });
 
 $("next-matching-round").addEventListener("click", async () => {
   $("matching-error").textContent = "";
   await runModeratorAction(() => matchingGame.startNextRound(state));
+});
+
+$("start-top20-game").addEventListener("click", async () => {
+  const accepted = await runModeratorAction(() => {
+    if (state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
+    top20Game.start(state);
+    top20Notes = emptyTop20Notes(0);
+    saveTop20Notes();
+    return true;
+  });
+  if (accepted) await syncAllTop20Teams();
+});
+
+$("reveal-price-round").addEventListener("click", async () => {
+  $("price-error").textContent = "";
+  const guesses = {
+    blue: parseEuroAmount(priceDrafts.blue.amount),
+    red: parseEuroAmount(priceDrafts.red.amount)
+  };
+
+  if (guesses.blue === null || guesses.red === null) {
+    $("price-error").textContent = "Beide Teams benötigen einen gültigen Preis.";
+    return;
+  }
+
+  await runModeratorAction(() => guessThePriceGame.revealRound(state, guesses));
+});
+
+$("next-price-round").addEventListener("click", async () => {
+  $("price-error").textContent = "";
+  const nextRoundIndex = state.game.roundIndex + 1;
+  const accepted = await runModeratorAction(() => {
+    if (!guessThePriceGame.startNextRound(state)) return false;
+    priceDrafts = emptyPriceDrafts(nextRoundIndex);
+    savePriceDrafts();
+    return true;
+  });
+  if (accepted) await syncAllPriceTeams();
 });
 
 window.addEventListener("beforeunload", () => {

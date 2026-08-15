@@ -1,4 +1,8 @@
-export const BUZZER_WINNING_SCORE = 5;
+import { BUZZER_QUESTIONS } from "./buzzer-questions.js";
+
+export const BUZZER_WINNING_SCORE = 20;
+export const BUZZER_CORRECT_POINTS = 3;
+export const BUZZER_WRONG_POINTS = 1;
 const SCORE_SYSTEM_VERSION = 2;
 
 function currentGameScores(state) {
@@ -12,12 +16,25 @@ function otherTeam(team) {
   return team === "blue" ? "red" : "blue";
 }
 
+function currentQuestionIndex(state) {
+  return Math.min(
+    Math.max(Number(state.game?.questionIndex) || 0, 0),
+    BUZZER_QUESTIONS.length - 1
+  );
+}
+
 export const buzzerGame = {
   id: "buzzer",
   name: "Buzzer Quiz",
 
+  start(state) {
+    if (state.game.id !== this.id || state.game.status !== "not-started") return false;
+    state.game.status = "waiting";
+    return true;
+  },
+
   open(state) {
-    if (state.game.status === "finished") return false;
+    if (state.game.status !== "waiting") return false;
 
     const scores = currentGameScores(state);
 
@@ -27,6 +44,7 @@ export const buzzerGame = {
       winner: null,
       winningTeam: null,
       scores,
+      questionIndex: currentQuestionIndex(state),
       scoreSystemVersion: SCORE_SYSTEM_VERSION
     };
 
@@ -58,18 +76,19 @@ export const buzzerGame = {
       winner: null,
       winningTeam: null,
       scores,
+      questionIndex: currentQuestionIndex(state),
       scoreSystemVersion: SCORE_SYSTEM_VERSION
     };
 
     return true;
   },
 
-  awardPoint(state, team = state.game.winner?.team) {
+  awardPoint(state, team = state.game.winner?.team, points = BUZZER_CORRECT_POINTS) {
     if (state.game.status !== "locked") return false;
     if (!["blue", "red"].includes(team)) return false;
 
     state.game.scores = currentGameScores(state);
-    state.game.scores[team] += 1;
+    state.game.scores[team] += points;
 
     if (state.game.scores[team] >= BUZZER_WINNING_SCORE) {
       state.game.status = "finished";
@@ -83,6 +102,19 @@ export const buzzerGame = {
   awardOpponentPoint(state) {
     const answeringTeam = state.game.winner?.team;
     if (!["blue", "red"].includes(answeringTeam)) return false;
-    return this.awardPoint(state, otherTeam(answeringTeam));
+    if (!this.awardPoint(state, otherTeam(answeringTeam), BUZZER_WRONG_POINTS)) return false;
+    if (state.game.status !== "finished") {
+      state.game.status = "open";
+      state.game.winner = null;
+    }
+    return true;
+  },
+
+  advanceQuestion(state) {
+    if (state.game.id !== this.id || state.game.status === "finished") return false;
+    state.game.questionIndex = (currentQuestionIndex(state) + 1) % BUZZER_QUESTIONS.length;
+    state.game.status = "waiting";
+    state.game.winner = null;
+    return true;
   }
 };
