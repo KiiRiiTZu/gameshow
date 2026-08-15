@@ -441,8 +441,8 @@ test("parses German and common Euro inputs", () => {
   assert.equal(parseEuroAmount("-2,00"), null);
   assert.equal(parseEuroAmount("abc"), null);
   assert.equal(formatEuroAmount(2269), "2.269,00 €");
-  assert.equal(formatSignedEuroDifference(548, 34), "+514,00 €");
-  assert.equal(formatSignedEuroDifference(548, 803), "−255,00 €");
+  assert.equal(formatSignedEuroDifference(548, 34), "−514,00 €");
+  assert.equal(formatSignedEuroDifference(548, 803), "+255,00 €");
 });
 
 test("locks both teams and awards the closer price guess", () => {

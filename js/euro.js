@@ -38,7 +38,7 @@ export function formatEuroAmount(value) {
 }
 
 export function formatSignedEuroDifference(actualPrice, guess) {
-  const difference = cents(Number(actualPrice) - Number(guess));
+  const difference = cents(Number(guess) - Number(actualPrice));
   if (!Number.isFinite(difference) || Math.abs(difference) > 10_000_000) return "—";
   const sign = difference >= 0 ? "+" : "−";
   return `${sign}${formatEuroAmount(Math.abs(difference))}`;

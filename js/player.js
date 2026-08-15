@@ -229,7 +229,7 @@ function schedulePriceDraft() {
   clearTimeout(priceDraftTimer);
   priceDraftTimer = setTimeout(() => {
     void sendPriceSubmission("draft");
-  }, 140);
+  }, 300);
 }
 
 $("player-price-amount").addEventListener("input", (event) => {
@@ -243,6 +243,14 @@ $("player-price-comment").addEventListener("input", (event) => {
   $("player-price-error").textContent = "";
   schedulePriceDraft();
 });
+
+function flushPriceDraft() {
+  clearTimeout(priceDraftTimer);
+  void sendPriceSubmission("draft");
+}
+
+$("player-price-amount").addEventListener("blur", flushPriceDraft);
+$("player-price-comment").addEventListener("blur", flushPriceDraft);
 
 $("lock-price-guess").addEventListener("click", async () => {
   if (priceSubmissionPending || parseEuroAmount(priceDraft.amount) === null) {
@@ -291,10 +299,16 @@ async function handleEvent(event, payload) {
     try {
       const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
       if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
+      const amountIsFocused = document.activeElement === $("player-price-amount");
+      const commentIsFocused = document.activeElement === $("player-price-comment");
       priceDraft = {
         roundIndex: privateState.roundIndex,
-        amount: String(privateState.draft?.amount || ""),
-        comment: String(privateState.draft?.comment || ""),
+        amount: amountIsFocused
+          ? priceDraft.amount
+          : String(privateState.draft?.amount || ""),
+        comment: commentIsFocused
+          ? priceDraft.comment
+          : String(privateState.draft?.comment || ""),
         locked: Boolean(privateState.locked)
       };
       priceSubmissionPending = false;
