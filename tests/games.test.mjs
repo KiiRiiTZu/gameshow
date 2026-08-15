@@ -337,7 +337,7 @@ test("reveals and scores only the active team", () => {
   assert.deepEqual(state.game.scores, { blue: 3, red: 0 });
 });
 
-test("alternates blue and red image rounds and awards one match point", () => {
+test("ends matching early when the trailing team cannot catch up", () => {
   const state = createInitialRoomState("TEST");
   const players = MATCHING_ASSIGNERS.map((assigner, index) => ({
     id: String(index),
@@ -356,12 +356,14 @@ test("alternates blue and red image rounds and awards one match point", () => {
     matchingGame.submitTeam(state, team);
     matchingGame.completeTurn(state);
     matchingGame.revealAll(state, { [team]: team === "blue" ? perfect : twoMatches });
-    if (roundIndex < MATCHING_GAME_ROUNDS.length - 1) matchingGame.startNextRound(state);
+    if (state.game.status === "finished") break;
+    matchingGame.startNextRound(state);
   }
 
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "blue");
-  assert.deepEqual(state.game.scores, { blue: 8, red: 4 });
+  assert.equal(state.game.roundIndex, 2);
+  assert.deepEqual(state.game.scores, { blue: 8, red: 2 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
   assert.equal(matchingGame.revealAll(state, { red: perfect }), false);
 });

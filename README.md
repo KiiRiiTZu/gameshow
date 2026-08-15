@@ -4,7 +4,7 @@ Eine browserbasierte Multiplayer-Gameshow für einen Moderator und vier Spieler 
 
 Zwischen den Spielen erscheint eine automatisch drehende Ankündigungskarte.
 
-Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne Wertung. Für den Gesamtsieg erhält das Gewinnerteam anschließend genau einen Spielpunkt.
+Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne Wertung. Für den Gesamtsieg erhält das Gewinnerteam anschließend genau einen Spielpunkt. Die gesamte Gameshow ist ein Best of 5 und endet, sobald ein Team drei Spiele gewonnen hat.
 
 ## Enthaltene Spiele
 
@@ -44,6 +44,7 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Elf vorbereitete Fragen führen zu Städten und Sehenswürdigkeiten in ganz Deutschland.
 - Beide Spieler eines Teams teilen sich einen gemeinsamen Pin und können ihn bis zum Einloggen verschieben.
 - Beide Teampartner können die gemeinsame Antwort einloggen.
+- Sobald beide Teams eingeloggt haben, sehen alle Spieler beide Pins; Ziel und Distanzen bleiben bis zur Auflösung verborgen.
 - Der Moderator sieht die Pins beider Teams in Echtzeit und deckt anschließend das Ziel auf.
 - Die Luftlinie zwischen Team-Pin und Ziel wird in Kilometern berechnet.
 - Das nähere Team erhält einen Kartenpunkt; das erste Team mit sechs Punkten gewinnt das Spiel.
@@ -56,7 +57,7 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Nur der Moderator trägt die Namen über Dropdown-Felder ein; die Spieler sehen die Zuordnungen erst beim Aufdecken.
 - Eine Person darf mehreren Bildern zugeordnet werden.
 - Jede Übereinstimmung innerhalb eines Teams zählt einen Punkt.
-- Nach vier Runden gewinnt das Team mit den meisten Übereinstimmungen einen Spielpunkt.
+- Das Spiel endet vorzeitig, sobald ein Team mathematisch nicht mehr eingeholt werden kann; andernfalls gewinnt nach vier Runden das Team mit den meisten Übereinstimmungen einen Spielpunkt.
 - Nach dem letzten Spiel wird der Gesamtsieger der Gameshow angezeigt.
 
 ## Lokal starten

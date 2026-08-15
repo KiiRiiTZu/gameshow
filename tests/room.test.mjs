@@ -4,8 +4,18 @@ import assert from "node:assert/strict";
 import {
   addOrUpdatePlayer,
   createInitialRoomState,
-  createRoomStateFromRecords
+  createRoomStateFromRecords,
+  getShowWinner,
+  SHOW_WINNING_SCORE
 } from "../js/room.js";
+
+test("ends the best-of-five show at three game wins", () => {
+  const state = createInitialRoomState("TEST");
+  state.scores.blue = SHOW_WINNING_SCORE - 1;
+  assert.equal(getShowWinner(state), null);
+  state.scores.blue += 1;
+  assert.equal(getShowWinner(state), "blue");
+});
 
 test("rejects a third player in the same team", () => {
   const state = createInitialRoomState("TEST");

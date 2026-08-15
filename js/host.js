@@ -7,7 +7,7 @@ import {
   updateRoomGameState
 } from "./database.js";
 
-import { addOrUpdatePlayer, createRoomStateFromRecords, generateRoomCode } from "./room.js";
+import { addOrUpdatePlayer, createRoomStateFromRecords, generateRoomCode, getShowWinner } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { registerGame } from "./games/game-engine.js";
@@ -294,6 +294,11 @@ function render() {
   renderGameEffects();
   $("blue-score").textContent = state.scores.blue;
   $("red-score").textContent = state.scores.red;
+  const showWinner = getShowWinner(state);
+  $("show-winner-banner").classList.toggle("hidden", !showWinner);
+  $("show-winner-banner").textContent = showWinner
+    ? `🏆 ${getTeamName(showWinner)} gewinnt die Gameshow mit ${state.scores[showWinner]} Spielpunkten!`
+    : "";
 
   renderPlayers("blue");
   renderPlayers("red");
@@ -339,6 +344,7 @@ function renderPriceGame() {
   const product = getPriceProduct(game.roundIndex);
   const isRevealed = ["revealed", "finished"].includes(game.status);
   const isFinished = game.status === "finished";
+  const showIsFinished = Boolean(getShowWinner(state));
   const bothLocked = game.lockedTeams.blue && game.lockedTeams.red;
 
   $("price-round-label").textContent =
@@ -360,7 +366,7 @@ function renderPriceGame() {
   $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
   $("next-price-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-price-round").disabled = moderatorActionPending;
-  $("start-top20-game").classList.toggle("hidden", !isFinished);
+  $("start-top20-game").classList.toggle("hidden", !isFinished || showIsFinished);
   $("start-top20-game").disabled = moderatorActionPending;
   $("price-round-result").classList.toggle("hidden", !isRevealed);
 
@@ -452,6 +458,7 @@ function renderBuzzerGame() {
 function renderSpotifyGame() {
   const game = state.game;
   const isFinished = game.status === "finished";
+  const showIsFinished = Boolean(getShowWinner(state));
   const isRoundFinished = game.status === "round-finished";
   const interactionLocked = isFinished || isRoundFinished;
   const currentTeam = game.currentTeam || "blue";
@@ -488,7 +495,7 @@ function renderSpotifyGame() {
       ? `${getTeamName(game.roundWinner)} gewinnt Liste ${roundNumber}.`
       : "";
   $("next-top20-round").classList.toggle("hidden", isFinished);
-  $("start-map-game").classList.toggle("hidden", !isFinished);
+  $("start-map-game").classList.toggle("hidden", !isFinished || showIsFinished);
   $("next-top20-round").disabled = moderatorActionPending;
   $("start-map-game").disabled = moderatorActionPending;
 
@@ -500,6 +507,7 @@ function renderMapGame() {
   const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
   const isRevealed = game.status === "revealed" || game.status === "finished";
   const isFinished = game.status === "finished";
+  const showIsFinished = Boolean(getShowWinner(state));
   const bothPinsReady = Boolean(game.pins?.blue && game.pins?.red);
   const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
 
@@ -532,7 +540,7 @@ function renderMapGame() {
   $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady || !bothTeamsLocked;
   $("next-map-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-map-round").disabled = moderatorActionPending;
-  $("start-matching-game").classList.toggle("hidden", !isFinished);
+  $("start-matching-game").classList.toggle("hidden", !isFinished || showIsFinished);
   $("start-matching-game").disabled = moderatorActionPending ||
     state.players.filter((player) => player.team === "blue").length !== 2 ||
     state.players.filter((player) => player.team === "red").length !== 2;
@@ -651,7 +659,9 @@ function renderMatchingGame() {
   } else {
     $("matching-turn").className = "matching-turn finished";
     $("matching-turn").textContent = isFinished
-      ? "Alle vier Runden sind ausgewertet."
+      ? game.roundIndex < MATCHING_GAME_ROUNDS.length - 1
+        ? "Das Spiel ist mathematisch entschieden."
+        : "Alle vier Runden sind ausgewertet."
       : `Runde ${game.roundIndex + 1} ist ausgewertet.`;
   }
 
@@ -672,9 +682,6 @@ function renderMatchingGame() {
   $("matching-round-result").classList.toggle("hidden", !result);
 
   if (result) {
-    const overallWinner = state.scores.blue === state.scores.red
-      ? null
-      : state.scores.blue > state.scores.red ? "blue" : "red";
     const conclusion = isFinished
       ? game.winningTeam
         ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Da seh ich dich!`
@@ -683,10 +690,6 @@ function renderMatchingGame() {
     $("matching-round-result").innerHTML = `
       <strong>${result[game.activeTeam]} Punkte für ${getTeamName(game.activeTeam)}</strong>
       <span>${conclusion}</span>
-      ${isFinished ? `<p><strong>${overallWinner
-        ? `🎉 ${getTeamName(overallWinner)} gewinnt die gesamte Gameshow!`
-        : "Die Gameshow endet insgesamt unentschieden."}</strong><br>` +
-        `Gesamtstand: Blau ${state.scores.blue} · ${state.scores.red} Rot</p>` : ""}
     `;
   }
 }
@@ -1069,7 +1072,7 @@ $("start-price-game-after-buzzer").addEventListener("click", async () => {
   }
 
   const accepted = await runModeratorAction(() => {
-    if (state.game.id !== "buzzer" || state.game.status !== "finished") return false;
+    if (getShowWinner(state) || state.game.id !== "buzzer" || state.game.status !== "finished") return false;
     guessThePriceGame.start(state);
     priceDrafts = emptyPriceDrafts(0);
     savePriceDrafts();
@@ -1113,7 +1116,7 @@ $("next-top20-round").addEventListener("click", async () => {
 
 $("start-map-game").addEventListener("click", async () => {
   await runModeratorAction(() => {
-    if (state.game.id !== top20Game.id || state.game.status !== "finished") return false;
+    if (getShowWinner(state) || state.game.id !== top20Game.id || state.game.status !== "finished") return false;
     return germanyMapGame.start(state);
   });
 });
@@ -1137,7 +1140,7 @@ $("start-matching-game").addEventListener("click", async () => {
   }
 
   const accepted = await runModeratorAction(() => {
-    if (state.game.id !== germanyMapGame.id || state.game.status !== "finished") return false;
+    if (getShowWinner(state) || state.game.id !== germanyMapGame.id || state.game.status !== "finished") return false;
     if (!matchingGame.start(state, assignerOrder)) return false;
     matchingAssignments = emptyMatchingAssignments();
     saveMatchingAssignments();
@@ -1223,7 +1226,7 @@ $("next-matching-round").addEventListener("click", async () => {
 
 $("start-top20-game").addEventListener("click", async () => {
   const accepted = await runModeratorAction(() => {
-    if (state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
+    if (getShowWinner(state) || state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
     top20Game.start(state);
     top20Notes = emptyTop20Notes(0);
     saveTop20Notes();

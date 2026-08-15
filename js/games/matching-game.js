@@ -75,6 +75,27 @@ function emptyRevealedAssignments() {
   return { blue: null, red: null };
 }
 
+function remainingMatchingPoints(roundIndex, team) {
+  return MATCHING_GAME_ROUNDS
+    .slice(Number(roundIndex) + 1)
+    .filter((_, offset) => getMatchingRoundTeam(Number(roundIndex) + 1 + offset) === team)
+    .length * 4;
+}
+
+function clinchedMatchingTeam(game) {
+  const blueMaximum = game.scores.blue + remainingMatchingPoints(game.roundIndex, "blue");
+  const redMaximum = game.scores.red + remainingMatchingPoints(game.roundIndex, "red");
+  if (game.scores.blue > redMaximum) return "blue";
+  if (game.scores.red > blueMaximum) return "red";
+  return null;
+}
+
+function finishMatchingGame(state, winningTeam) {
+  state.game.status = "finished";
+  state.game.winningTeam = winningTeam;
+  if (winningTeam) state.scores[winningTeam] += 1;
+}
+
 function normalizeName(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toLocaleLowerCase("de");
 }
@@ -222,17 +243,21 @@ export const matchingGame = {
     state.game.scores.red += roundScores.red;
     state.game.roundResults[state.game.roundIndex] = roundScores;
 
+    const clinchedTeam = clinchedMatchingTeam(state.game);
+    if (clinchedTeam) {
+      finishMatchingGame(state, clinchedTeam);
+      return true;
+    }
+
     if (state.game.roundIndex < MATCHING_GAME_ROUNDS.length - 1) {
       state.game.status = "round-finished";
       return true;
     }
 
-    state.game.status = "finished";
-    state.game.winningTeam = state.game.scores.blue === state.game.scores.red
+    const winningTeam = state.game.scores.blue === state.game.scores.red
       ? null
       : state.game.scores.blue > state.game.scores.red ? "blue" : "red";
-
-    if (state.game.winningTeam) state.scores[state.game.winningTeam] += 1;
+    finishMatchingGame(state, winningTeam);
     return true;
   },
 

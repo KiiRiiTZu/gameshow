@@ -3,7 +3,7 @@ import {
   getPlayers
 } from "./database.js";
 
-import { createRoomStateFromRecords, normalizeRoomCode } from "./room.js";
+import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
@@ -385,6 +385,12 @@ function render() {
   previousGameId = currentGameId;
   previousBuzzerStatus = currentGameId === "buzzer" ? roomState.game.status : null;
 
+  const showWinner = getShowWinner(roomState);
+  $("player-show-winner-banner").classList.toggle("hidden", !showWinner);
+  $("player-show-winner-banner").textContent = showWinner
+    ? `🏆 ${getTeamName(showWinner)} gewinnt die Gameshow mit ${roomState.scores[showWinner]} Spielpunkten!`
+    : "";
+
   const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
   const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
   const matchingIsActive = roomState.game?.id === MATCHING_GAME_ID;
@@ -518,6 +524,7 @@ function renderMapGame() {
   const isFinished = game.status === "finished";
   const ownPin = game.pins?.[player.team];
   const ownTeamLocked = Boolean(game.lockedTeams?.[player.team]);
+  const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
 
   $("player-map-question-number").textContent =
     `FRAGE ${game.roundIndex + 1} VON ${GERMANY_MAP_QUESTIONS.length}`;
@@ -526,6 +533,8 @@ function renderMapGame() {
   $("player-map-red-score").textContent = game.roundScores.red;
   $("player-map-instruction").textContent = isRevealed
     ? "Der Moderator hat das Ziel aufgedeckt."
+    : bothTeamsLocked
+      ? "Beide Antworten sind eingeloggt. Der Moderator deckt gleich die Distanz zum Ziel auf."
     : ownTeamLocked
       ? "Eure Antwort ist eingeloggt. Wartet auf das andere Team."
     : ownPin
@@ -538,7 +547,7 @@ function renderMapGame() {
     : "Antwort einloggen";
 
   playerMap?.render({
-    pins: isRevealed
+    pins: isRevealed || bothTeamsLocked
       ? game.pins
       : { blue: player.team === "blue" ? ownPin : null, red: player.team === "red" ? ownPin : null },
     target: question.target,
@@ -553,7 +562,9 @@ function renderMapGame() {
       ? `🏆 ${getTeamName(game.winningTeam)} gewinnt das Kartenspiel! Blau: ${blueDistance} km · Rot: ${redDistance} km`
       : `${question.answer} · ${getTeamName(game.roundWinner)} ist näher! Blau: ${blueDistance} km · Rot: ${redDistance} km`;
   } else {
-    $("player-map-result").textContent = ownTeamLocked
+    $("player-map-result").textContent = bothTeamsLocked
+      ? "Beide Team-Pins sind sichtbar. Das Ziel bleibt noch verborgen."
+      : ownTeamLocked
       ? "Antwort eingeloggt ✓"
       : ownPin
       ? "Pin gesetzt ✓"
@@ -614,7 +625,9 @@ function renderMatchingGame() {
   if (isFinished || isRoundFinished || isRevealing) {
     $("player-matching-turn").className = "matching-turn finished";
     $("player-matching-turn").textContent = isFinished
-      ? "Alle Runden sind ausgewertet."
+      ? game.roundIndex < MATCHING_GAME_ROUNDS.length - 1
+        ? "Das Spiel ist mathematisch entschieden."
+        : "Alle Runden sind ausgewertet."
       : isRoundFinished
         ? `Runde ${game.roundIndex + 1} ist beendet.`
         : "Der Moderator deckt gleich alle Antworten auf.";
@@ -625,17 +638,9 @@ function renderMatchingGame() {
   }
 
   if (isFinished) {
-    const overallWinner = roomState.scores.blue === roomState.scores.red
-      ? null
-      : roomState.scores.blue > roomState.scores.red ? "blue" : "red";
     $("player-matching-result").textContent = game.winningTeam
-      ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Da seh ich dich! ` +
-        `🎉 ${overallWinner
-          ? `${getTeamName(overallWinner)} gewinnt die gesamte Gameshow!`
-          : "Die Gameshow endet insgesamt unentschieden."}`
-      : `Da seh ich dich endet unentschieden. ${overallWinner
-        ? `🎉 ${getTeamName(overallWinner)} gewinnt die gesamte Gameshow!`
-        : "Die Gameshow endet insgesamt unentschieden."}`;
+      ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Da seh ich dich!`
+      : "Da seh ich dich endet unentschieden.";
   } else if (isRoundFinished) {
     $("player-matching-result").textContent =
       `${result[game.activeTeam]} Punkte für ${getTeamName(game.activeTeam)}. Wartet auf die nächste Runde.`;

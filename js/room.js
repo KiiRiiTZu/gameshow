@@ -1,5 +1,12 @@
 export const TEAM_CAPACITY = 2;
 export const SCORE_SYSTEM_VERSION = 2;
+export const SHOW_WINNING_SCORE = 3;
+
+export function getShowWinner(state) {
+  if ((Number(state?.scores?.blue) || 0) >= SHOW_WINNING_SCORE) return "blue";
+  if ((Number(state?.scores?.red) || 0) >= SHOW_WINNING_SCORE) return "red";
+  return null;
+}
 
 function emptyTeamScores() {
   return { blue: 0, red: 0 };
