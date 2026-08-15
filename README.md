@@ -2,7 +2,7 @@
 
 Eine browserbasierte Multiplayer-Gameshow für einen Moderator und vier Spieler in zwei Teams. Räume, Spieler, Punkte und Spielzustände werden mit Supabase gespeichert und über Supabase Realtime synchronisiert.
 
-Zwischen den Spielen erscheint eine automatisch drehende Ankündigungskarte. Nach dem Aufdecken der Ergebnisse startet der Moderator mit einem zweiten Klick eine Konfetti-Animation mit Gewinnerteam und Spielernamen.
+Zwischen den Spielen erscheint eine automatisch drehende Ankündigungskarte.
 
 Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne Wertung. Für den Gesamtsieg erhält das Gewinnerteam anschließend genau einen Spielpunkt.
 
@@ -23,6 +23,7 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 
 - Gespielt werden drei vorbereitete Listen: Spotify-Stars, bevölkerungsreichste Länder und umsatzstärkste deutsche Unternehmen.
 - Team Blau und Team Rot nennen abwechselnd einen Eintrag.
+- Beide Spieler eines Teams teilen sich eine verschlüsselte Live-Notiz, die zusätzlich der Moderator sieht.
 - In der streambaren Moderatoransicht bleiben alle Lösungen verborgen. Der Moderator klickt nur auf den passenden Rang, um den hinterlegten Eintrag samt Wert aufzudecken.
 - Ist die Antwort nicht dabei, trägt der Moderator ein Kreuz für das aktive Team ein.
 - Nach zwei Kreuzen verliert ein Team die aktuelle Runde.

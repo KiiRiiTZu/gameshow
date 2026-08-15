@@ -23,7 +23,7 @@ import {
   encryptPrivatePayload,
   exportEncryptionPublicKey
 } from "./private-channel-crypto.js";
-import { showGameTransition, showWinnerCelebration } from "./game-effects.js";
+import { showGameTransition } from "./game-effects.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
 const TOP_20_SLOT_COUNT = 20;
@@ -55,6 +55,8 @@ let matchingSubmissionPending = false;
 let matchingDraft = { key: "", values: ["", "", "", ""] };
 let matchingDraftTimer = null;
 let matchingOwnState = { roundIndex: -1, assignerIndex: -1, assignments: ["", "", "", ""] };
+let top20Note = { roundIndex: -1, text: "" };
+let top20NoteTimer = null;
 let priceKeyPair = null;
 let pricePublicKey = null;
 let priceDraft = { roundIndex: -1, amount: "", comment: "", locked: false };
@@ -259,6 +261,32 @@ async function registerPriceKey() {
   await realtime.send("price_key_registration", { playerId, publicKey: pricePublicKey });
 }
 
+async function sendTop20Note() {
+  if (!player || roomState?.game?.id !== TOP_20_GAME_ID ||
+      roomState.game.status !== "playing" || !roomState.top20SubmissionKey) return false;
+
+  try {
+    const encrypted = await encryptPrivatePayload(roomState.top20SubmissionKey, {
+      playerId,
+      roundIndex: roomState.game.roundIndex,
+      text: top20Note.text
+    });
+    await realtime.send("top20_private_submission", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.error("Private Top 20 note could not be encrypted:", error);
+    return false;
+  }
+}
+
+$("player-top20-note").addEventListener("input", (event) => {
+  top20Note.text = event.currentTarget.value.slice(0, 280);
+  clearTimeout(top20NoteTimer);
+  top20NoteTimer = setTimeout(() => {
+    void sendTop20Note();
+  }, 140);
+});
+
 async function sendPriceSubmission(type = "draft") {
   if (!player || roomState?.game?.id !== PRICE_GAME_ID ||
       roomState.game.status !== "guessing" || roomState.game.lockedTeams?.[player.team] ||
@@ -318,12 +346,6 @@ $("lock-price-guess").addEventListener("click", async () => {
 });
 
 async function handleEvent(event, payload) {
-  if (event === "winner_celebration" && payload.gameId === roomState?.game?.id &&
-      payload.team === roomState.game.winningTeam) {
-    showWinnerCelebration(payload.team, roomState.players, payload.gameId);
-    return;
-  }
-
   if (event === "buzz_winner") {
     void playBuzzerSound();
     return;
@@ -363,6 +385,22 @@ async function handleEvent(event, payload) {
       render();
     } catch (error) {
       console.warn("Private team draft could not be decrypted:", error);
+    }
+    return;
+  }
+
+  if (event === "top20_private_state" && payload.playerId === playerId &&
+      payload.encrypted && priceKeyPair?.privateKey) {
+    try {
+      const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
+      if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
+      top20Note = {
+        roundIndex: privateState.roundIndex,
+        text: String(privateState.note?.text || "")
+      };
+      render();
+    } catch (error) {
+      console.warn("Private Top 20 note could not be decrypted:", error);
     }
     return;
   }
@@ -417,6 +455,10 @@ async function handleEvent(event, payload) {
 
     sendingBuzz = false;
     if (player) await registerPriceKey();
+    if (roomState.game?.id === TOP_20_GAME_ID &&
+        top20Note.roundIndex !== roomState.game.roundIndex) {
+      top20Note = { roundIndex: roomState.game.roundIndex, text: "" };
+    }
     if (roomState.game?.id === MATCHING_GAME_ID &&
         matchingOwnState.roundIndex !== roomState.game.roundIndex) {
       matchingOwnState = {
@@ -539,11 +581,15 @@ function renderSpotifyGame() {
   $("player-blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("player-red-strikes").textContent = renderStrikes(game.strikes?.red);
   $("player-spotify-board").innerHTML = renderSpotifySlots(game.revealed, game.valueLabel);
+  const noteInput = $("player-top20-note");
+  if (noteInput.value !== top20Note.text) noteInput.value = top20Note.text;
+  noteInput.disabled = game.status !== "playing";
+  $("player-spotify-result").classList.toggle("hidden", !isFinished && !isRoundFinished);
   $("player-spotify-result").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20!`
     : isRoundFinished
       ? `Liste ${roundNumber} ist beendet. Wartet auf die nächste Liste.`
-      : `Nennt abwechselnd einen Eintrag. Der Moderator deckt richtige Lösungen auf.`;
+      : "";
 }
 
 function renderSpotifySlots(revealed = [], valueLabel = "Wert") {

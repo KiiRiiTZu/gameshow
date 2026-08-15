@@ -316,6 +316,28 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .top20-actions p { margin: 0; }
 
+.top20-team-notes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.top20-team-note,
+.top20-player-note {
+  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px;
+  background: rgba(255,255,255,.035);
+}
+
+.top20-team-note.blue { border-color: rgba(90,114,246,.48); }
+.top20-team-note.red { border-color: rgba(210,55,80,.48); }
+.top20-team-note p { min-height: 42px; margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.top20-player-note { display: grid; gap: 8px; margin-top: 16px; }
+.top20-player-note textarea { min-height: 88px; }
+.top20-player-note p { margin: 0; }
+
 .spotify-board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -602,8 +624,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .price-team-form.locked input,
 .price-team-form.locked textarea { opacity: .7; }
 
-.game-transition-overlay,
-.winner-celebration {
+.game-transition-overlay {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -616,8 +637,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   animation: effect-fade-in .28s ease both;
 }
 
-.game-transition-overlay.leaving,
-.winner-celebration.leaving { animation: effect-fade-out .45s ease both; }
+.game-transition-overlay.leaving { animation: effect-fade-out .45s ease both; }
 
 .game-transition-card {
   width: min(620px, 82vw);
@@ -666,43 +686,6 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 }
 .game-transition-back strong { font-size: clamp(2.1rem, 6vw, 4.4rem); }
 
-.winner-celebration { z-index: 1100; background: rgba(7, 9, 15, .7); }
-
-.winner-celebration-panel {
-  position: relative;
-  z-index: 2;
-  width: min(690px, 84vw);
-  padding: 42px;
-  border: 3px solid rgba(255,255,255,.72);
-  border-radius: 30px;
-  text-align: center;
-  box-shadow: 0 35px 110px rgba(0,0,0,.52);
-  animation: winner-panel-in .55s cubic-bezier(.2, .9, .25, 1.25) both;
-}
-
-.winner-celebration.blue .winner-celebration-panel {
-  background: linear-gradient(145deg, rgba(49,79,202,.97), rgba(20,29,71,.97));
-}
-.winner-celebration.red .winner-celebration-panel {
-  background: linear-gradient(145deg, rgba(193,48,72,.97), rgba(76,20,35,.97));
-}
-
-.winner-celebration-panel span { letter-spacing: .16em; font-weight: 900; opacity: .82; }
-.winner-celebration-panel strong { display: block; margin: 10px 0; font-size: clamp(2.8rem, 8vw, 6rem); }
-.winner-celebration-panel p { margin: 0; font-size: clamp(1.25rem, 3vw, 2.1rem); font-weight: 900; }
-
-.confetti-field { position: absolute; inset: 0; overflow: hidden; }
-.confetti-field i {
-  position: absolute;
-  top: -8vh;
-  left: 0;
-  width: 11px;
-  height: 20px;
-  border-radius: 2px;
-  transform: translateX(var(--x));
-  animation: confetti-fall var(--duration) var(--delay) linear infinite;
-}
-
 @keyframes game-card-flip {
   0% { opacity: 0; transform: translateY(35px) scale(.86); }
   14%, 42% { opacity: 1; transform: translateY(0) scale(1, 1); }
@@ -721,16 +704,6 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   50%, 100% { visibility: visible; }
 }
 
-@keyframes confetti-fall {
-  from { transform: translate(var(--x), -8vh) rotate(0deg); }
-  to { transform: translate(calc(var(--x) + var(--drift)), 112vh) rotate(760deg); }
-}
-
-@keyframes winner-panel-in {
-  from { opacity: 0; transform: scale(.65) rotate(-2deg); }
-  to { opacity: 1; transform: scale(1) rotate(0); }
-}
-
 @keyframes effect-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes effect-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
@@ -738,8 +711,6 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   .game-transition-card-inner { animation: none; }
   .game-transition-front { display: none; }
   .game-transition-back { visibility: visible; animation: none; }
-  .confetti-field { display: none; }
-  .winner-celebration-panel { animation: none; }
 }
 
 .team-picker {
@@ -873,7 +844,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   .shell { padding-top: 24px; }
   .hero-card { padding: 27px; }
   .choice-grid, .scoreboard { grid-template-columns: 1fr; }
-  .spotify-meta, .spotify-board { grid-template-columns: 1fr; }
+  .spotify-meta, .spotify-board, .top20-team-notes { grid-template-columns: 1fr; }
   .matching-board, .price-host-layout, .player-price-layout { grid-template-columns: 1fr; }
   .top20-actions { align-items: stretch; flex-direction: column; }
   .versus { text-align: center; }

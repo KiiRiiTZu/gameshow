@@ -516,3 +516,13 @@ test("encrypts private team drafts for one recipient", async () => {
   assert.deepEqual(await decryptPrivatePayload(keyPair.privateKey, encrypted), payload);
   await assert.rejects(() => decryptPrivatePayload(otherKeyPair.privateKey, encrypted));
 });
+
+test("encrypts a Top 20 team note without exposing its text", async () => {
+  const keyPair = await createEncryptionKeyPair();
+  const publicKey = await exportEncryptionPublicKey(keyPair.publicKey);
+  const payload = { playerId: "blue-1", roundIndex: 1, text: "Vielleicht ist Adele dabei" };
+  const encrypted = await encryptPrivatePayload(publicKey, payload);
+
+  assert.equal(JSON.stringify(encrypted).includes("Adele"), false);
+  assert.deepEqual(await decryptPrivatePayload(keyPair.privateKey, encrypted), payload);
+});

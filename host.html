@@ -65,7 +65,6 @@
 
       <div id="buzzer-finished-controls" class="game-finished hidden">
         <p id="buzzer-winner-message"></p>
-        <button id="celebrate-buzzer-winner" class="button success">Sieger feiern</button>
         <button id="start-spotify-game" class="button primary">Top 20 starten</button>
       </div>
     </section>
@@ -96,13 +95,23 @@
         <button id="spotify-miss" class="button danger" type="button">✕ Nicht dabei</button>
       </div>
 
+      <div class="top20-team-notes">
+        <article class="top20-team-note blue">
+          <strong>Team Blau · interne Notiz</strong>
+          <p id="top20-blue-note">Noch keine Eingabe</p>
+        </article>
+        <article class="top20-team-note red">
+          <strong>Team Rot · interne Notiz</strong>
+          <p id="top20-red-note">Noch keine Eingabe</p>
+        </article>
+      </div>
+
       <p id="spotify-error" class="error"></p>
       <div id="spotify-board" class="spotify-board"></div>
 
       <div id="spotify-finished" class="game-finished hidden">
         <p id="spotify-winner-message"></p>
         <button id="next-top20-round" class="button primary">Nächste Liste starten</button>
-        <button id="celebrate-spotify-winner" class="button success hidden">Sieger feiern</button>
         <button id="start-map-game" class="button primary hidden">Deutschlandkarte starten</button>
       </div>
     </section>
@@ -174,7 +183,6 @@
         <button id="complete-matching-turn" class="button secondary hidden">Nächste Spieler</button>
         <button id="reveal-matching-all" class="button primary hidden">Alle Antworten aufdecken</button>
         <button id="next-matching-round" class="button primary hidden">Nächste Runde</button>
-        <button id="celebrate-matching-winner" class="button success hidden">Sieger feiern</button>
         <button id="start-price-game" class="button primary hidden">Preisratespiel starten</button>
       </div>
       <p id="matching-next-game-error" class="error"></p>
@@ -229,7 +237,6 @@
       <div class="controls">
         <button id="reveal-price-round" class="button primary">Preis aufdecken &amp; auswerten</button>
         <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
-        <button id="celebrate-price-winner" class="button success hidden">Sieger feiern</button>
       </div>
     </section>
 

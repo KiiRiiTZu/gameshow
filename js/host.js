@@ -37,7 +37,7 @@ import {
   exportMatchingPublicKey
 } from "./matching-crypto.js";
 import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
-import { showGameTransition, showWinnerCelebration } from "./game-effects.js";
+import { showGameTransition } from "./game-effects.js";
 
 registerGame(buzzerGame);
 registerGame(top20Game);
@@ -55,6 +55,7 @@ let hostMap;
 let matchingAssignments = [];
 let matchingKeyPair;
 let matchingPublicKey;
+let top20Notes = emptyTop20Notes();
 let priceDrafts = emptyPriceDrafts();
 const pricePlayerKeys = new Map();
 let previousGameId = null;
@@ -69,8 +70,47 @@ function matchingStorageKey() {
   return `gameshow-matching-assignments-${roomRecord.id}`;
 }
 
+function top20StorageKey() {
+  return `gameshow-top20-notes-${roomRecord.id}`;
+}
+
 function priceStorageKey() {
   return `gameshow-price-drafts-${roomRecord.id}`;
+}
+
+function emptyTop20Notes(roundIndex = 0) {
+  return {
+    roundIndex,
+    blue: { text: "", updatedBy: null },
+    red: { text: "", updatedBy: null }
+  };
+}
+
+function saveTop20Notes() {
+  try {
+    localStorage.setItem(top20StorageKey(), JSON.stringify(top20Notes));
+  } catch (error) {
+    console.warn("Private Top 20 notes could not be saved:", error);
+  }
+}
+
+function restoreTop20Notes() {
+  top20Notes = emptyTop20Notes(state.game.roundIndex);
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(top20StorageKey()));
+    if (!saved || saved.roundIndex !== state.game.roundIndex) return false;
+    for (const team of ["blue", "red"]) {
+      top20Notes[team] = {
+        text: String(saved[team]?.text || "").slice(0, 280),
+        updatedBy: saved[team]?.updatedBy || null
+      };
+    }
+    return true;
+  } catch (error) {
+    console.warn("Private Top 20 notes could not be restored:", error);
+    return false;
+  }
 }
 
 function emptyPriceDrafts(roundIndex = 0) {
@@ -208,7 +248,10 @@ async function initializeHost() {
   state = createRoomStateFromRecords(roomCode, roomRecord, players);
   restoreLocalGameState();
 
-  if (state.game.id === top20Game.id) top20Game.normalize(state);
+  if (state.game.id === top20Game.id) {
+    top20Game.normalize(state);
+    restoreTop20Notes();
+  }
   if (state.game.id === germanyMapGame.id) germanyMapGame.normalize(state);
   if (state.game.id === matchingGame.id) {
     matchingGame.normalize(state);
@@ -312,9 +355,6 @@ function renderPriceGame() {
   $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
   $("next-price-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-price-round").disabled = moderatorActionPending;
-  $("celebrate-price-winner").classList.toggle(
-    "hidden", !isFinished || !game.winningTeam || game.winnerCelebrated
-  );
   $("price-round-result").classList.toggle("hidden", !isRevealed);
 
   if (!isRevealed) return;
@@ -372,12 +412,6 @@ function renderBuzzerGame() {
   $("correct-answer").disabled = moderatorActionPending;
   $("wrong-answer").disabled = moderatorActionPending;
   $("start-spotify-game").disabled = moderatorActionPending;
-  $("celebrate-buzzer-winner").classList.toggle(
-    "hidden", !isFinished || !state.game.winningTeam || state.game.winnerCelebrated
-  );
-  $("start-spotify-game").classList.toggle(
-    "hidden", isFinished && Boolean(state.game.winningTeam) && !state.game.winnerCelebrated
-  );
   $("answer-controls").classList.toggle("hidden", !winner || isFinished);
   $("buzzer-finished-controls").classList.toggle("hidden", !isFinished);
 
@@ -436,6 +470,8 @@ function renderSpotifyGame() {
   $("blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("red-strikes").textContent = renderStrikes(game.strikes?.red);
   $("spotify-board").innerHTML = renderSpotifySlots(revealed, list, interactionLocked);
+  $("top20-blue-note").textContent = top20Notes.blue.text || "Noch keine Eingabe";
+  $("top20-red-note").textContent = top20Notes.red.text || "Noch keine Eingabe";
   $("spotify-finished").classList.toggle("hidden", !interactionLocked);
   $("spotify-winner-message").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20 mit ${game.roundWins[game.winningTeam]} Rundensiegen!`
@@ -443,12 +479,7 @@ function renderSpotifyGame() {
       ? `${getTeamName(game.roundWinner)} gewinnt Liste ${roundNumber}.`
       : "";
   $("next-top20-round").classList.toggle("hidden", isFinished);
-  $("celebrate-spotify-winner").classList.toggle(
-    "hidden", !isFinished || !game.winningTeam || game.winnerCelebrated
-  );
-  $("start-map-game").classList.toggle(
-    "hidden", !isFinished || (Boolean(game.winningTeam) && !game.winnerCelebrated)
-  );
+  $("start-map-game").classList.toggle("hidden", !isFinished);
   $("next-top20-round").disabled = moderatorActionPending;
   $("start-map-game").disabled = moderatorActionPending;
 
@@ -491,14 +522,12 @@ function renderMapGame() {
   $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady;
   $("next-map-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-map-round").disabled = moderatorActionPending;
-  $("start-matching-game").classList.toggle(
-    "hidden", !isFinished || (Boolean(game.winningTeam) && !game.winnerCelebrated)
-  );
+  $("start-matching-game").classList.toggle("hidden", !isFinished);
   $("start-matching-game").disabled = moderatorActionPending ||
     state.players.filter((player) => player.team === "blue").length !== 2 ||
     state.players.filter((player) => player.team === "red").length !== 2;
   $("next-map-round").textContent = game.roundScores[game.roundWinner] >= GERMANY_MAP_ROUNDS_TO_WIN
-    ? "Sieger feiern"
+    ? "Spiel abschließen"
     : "Nächste Frage";
   $("map-result").classList.toggle("hidden", !isRevealed);
 
@@ -635,12 +664,7 @@ function renderMatchingGame() {
   $("reveal-matching-all").disabled = moderatorActionPending;
   $("next-matching-round").classList.toggle("hidden", game.status !== "round-finished");
   $("next-matching-round").disabled = moderatorActionPending;
-  $("celebrate-matching-winner").classList.toggle(
-    "hidden", !isFinished || !game.winningTeam || game.winnerCelebrated
-  );
-  $("start-price-game").classList.toggle(
-    "hidden", !isFinished || (Boolean(game.winningTeam) && !game.winnerCelebrated)
-  );
+  $("start-price-game").classList.toggle("hidden", !isFinished);
   $("start-price-game").disabled = moderatorActionPending ||
     state.players.filter((player) => player.team === "blue").length !== 2 ||
     state.players.filter((player) => player.team === "red").length !== 2;
@@ -718,6 +742,9 @@ async function broadcastState() {
   }
   if (state.game.id === guessThePriceGame.id) {
     publicState.priceSubmissionKey = matchingPublicKey;
+  }
+  if (state.game.id === top20Game.id) {
+    publicState.top20SubmissionKey = matchingPublicKey;
   }
   await realtime.send("room_state", publicState);
 }
@@ -886,6 +913,57 @@ async function syncAllMatchingTeams() {
   await Promise.all([syncMatchingTeam("blue"), syncMatchingTeam("red")]);
 }
 
+async function sendTop20PrivateState(playerId) {
+  if (state.game.id !== top20Game.id) return false;
+  const roomPlayer = state.players.find((item) => item.id === playerId);
+  const publicKey = pricePlayerKeys.get(playerId);
+  if (!roomPlayer || !publicKey) return false;
+
+  try {
+    const encrypted = await encryptPrivatePayload(publicKey, {
+      roundIndex: state.game.roundIndex,
+      note: top20Notes[roomPlayer.team]
+    });
+    await realtime.send("top20_private_state", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.warn("Private Top 20 note could not be encrypted:", error);
+    return false;
+  }
+}
+
+async function syncTop20Team(team) {
+  const teamPlayers = state.players.filter((player) => player.team === team);
+  await Promise.all(teamPlayers.map((player) => sendTop20PrivateState(player.id)));
+}
+
+async function syncAllTop20Teams() {
+  await Promise.all([syncTop20Team("blue"), syncTop20Team("red")]);
+}
+
+async function handleTop20Submission(payload) {
+  if (state.game.id !== top20Game.id || state.game.status !== "playing" ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+
+  const player = state.players.find((item) => item.id === payload.playerId);
+  if (!player) return;
+
+  try {
+    const submission = await decryptPrivatePayload(matchingKeyPair.privateKey, payload.encrypted);
+    if (submission?.playerId !== player.id || submission.roundIndex !== state.game.roundIndex) return;
+
+    top20Notes[player.team] = {
+      text: String(submission.text || "").slice(0, 280),
+      updatedBy: player.id
+    };
+    saveTop20Notes();
+    render();
+    await syncTop20Team(player.team);
+  } catch (error) {
+    console.warn("Encrypted Top 20 note could not be processed:", error);
+  }
+}
+
 async function sendPricePrivateState(playerId) {
   if (state.game.id !== guessThePriceGame.id) return false;
   const roomPlayer = state.players.find((item) => item.id === playerId);
@@ -920,6 +998,7 @@ async function handlePriceKeyRegistration(payload) {
   if (!roomPlayer || !payload?.publicKey || payload.publicKey.kty !== "RSA") return;
   pricePlayerKeys.set(roomPlayer.id, payload.publicKey);
   if (state.game.id === matchingGame.id) await sendMatchingPrivateState(roomPlayer.id);
+  if (state.game.id === top20Game.id) await sendTop20PrivateState(roomPlayer.id);
   if (state.game.id === guessThePriceGame.id) await sendPricePrivateState(roomPlayer.id);
 }
 
@@ -974,12 +1053,6 @@ async function handlePriceSubmission(payload) {
 }
 
 async function handleEvent(event, payload) {
-  if (event === "winner_celebration" && payload.gameId === state.game.id &&
-      payload.team === state.game.winningTeam) {
-    showWinnerCelebration(payload.team, state.players, payload.gameId);
-    return;
-  }
-
   if (event === "buzz_winner") {
     void playBuzzerSound();
     return;
@@ -1007,6 +1080,11 @@ async function handleEvent(event, payload) {
 
   if (event === "price_private_submission") {
     await handlePriceSubmission(payload);
+    return;
+  }
+
+  if (event === "top20_private_submission") {
+    await handleTop20Submission(payload);
     return;
   }
 
@@ -1047,22 +1125,6 @@ function startRealtime() {
   });
 }
 
-async function celebrateFinishedGame(expectedGameId) {
-  const accepted = await runModeratorAction(() => {
-    if (state.game.id !== expectedGameId || state.game.status !== "finished" ||
-        !state.game.winningTeam || state.game.winnerCelebrated) return false;
-    state.game.winnerCelebrated = true;
-    return true;
-  });
-
-  if (accepted) {
-    await realtime.send("winner_celebration", {
-      gameId: expectedGameId,
-      team: state.game.winningTeam
-    });
-  }
-}
-
 $("open-buzzer").addEventListener("click", async () => {
   await runModeratorAction(() => buzzerGame.open(state));
 });
@@ -1087,16 +1149,15 @@ $("wrong-answer").addEventListener("click", async () => {
   });
 });
 
-$("celebrate-buzzer-winner").addEventListener("click", async () => {
-  await celebrateFinishedGame(buzzerGame.id);
-});
-
 $("start-spotify-game").addEventListener("click", async () => {
-  await runModeratorAction(() => {
+  const accepted = await runModeratorAction(() => {
     if (state.game.id !== "buzzer" || state.game.status !== "finished") return false;
     top20Game.start(state);
+    top20Notes = emptyTop20Notes(0);
+    saveTop20Notes();
     return true;
   });
+  if (accepted) await syncAllTop20Teams();
 });
 
 $("spotify-board").addEventListener("click", async (event) => {
@@ -1122,11 +1183,14 @@ $("spotify-miss").addEventListener("click", async () => {
 
 $("next-top20-round").addEventListener("click", async () => {
   $("spotify-error").textContent = "";
-  await runModeratorAction(() => top20Game.startNextRound(state));
-});
-
-$("celebrate-spotify-winner").addEventListener("click", async () => {
-  await celebrateFinishedGame(top20Game.id);
+  const nextRoundIndex = state.game.roundIndex + 1;
+  const accepted = await runModeratorAction(() => {
+    if (!top20Game.startNextRound(state)) return false;
+    top20Notes = emptyTop20Notes(nextRoundIndex);
+    saveTop20Notes();
+    return true;
+  });
+  if (accepted) await syncAllTop20Teams();
 });
 
 $("start-map-game").addEventListener("click", async () => {
@@ -1141,10 +1205,7 @@ $("reveal-map-round").addEventListener("click", async () => {
 });
 
 $("next-map-round").addEventListener("click", async () => {
-  const accepted = await runModeratorAction(() => germanyMapGame.startNextRound(state));
-  if (accepted && state.game.status === "finished") {
-    await celebrateFinishedGame(germanyMapGame.id);
-  }
+  await runModeratorAction(() => germanyMapGame.startNextRound(state));
 });
 
 $("start-matching-game").addEventListener("click", async () => {
@@ -1267,10 +1328,6 @@ $("next-matching-round").addEventListener("click", async () => {
   if (accepted) await syncAllMatchingTeams();
 });
 
-$("celebrate-matching-winner").addEventListener("click", async () => {
-  await celebrateFinishedGame(matchingGame.id);
-});
-
 $("start-price-game").addEventListener("click", async () => {
   $("matching-next-game-error").textContent = "";
 
@@ -1315,10 +1372,6 @@ $("next-price-round").addEventListener("click", async () => {
     return true;
   });
   if (accepted) await syncAllPriceTeams();
-});
-
-$("celebrate-price-winner").addEventListener("click", async () => {
-  await celebrateFinishedGame(guessThePriceGame.id);
 });
 
 window.addEventListener("beforeunload", () => {
