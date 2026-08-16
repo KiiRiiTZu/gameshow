@@ -419,6 +419,7 @@ function renderBuzzerGame() {
 
   $("open-buzzer").disabled = moderatorActionPending || status !== "waiting";
   $("reset-buzzer").disabled = moderatorActionPending || isFinished;
+  $("skip-buzzer-question").disabled = moderatorActionPending || isNotStarted || isFinished;
   $("correct-answer").disabled = moderatorActionPending;
   $("wrong-answer").disabled = moderatorActionPending;
   $("start-price-game-after-buzzer").disabled = moderatorActionPending;
@@ -1044,6 +1045,10 @@ $("open-buzzer").addEventListener("click", async () => {
 
 $("reset-buzzer").addEventListener("click", async () => {
   await runModeratorAction(() => buzzerGame.reset(state));
+});
+
+$("skip-buzzer-question").addEventListener("click", async () => {
+  await runModeratorAction(() => buzzerGame.advanceQuestion(state));
 });
 
 $("correct-answer").addEventListener("click", async () => {

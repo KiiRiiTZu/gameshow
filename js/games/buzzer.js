@@ -111,7 +111,9 @@ export const buzzerGame = {
   },
 
   advanceQuestion(state) {
-    if (state.game.id !== this.id || state.game.status === "finished") return false;
+    if (state.game.id !== this.id || ["not-started", "finished"].includes(state.game.status)) {
+      return false;
+    }
     state.game.questionIndex = (currentQuestionIndex(state) + 1) % BUZZER_QUESTIONS.length;
     state.game.status = "waiting";
     state.game.winner = null;

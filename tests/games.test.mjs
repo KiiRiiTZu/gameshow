@@ -88,6 +88,21 @@ test("keeps buzzer quiz points when the next question starts", () => {
   assert.deepEqual(state.game.scores, { blue: 2, red: 1 });
 });
 
+test("skips an unanswered buzzer question without awarding points", () => {
+  const state = createInitialRoomState("TEST");
+  buzzerGame.start(state);
+  buzzerGame.open(state);
+  buzzerGame.registerBuzz(state, { id: "1", name: "A", team: "blue" });
+  const scoresBefore = structuredClone(state.game.scores);
+
+  assert.equal(buzzerGame.advanceQuestion(state), true);
+  assert.equal(state.game.questionIndex, 1);
+  assert.equal(state.game.status, "waiting");
+  assert.equal(state.game.winner, null);
+  assert.deepEqual(state.game.scores, scoresBefore);
+  assert.deepEqual(state.scores, { blue: 0, red: 0 });
+});
+
 test("awards a quiz point to the opposing team after a wrong answer", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
@@ -316,7 +331,7 @@ test("collects one active team in two moderator-controlled turns", () => {
 });
 
 test("contains all prepared buzzer questions", () => {
-  assert.equal(BUZZER_QUESTIONS.length, 13);
+  assert.equal(BUZZER_QUESTIONS.length, 26);
   assert.ok(BUZZER_QUESTIONS.every((entry) => entry.question && entry.answer));
 });
 

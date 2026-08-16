@@ -1,15 +1,28 @@
 - Wie heißt das aktuell höchste Hochhaus der Welt? Burj Khalifa 828m
 - Was ist das leichteste bisher entdeckte Element? Wasserstoff
-- Wie viele unterschiedliche Euromünzen gibt es? 1,2,5,10,20,50,1,2
+- Wie viele unterschiedliche Euromünzen gibt es? 8 (1,2,5,10,20,50,1,2)
 - In welchem Jahr wurde der Euro als Bargeld eingeführt? 2002
 - Wie oft wurde Deutschland Fußballweltmeister und wann das erste mal? 4mal, 1954
 - Wer ist aktuell der reichste Mensch der Welt? Elon Musk
 - In welchem Jahr starb Michael Jackson? 2009
-- Was ist das flächenmäßig größte land der Erde? Russland?
+- Was ist das flächenmäßig größte land der Erde? Russland
 - Welches Element hat Gold im Periodensystem? Au (Aurum)
 - Wie lautet die Messeinheit des Gleichstromwiderstandes? Ohm
 - Welches Gerät registriert Erschütterungen eines Erbebens? Seismograph
 - Wann kam das erste iPhone auf den Markt? 2007
 - Was ist ein Ornithologe? Ein Vogelkundler
+- Wofür steht die Abkürzung USB? Universal Serial Bus
+- Wie heißt der kleinste Planet in unserem Sonnensystem? Merkur
+- Wie hieß das Luftschiff, das 1937 explodierte? Hindenburg
+- Warum hat die Freiheitsstatue 7 Zacken in der Krone? Für die 7 Weltmeere
+- Wie nannte sich die japanische selbstmord-spezialtruppe im 2. Weltkrieg? Kamikaze
+- Wo ist der Austragungsort der internationalen Tennismeisterschaften von England? Wimbledon
+- Wie viele deutsche Weltmeister gab es bisher in der Formel1? 3 (Nico Rossberg, Michael Schumacher, Sebastian Vettel)
+- Wie nennt man ein Unentschieden im Schach? Remis
+- Welcher Musiker hat die meisten Nummer 1 Hits weltweit? Elvis Presley (21)
+- Welcher Film hat die meisten Oscar-Auszeichnungen? Ben-Hur, Titanic, Der Herr der Ringe: Die Rückkehr des Königs alle mit 11
+- Wie heißt die medizinische Fachrichtung, die sich mit der Haut beschäftigt? Dermathologie
+- Wo im Körper befindet sich der Hammer? Im Ohr
+- Welches DIN Format hat eine gewöhnliche Postkarte? DIN-A6
 
 

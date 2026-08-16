@@ -11,7 +11,20 @@ export const BUZZER_QUESTIONS = [
   { question: "Wie lautet die Maßeinheit des elektrischen Widerstands?", answer: "Ohm" },
   { question: "Welches Gerät registriert die Erschütterungen eines Erdbebens?", answer: "Seismograph" },
   { question: "Wann kam das erste iPhone auf den Markt?", answer: "2007" },
-  { question: "Was ist ein Ornithologe?", answer: "Ein Vogelkundler" }
+  { question: "Was ist ein Ornithologe?", answer: "Ein Vogelkundler" },
+  { question: "Wofür steht die Abkürzung USB?", answer: "Universal Serial Bus" },
+  { question: "Wie heißt der kleinste Planet in unserem Sonnensystem?", answer: "Merkur" },
+  { question: "Wie hieß das Luftschiff, das 1937 explodierte?", answer: "Hindenburg" },
+  { question: "Warum hat die Freiheitsstatue sieben Zacken in der Krone?", answer: "Für die sieben Weltmeere" },
+  { question: "Wie nannte sich die japanische Selbstmord-Spezialtruppe im Zweiten Weltkrieg?", answer: "Kamikaze" },
+  { question: "Wo ist der Austragungsort der internationalen Tennismeisterschaften von England?", answer: "Wimbledon" },
+  { question: "Wie viele deutsche Weltmeister gab es bisher in der Formel 1?", answer: "Drei · Nico Rosberg, Michael Schumacher und Sebastian Vettel" },
+  { question: "Wie nennt man ein Unentschieden im Schach?", answer: "Remis" },
+  { question: "Welcher Musiker hat die meisten Nummer-eins-Hits weltweit?", answer: "Elvis Presley · 21" },
+  { question: "Welche Filme haben die meisten Oscar-Auszeichnungen erhalten?", answer: "Ben-Hur, Titanic und Der Herr der Ringe: Die Rückkehr des Königs · jeweils 11" },
+  { question: "Wie heißt die medizinische Fachrichtung, die sich mit der Haut beschäftigt?", answer: "Dermatologie" },
+  { question: "Wo im Körper befindet sich der Hammer?", answer: "Im Ohr" },
+  { question: "Welches DIN-Format hat eine gewöhnliche Postkarte?", answer: "DIN A6" }
 ];
 
 export function getBuzzerQuestion(index = 0) {

@@ -65,9 +65,10 @@
         <span class="muted">Öffne den Buzzer, sobald du die Frage gestellt hast.</span>
       </div>
 
-      <div class="controls">
+      <div id="buzzer-controls" class="controls">
         <button id="open-buzzer" class="button primary">Buzzer öffnen</button>
         <button id="reset-buzzer" class="button secondary">Zurücksetzen</button>
+        <button id="skip-buzzer-question" class="button secondary">Keine Antwort · Nächste Frage</button>
       </div>
 
       <div id="answer-controls" class="answer-controls hidden">
@@ -246,7 +247,7 @@
 
       <div id="price-round-result" class="map-result hidden"></div>
       <p id="price-error" class="error"></p>
-      <div id="buzzer-controls" class="controls">
+      <div class="controls">
         <button id="reveal-price-round" class="button primary">Preis aufdecken &amp; auswerten</button>
         <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
         <button id="start-top20-game" class="button primary hidden">Top 20 starten</button>
