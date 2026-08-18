@@ -334,10 +334,26 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .top20-team-note.blue { border-color: rgba(90,114,246,.48); }
 .top20-team-note.red { border-color: rgba(210,55,80,.48); }
-.top20-team-note p { min-height: 64px; margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .top20-player-note { display: grid; gap: 8px; margin-top: 16px; }
-.top20-player-note textarea { min-height: 132px; }
 .top20-player-note p { margin: 0; }
+
+.private-note-list,
+.player-private-notes { display: grid; gap: 8px; margin-top: 10px; }
+
+.private-note-entry {
+  min-height: 58px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: rgba(255,255,255,.045);
+}
+
+.private-note-entry strong,
+.player-private-note label { display: block; margin-bottom: 5px; font-size: .78rem; color: #979dad; }
+.private-note-entry p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.player-private-note { display: grid; gap: 5px; }
+.player-private-note textarea { min-height: 92px; resize: vertical; }
+.player-private-note textarea[readonly] { opacity: .72; cursor: default; }
 
 .spotify-board {
   display: grid;

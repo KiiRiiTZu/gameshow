@@ -517,7 +517,14 @@ test("encrypts private team drafts for one recipient", async () => {
   const keyPair = await createEncryptionKeyPair();
   const otherKeyPair = await createEncryptionKeyPair();
   const publicKey = await exportEncryptionPublicKey(keyPair.publicKey);
-  const payload = { roundIndex: 2, amount: "59,99", comment: "Ich tippe knapp 60 Euro" };
+  const payload = {
+    roundIndex: 2,
+    amount: "59,99",
+    comments: {
+      "blue-1": "Ich tippe knapp 60 Euro",
+      "blue-2": "Könnte etwas günstiger sein"
+    }
+  };
   const encrypted = await encryptPrivatePayload(publicKey, payload);
 
   assert.equal(JSON.stringify(encrypted).includes("60 Euro"), false);
@@ -532,5 +539,22 @@ test("encrypts a Top 20 team note without exposing its text", async () => {
   const encrypted = await encryptPrivatePayload(publicKey, payload);
 
   assert.equal(JSON.stringify(encrypted).includes("Adele"), false);
+  assert.deepEqual(await decryptPrivatePayload(keyPair.privateKey, encrypted), payload);
+});
+
+test("encrypts separate Kartenwissen notes for both teammates", async () => {
+  const keyPair = await createEncryptionKeyPair();
+  const publicKey = await exportEncryptionPublicKey(keyPair.publicKey);
+  const payload = {
+    roundIndex: 4,
+    notes: {
+      "red-1": "Ich würde den Pin weiter nach Westen setzen",
+      "red-2": "Für mich liegt es eher im Süden"
+    }
+  };
+  const encrypted = await encryptPrivatePayload(publicKey, payload);
+
+  assert.equal(JSON.stringify(encrypted).includes("Westen"), false);
+  assert.equal(JSON.stringify(encrypted).includes("Süden"), false);
   assert.deepEqual(await decryptPrivatePayload(keyPair.privateKey, encrypted), payload);
 });

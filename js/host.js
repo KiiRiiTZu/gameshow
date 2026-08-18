@@ -55,6 +55,7 @@ let matchingAssignments = [];
 let matchingKeyPair;
 let matchingPublicKey;
 let top20Notes = emptyTop20Notes();
+let mapNotes = emptyMapNotes();
 let priceDrafts = emptyPriceDrafts();
 const pricePlayerKeys = new Map();
 let previousGameId = null;
@@ -78,11 +79,27 @@ function priceStorageKey() {
   return `gameshow-price-drafts-${roomRecord.id}`;
 }
 
+function mapNotesStorageKey() {
+  return `gameshow-map-notes-${roomRecord.id}`;
+}
+
+function normalizePersonalNotes(value, legacyText = "", legacyUpdatedBy = null) {
+  const notes = {};
+  const source = value && typeof value === "object" ? value : {};
+  for (const [playerId, text] of Object.entries(source)) {
+    notes[playerId] = String(text || "").slice(0, 280);
+  }
+  if (legacyUpdatedBy && legacyText && !notes[legacyUpdatedBy]) {
+    notes[legacyUpdatedBy] = String(legacyText).slice(0, 280);
+  }
+  return notes;
+}
+
 function emptyTop20Notes(roundIndex = 0) {
   return {
     roundIndex,
-    blue: { text: "", updatedBy: null },
-    red: { text: "", updatedBy: null }
+    blue: { notes: {} },
+    red: { notes: {} }
   };
 }
 
@@ -102,8 +119,11 @@ function restoreTop20Notes() {
     if (!saved || saved.roundIndex !== state.game.roundIndex) return false;
     for (const team of ["blue", "red"]) {
       top20Notes[team] = {
-        text: String(saved[team]?.text || "").slice(0, 280),
-        updatedBy: saved[team]?.updatedBy || null
+        notes: normalizePersonalNotes(
+          saved[team]?.notes,
+          saved[team]?.text,
+          saved[team]?.updatedBy
+        )
       };
     }
     return true;
@@ -116,8 +136,8 @@ function restoreTop20Notes() {
 function emptyPriceDrafts(roundIndex = 0) {
   return {
     roundIndex,
-    blue: { amount: "", comment: "", updatedBy: null },
-    red: { amount: "", comment: "", updatedBy: null }
+    blue: { amount: "", comments: {}, updatedBy: null },
+    red: { amount: "", comments: {}, updatedBy: null }
   };
 }
 
@@ -138,13 +158,48 @@ function restorePriceDrafts() {
     for (const team of ["blue", "red"]) {
       priceDrafts[team] = {
         amount: String(saved[team]?.amount || "").slice(0, 40),
-        comment: String(saved[team]?.comment || "").slice(0, 280),
+        comments: normalizePersonalNotes(
+          saved[team]?.comments,
+          saved[team]?.comment,
+          saved[team]?.updatedBy
+        ),
         updatedBy: saved[team]?.updatedBy || null
       };
     }
     return true;
   } catch (error) {
     console.warn("Private price drafts could not be restored:", error);
+    return false;
+  }
+}
+
+function emptyMapNotes(roundIndex = 0) {
+  return {
+    roundIndex,
+    blue: { notes: {} },
+    red: { notes: {} }
+  };
+}
+
+function saveMapNotes() {
+  try {
+    localStorage.setItem(mapNotesStorageKey(), JSON.stringify(mapNotes));
+  } catch (error) {
+    console.warn("Private map notes could not be saved:", error);
+  }
+}
+
+function restoreMapNotes() {
+  mapNotes = emptyMapNotes(state.game.roundIndex);
+  try {
+    const saved = JSON.parse(localStorage.getItem(mapNotesStorageKey()));
+    if (!saved || saved.roundIndex !== state.game.roundIndex) return false;
+    for (const team of ["blue", "red"]) {
+      mapNotes[team] = { notes: normalizePersonalNotes(saved[team]?.notes) };
+    }
+    return true;
+  } catch (error) {
+    console.warn("Private map notes could not be restored:", error);
     return false;
   }
 }
@@ -252,7 +307,10 @@ async function initializeHost() {
     top20Game.normalize(state);
     restoreTop20Notes();
   }
-  if (state.game.id === germanyMapGame.id) germanyMapGame.normalize(state);
+  if (state.game.id === germanyMapGame.id) {
+    germanyMapGame.normalize(state);
+    restoreMapNotes();
+  }
   if (state.game.id === matchingGame.id) {
     matchingGame.normalize(state);
     const assignmentsRestored = restoreMatchingAssignments();
@@ -334,9 +392,21 @@ function renderPriceDraft(team) {
   $(`price-${team}-guess`).textContent = parsedAmount === null
     ? draft.amount || "Noch keine Eingabe"
     : formatEuroAmount(parsedAmount);
-  $(`price-${team}-comment`).textContent = draft.comment || "Noch kein Kommentar";
+  renderHostPersonalNotes(`price-${team}-comments`, team, draft.comments);
   $(`price-${team}-lock`).textContent = locked ? "Eingeloggt ✓" : "Offen";
   $(`price-${team}-lock`).className = `status-pill ${locked ? "open" : ""}`;
+}
+
+function renderHostPersonalNotes(containerId, team, notes = {}) {
+  const teamPlayers = state.players.filter((item) => item.team === team);
+  $(containerId).innerHTML = teamPlayers.length
+    ? teamPlayers.map((item) => `
+      <div class="private-note-entry">
+        <strong>${escapeHtml(item.name)}</strong>
+        <p>${escapeHtml(notes[item.id] || "Noch keine Eingabe")}</p>
+      </div>
+    `).join("")
+    : '<span class="muted small">Noch keine Spieler</span>';
 }
 
 function renderPriceGame() {
@@ -487,8 +557,8 @@ function renderSpotifyGame() {
   $("blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("red-strikes").textContent = renderStrikes(game.strikes?.red);
   $("spotify-board").innerHTML = renderSpotifySlots(revealed, list, interactionLocked);
-  $("top20-blue-note").textContent = top20Notes.blue.text || "Noch keine Eingabe";
-  $("top20-red-note").textContent = top20Notes.red.text || "Noch keine Eingabe";
+  renderHostPersonalNotes("top20-blue-notes", "blue", top20Notes.blue.notes);
+  renderHostPersonalNotes("top20-red-notes", "red", top20Notes.red.notes);
   $("spotify-finished").classList.toggle("hidden", !interactionLocked);
   $("spotify-winner-message").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20 mit ${game.roundWins[game.winningTeam]} Rundensiegen!`
@@ -536,6 +606,8 @@ function renderMapGame() {
     <span class="${game.lockedTeams?.blue ? "ready" : ""}">Blau: ${game.lockedTeams?.blue ? "eingeloggt ✓" : game.pins?.blue ? "Pin gesetzt" : "wartet…"}</span>
     <span class="${game.lockedTeams?.red ? "ready" : ""}">Rot: ${game.lockedTeams?.red ? "eingeloggt ✓" : game.pins?.red ? "Pin gesetzt" : "wartet…"}</span>
   `;
+  renderHostPersonalNotes("map-blue-notes", "blue", mapNotes.blue.notes);
+  renderHostPersonalNotes("map-red-notes", "red", mapNotes.red.notes);
 
   $("reveal-map-round").classList.toggle("hidden", isRevealed);
   $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady || !bothTeamsLocked;
@@ -755,6 +827,9 @@ async function broadcastState() {
   if (state.game.id === top20Game.id) {
     publicState.top20SubmissionKey = matchingPublicKey;
   }
+  if (state.game.id === germanyMapGame.id) {
+    publicState.mapSubmissionKey = matchingPublicKey;
+  }
   await realtime.send("room_state", publicState);
 }
 
@@ -835,7 +910,7 @@ async function sendTop20PrivateState(playerId) {
   try {
     const encrypted = await encryptPrivatePayload(publicKey, {
       roundIndex: state.game.roundIndex,
-      note: top20Notes[roomPlayer.team]
+      notes: top20Notes[roomPlayer.team].notes
     });
     await realtime.send("top20_private_state", { playerId, encrypted });
     return true;
@@ -865,10 +940,7 @@ async function handleTop20Submission(payload) {
     const submission = await decryptPrivatePayload(matchingKeyPair.privateKey, payload.encrypted);
     if (submission?.playerId !== player.id || submission.roundIndex !== state.game.roundIndex) return;
 
-    top20Notes[player.team] = {
-      text: String(submission.text || "").slice(0, 280),
-      updatedBy: player.id
-    };
+    top20Notes[player.team].notes[player.id] = String(submission.text || "").slice(0, 280);
     saveTop20Notes();
     render();
     await syncTop20Team(player.team);
@@ -911,7 +983,54 @@ async function handlePriceKeyRegistration(payload) {
   if (!roomPlayer || !payload?.publicKey || payload.publicKey.kty !== "RSA") return;
   pricePlayerKeys.set(roomPlayer.id, payload.publicKey);
   if (state.game.id === top20Game.id) await sendTop20PrivateState(roomPlayer.id);
+  if (state.game.id === germanyMapGame.id) await sendMapPrivateState(roomPlayer.id);
   if (state.game.id === guessThePriceGame.id) await sendPricePrivateState(roomPlayer.id);
+}
+
+async function sendMapPrivateState(playerId) {
+  if (state.game.id !== germanyMapGame.id) return false;
+  const roomPlayer = state.players.find((item) => item.id === playerId);
+  const publicKey = pricePlayerKeys.get(playerId);
+  if (!roomPlayer || !publicKey) return false;
+
+  try {
+    const encrypted = await encryptPrivatePayload(publicKey, {
+      roundIndex: state.game.roundIndex,
+      notes: mapNotes[roomPlayer.team].notes
+    });
+    await realtime.send("map_private_state", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.warn("Private map notes could not be encrypted:", error);
+    return false;
+  }
+}
+
+async function syncMapTeam(team) {
+  const teamPlayers = state.players.filter((item) => item.team === team);
+  await Promise.all(teamPlayers.map((item) => sendMapPrivateState(item.id)));
+}
+
+async function syncAllMapTeams() {
+  await Promise.all([syncMapTeam("blue"), syncMapTeam("red")]);
+}
+
+async function handleMapSubmission(payload) {
+  if (state.game.id !== germanyMapGame.id || state.game.status !== "placing" ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+  const player = state.players.find((item) => item.id === payload.playerId);
+  if (!player) return;
+
+  try {
+    const submission = await decryptPrivatePayload(matchingKeyPair.privateKey, payload.encrypted);
+    if (submission?.playerId !== player.id || submission.roundIndex !== state.game.roundIndex) return;
+    mapNotes[player.team].notes[player.id] = String(submission.text || "").slice(0, 280);
+    saveMapNotes();
+    render();
+    await syncMapTeam(player.team);
+  } catch (error) {
+    console.warn("Encrypted map note could not be processed:", error);
+  }
 }
 
 async function handlePriceSubmission(payload) {
@@ -928,12 +1047,19 @@ async function handlePriceSubmission(payload) {
     );
     const valid = submission?.playerId === player.id &&
       submission.roundIndex === state.game.roundIndex &&
-      ["draft", "lock"].includes(submission.type);
+      ["amount", "comment", "lock"].includes(submission.type);
     if (!valid) return;
 
     const amount = String(submission.amount || "").slice(0, 40);
     const comment = String(submission.comment || "").slice(0, 280);
-    priceDrafts[player.team] = { amount, comment, updatedBy: player.id };
+    const teamDraft = priceDrafts[player.team];
+    if (submission.type === "amount" || submission.type === "lock") {
+      teamDraft.amount = amount;
+      teamDraft.updatedBy = player.id;
+    }
+    if (submission.type === "comment" || submission.type === "lock") {
+      teamDraft.comments[player.id] = comment;
+    }
     savePriceDrafts();
     render();
 
@@ -992,6 +1118,11 @@ async function handleEvent(event, payload) {
 
   if (event === "top20_private_submission") {
     await handleTop20Submission(payload);
+    return;
+  }
+
+  if (event === "map_private_submission") {
+    await handleMapSubmission(payload);
     return;
   }
 
@@ -1120,10 +1251,14 @@ $("next-top20-round").addEventListener("click", async () => {
 });
 
 $("start-map-game").addEventListener("click", async () => {
-  await runModeratorAction(() => {
+  const accepted = await runModeratorAction(() => {
     if (getShowWinner(state) || state.game.id !== top20Game.id || state.game.status !== "finished") return false;
-    return germanyMapGame.start(state);
+    if (!germanyMapGame.start(state)) return false;
+    mapNotes = emptyMapNotes(0);
+    saveMapNotes();
+    return true;
   });
+  if (accepted) await syncAllMapTeams();
 });
 
 $("reveal-map-round").addEventListener("click", async () => {
@@ -1131,7 +1266,14 @@ $("reveal-map-round").addEventListener("click", async () => {
 });
 
 $("next-map-round").addEventListener("click", async () => {
-  await runModeratorAction(() => germanyMapGame.startNextRound(state));
+  const nextRoundIndex = state.game.roundIndex + 1;
+  const accepted = await runModeratorAction(() => {
+    if (!germanyMapGame.startNextRound(state)) return false;
+    mapNotes = emptyMapNotes(nextRoundIndex);
+    saveMapNotes();
+    return true;
+  });
+  if (accepted) await syncAllMapTeams();
 });
 
 $("start-matching-game").addEventListener("click", async () => {

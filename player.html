@@ -74,10 +74,9 @@
         </div>
         <div id="player-spotify-board" class="spotify-board compact"></div>
         <div class="top20-player-note">
-          <label for="player-top20-note">Team-Notiz</label>
-          <textarea id="player-top20-note" maxlength="280" rows="4"
-            placeholder="Tauscht euch hier innerhalb eures Teams aus."></textarea>
-          <p class="muted small">Nur dein Team und der Moderator können diese Notiz lesen.</p>
+          <strong>Eure persönlichen Team-Notizen</strong>
+          <div id="player-top20-notes" class="player-private-notes"></div>
+          <p class="muted small">Jeder schreibt in sein eigenes Feld. Nur euer Team und der Moderator können sie lesen.</p>
         </div>
         <div id="player-spotify-result" class="player-message"></div>
       </div>
@@ -96,6 +95,11 @@
         </div>
         <p id="player-map-instruction" class="muted">Tippt auf die Karte, um euren gemeinsamen Team-Pin zu setzen.</p>
         <div id="player-germany-map" class="germany-map player-map"></div>
+        <div class="top20-player-note">
+          <strong>Eure persönlichen Team-Notizen</strong>
+          <div id="player-map-notes" class="player-private-notes"></div>
+          <p class="muted small">Jeder schreibt in sein eigenes Feld. Nur euer Team und der Moderator können sie lesen.</p>
+        </div>
         <button id="lock-map-pin" class="button primary full">Antwort einloggen</button>
         <div id="player-map-result" class="player-message"></div>
       </div>
@@ -141,10 +145,9 @@
               <span>€</span>
             </div>
 
-            <label for="player-price-comment">Team-Notiz</label>
-            <textarea id="player-price-comment" maxlength="280" rows="5"
-              placeholder="Schreibt hier eure Überlegungen. Nur dein Team und der Moderator können sie lesen."></textarea>
-            <p class="muted small">Preis und Notiz werden live mit deinem Teampartner synchronisiert.</p>
+            <strong>Eure persönlichen Team-Notizen</strong>
+            <div id="player-price-comments" class="player-private-notes"></div>
+            <p class="muted small">Der Preis ist gemeinsam; jeder schreibt in sein eigenes Notizfeld.</p>
             <button id="lock-price-guess" class="button primary full">Preis einloggen</button>
             <p id="player-price-error" class="error"></p>
           </div>

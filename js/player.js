@@ -49,12 +49,15 @@ let joined = false;
 let sendingBuzz = false;
 let realtime = null;
 let playerMap = null;
-let top20Note = { roundIndex: -1, text: "" };
+let top20Notes = { roundIndex: -1, notes: {} };
 let top20NoteTimer = null;
+let mapNotes = { roundIndex: -1, notes: {} };
+let mapNoteTimer = null;
 let priceKeyPair = null;
 let pricePublicKey = null;
-let priceDraft = { roundIndex: -1, amount: "", comment: "", locked: false };
-let priceDraftTimer = null;
+let priceDraft = { roundIndex: -1, amount: "", comments: {}, locked: false };
+let priceAmountTimer = null;
+let priceCommentTimer = null;
 let priceSubmissionPending = false;
 let previousGameId = null;
 let previousBuzzerStatus = null;
@@ -172,7 +175,7 @@ async function sendTop20Note() {
     const encrypted = await encryptPrivatePayload(roomState.top20SubmissionKey, {
       playerId,
       roundIndex: roomState.game.roundIndex,
-      text: top20Note.text
+      text: top20Notes.notes[playerId] || ""
     });
     await realtime.send("top20_private_submission", { playerId, encrypted });
     return true;
@@ -182,17 +185,49 @@ async function sendTop20Note() {
   }
 }
 
-$("player-top20-note").addEventListener("input", (event) => {
-  top20Note.text = event.currentTarget.value.slice(0, 280);
+$("player-top20-notes").addEventListener("input", (event) => {
+  if (event.target.dataset.notePlayerId !== playerId) return;
+  top20Notes.notes[playerId] = event.target.value.slice(0, 280);
   clearTimeout(top20NoteTimer);
   top20NoteTimer = setTimeout(() => {
     void sendTop20Note();
   }, 300);
 });
 
-$("player-top20-note").addEventListener("blur", () => {
+$("player-top20-notes").addEventListener("focusout", (event) => {
+  if (event.target.dataset.notePlayerId !== playerId) return;
   clearTimeout(top20NoteTimer);
   void sendTop20Note();
+});
+
+async function sendMapNote() {
+  if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
+      roomState.game.status !== "placing" || !roomState.mapSubmissionKey) return false;
+  try {
+    const encrypted = await encryptPrivatePayload(roomState.mapSubmissionKey, {
+      playerId,
+      roundIndex: roomState.game.roundIndex,
+      text: mapNotes.notes[playerId] || ""
+    });
+    await realtime.send("map_private_submission", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.error("Private map note could not be encrypted:", error);
+    return false;
+  }
+}
+
+$("player-map-notes").addEventListener("input", (event) => {
+  if (event.target.dataset.notePlayerId !== playerId) return;
+  mapNotes.notes[playerId] = event.target.value.slice(0, 280);
+  clearTimeout(mapNoteTimer);
+  mapNoteTimer = setTimeout(() => void sendMapNote(), 300);
+});
+
+$("player-map-notes").addEventListener("focusout", (event) => {
+  if (event.target.dataset.notePlayerId !== playerId) return;
+  clearTimeout(mapNoteTimer);
+  void sendMapNote();
 });
 
 $("lock-map-pin").addEventListener("click", async () => {
@@ -203,7 +238,7 @@ $("lock-map-pin").addEventListener("click", async () => {
   await realtime.send("map_lock", { playerId });
 });
 
-async function sendPriceSubmission(type = "draft") {
+async function sendPriceSubmission(type = "amount") {
   if (!player || roomState?.game?.id !== PRICE_GAME_ID ||
       roomState.game.status !== "guessing" || roomState.game.lockedTeams?.[player.team] ||
       !roomState.priceSubmissionKey) return false;
@@ -214,7 +249,7 @@ async function sendPriceSubmission(type = "draft") {
       playerId,
       roundIndex: roomState.game.roundIndex,
       amount: priceDraft.amount,
-      comment: priceDraft.comment
+      comment: priceDraft.comments[playerId] || ""
     });
     await realtime.send("price_private_submission", { playerId, encrypted });
     return true;
@@ -225,32 +260,30 @@ async function sendPriceSubmission(type = "draft") {
   }
 }
 
-function schedulePriceDraft() {
-  clearTimeout(priceDraftTimer);
-  priceDraftTimer = setTimeout(() => {
-    void sendPriceSubmission("draft");
-  }, 300);
-}
-
 $("player-price-amount").addEventListener("input", (event) => {
   priceDraft.amount = event.currentTarget.value.slice(0, 40);
   $("player-price-error").textContent = "";
-  schedulePriceDraft();
+  clearTimeout(priceAmountTimer);
+  priceAmountTimer = setTimeout(() => void sendPriceSubmission("amount"), 300);
 });
 
-$("player-price-comment").addEventListener("input", (event) => {
-  priceDraft.comment = event.currentTarget.value.slice(0, 280);
+$("player-price-comments").addEventListener("input", (event) => {
+  if (event.target.dataset.notePlayerId !== playerId) return;
+  priceDraft.comments[playerId] = event.target.value.slice(0, 280);
   $("player-price-error").textContent = "";
-  schedulePriceDraft();
+  clearTimeout(priceCommentTimer);
+  priceCommentTimer = setTimeout(() => void sendPriceSubmission("comment"), 300);
 });
 
-function flushPriceDraft() {
-  clearTimeout(priceDraftTimer);
-  void sendPriceSubmission("draft");
-}
-
-$("player-price-amount").addEventListener("blur", flushPriceDraft);
-$("player-price-comment").addEventListener("blur", flushPriceDraft);
+$("player-price-amount").addEventListener("blur", () => {
+  clearTimeout(priceAmountTimer);
+  void sendPriceSubmission("amount");
+});
+$("player-price-comments").addEventListener("focusout", (event) => {
+  if (event.target.dataset.notePlayerId !== playerId) return;
+  clearTimeout(priceCommentTimer);
+  void sendPriceSubmission("comment");
+});
 
 $("lock-price-guess").addEventListener("click", async () => {
   if (priceSubmissionPending || parseEuroAmount(priceDraft.amount) === null) {
@@ -258,7 +291,8 @@ $("lock-price-guess").addEventListener("click", async () => {
     return;
   }
 
-  clearTimeout(priceDraftTimer);
+  clearTimeout(priceAmountTimer);
+  clearTimeout(priceCommentTimer);
   priceSubmissionPending = true;
   $("player-price-error").textContent = "Preis wird eingeloggt…";
   renderPriceGame();
@@ -300,15 +334,20 @@ async function handleEvent(event, payload) {
       const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
       if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
       const amountIsFocused = document.activeElement === $("player-price-amount");
-      const commentIsFocused = document.activeElement === $("player-price-comment");
+      const ownComment = document.querySelector(
+        `#player-price-comments [data-note-player-id="${CSS.escape(playerId)}"]`
+      );
+      const commentIsFocused = document.activeElement === ownComment;
+      const incomingComments = privateState.draft?.comments || {};
       priceDraft = {
         roundIndex: privateState.roundIndex,
         amount: amountIsFocused
           ? priceDraft.amount
           : String(privateState.draft?.amount || ""),
-        comment: commentIsFocused
-          ? priceDraft.comment
-          : String(privateState.draft?.comment || ""),
+        comments: {
+          ...incomingComments,
+          ...(commentIsFocused ? { [playerId]: priceDraft.comments[playerId] || "" } : {})
+        },
         locked: Boolean(privateState.locked)
       };
       priceSubmissionPending = false;
@@ -324,14 +363,43 @@ async function handleEvent(event, payload) {
     try {
       const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
       if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
-      if (document.activeElement === $("player-top20-note")) return;
-      top20Note = {
+      const ownNote = document.querySelector(
+        `#player-top20-notes [data-note-player-id="${CSS.escape(playerId)}"]`
+      );
+      const ownIsFocused = document.activeElement === ownNote;
+      top20Notes = {
         roundIndex: privateState.roundIndex,
-        text: String(privateState.note?.text || "")
+        notes: {
+          ...(privateState.notes || {}),
+          ...(ownIsFocused ? { [playerId]: top20Notes.notes[playerId] || "" } : {})
+        }
       };
       render();
     } catch (error) {
       console.warn("Private Top 20 note could not be decrypted:", error);
+    }
+    return;
+  }
+
+  if (event === "map_private_state" && payload.playerId === playerId &&
+      payload.encrypted && priceKeyPair?.privateKey) {
+    try {
+      const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
+      if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
+      const ownNote = document.querySelector(
+        `#player-map-notes [data-note-player-id="${CSS.escape(playerId)}"]`
+      );
+      const ownIsFocused = document.activeElement === ownNote;
+      mapNotes = {
+        roundIndex: privateState.roundIndex,
+        notes: {
+          ...(privateState.notes || {}),
+          ...(ownIsFocused ? { [playerId]: mapNotes.notes[playerId] || "" } : {})
+        }
+      };
+      render();
+    } catch (error) {
+      console.warn("Private map notes could not be decrypted:", error);
     }
     return;
   }
@@ -355,15 +423,19 @@ async function handleEvent(event, payload) {
     sendingBuzz = false;
     if (player) await registerPriceKey();
     if (roomState.game?.id === TOP_20_GAME_ID &&
-        top20Note.roundIndex !== roomState.game.roundIndex) {
-      top20Note = { roundIndex: roomState.game.roundIndex, text: "" };
+        top20Notes.roundIndex !== roomState.game.roundIndex) {
+      top20Notes = { roundIndex: roomState.game.roundIndex, notes: {} };
+    }
+    if (roomState.game?.id === GERMANY_MAP_GAME_ID &&
+        mapNotes.roundIndex !== roomState.game.roundIndex) {
+      mapNotes = { roundIndex: roomState.game.roundIndex, notes: {} };
     }
     if (roomState.game?.id === PRICE_GAME_ID) {
       if (priceDraft.roundIndex !== roomState.game.roundIndex) {
         priceDraft = {
           roundIndex: roomState.game.roundIndex,
           amount: "",
-          comment: "",
+          comments: {},
           locked: Boolean(roomState.game.lockedTeams?.[player?.team])
         };
       }
@@ -488,15 +560,53 @@ function renderSpotifyGame() {
   $("player-blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("player-red-strikes").textContent = renderStrikes(game.strikes?.red);
   $("player-spotify-board").innerHTML = renderSpotifySlots(game.revealed);
-  const noteInput = $("player-top20-note");
-  if (noteInput.value !== top20Note.text) noteInput.value = top20Note.text;
-  noteInput.disabled = game.status !== "playing";
+  renderPersonalNoteFields("player-top20-notes", top20Notes.notes, game.status === "playing");
   $("player-spotify-result").classList.toggle("hidden", !isFinished && !isRoundFinished);
   $("player-spotify-result").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20!`
     : isRoundFinished
       ? `Liste ${roundNumber} ist beendet. Wartet auf die nächste Liste.`
       : "";
+}
+
+function renderPersonalNoteFields(containerId, notes = {}, ownEditable = true) {
+  const container = $(containerId);
+  const teamPlayers = roomState.players
+    .filter((item) => item.team === player.team)
+    .sort((a, b) => Number(b.id === playerId) - Number(a.id === playerId));
+
+  for (const item of teamPlayers) {
+    let wrapper = container.querySelector(`[data-note-wrapper-id="${CSS.escape(item.id)}"]`);
+    if (!wrapper) {
+      wrapper = document.createElement("div");
+      wrapper.className = "player-private-note";
+      wrapper.dataset.noteWrapperId = item.id;
+      const label = document.createElement("label");
+      const textarea = document.createElement("textarea");
+      textarea.id = `${containerId}-${item.id}`;
+      textarea.dataset.notePlayerId = item.id;
+      textarea.maxLength = 280;
+      textarea.rows = 3;
+      label.htmlFor = textarea.id;
+      wrapper.append(label, textarea);
+    }
+
+    const label = wrapper.querySelector("label");
+    const textarea = wrapper.querySelector("textarea");
+    const isOwn = item.id === playerId;
+    label.textContent = `${item.name}${isOwn ? " · Du" : " · Teampartner"}`;
+    textarea.placeholder = isOwn ? "Deine Überlegungen…" : "Noch keine Eingabe";
+    textarea.readOnly = !isOwn;
+    textarea.disabled = isOwn && !ownEditable;
+    if (document.activeElement !== textarea && textarea.value !== String(notes[item.id] || "")) {
+      textarea.value = String(notes[item.id] || "");
+    }
+    container.append(wrapper);
+  }
+
+  for (const wrapper of [...container.querySelectorAll("[data-note-wrapper-id]")]) {
+    if (!teamPlayers.some((item) => item.id === wrapper.dataset.noteWrapperId)) wrapper.remove();
+  }
 }
 
 function renderSpotifySlots(revealed = []) {
@@ -545,6 +655,11 @@ function renderMapGame() {
   $("lock-map-pin").textContent = ownTeamLocked
     ? "Antwort eingeloggt ✓"
     : "Antwort einloggen";
+  renderPersonalNoteFields(
+    "player-map-notes",
+    mapNotes.notes,
+    game.status === "placing" && !ownTeamLocked
+  );
 
   playerMap?.render({
     pins: isRevealed || bothTeamsLocked
@@ -672,11 +787,9 @@ function renderPriceGame() {
   $("player-price-product-name").textContent = product.name;
 
   const amountInput = $("player-price-amount");
-  const commentInput = $("player-price-comment");
   if (amountInput.value !== priceDraft.amount) amountInput.value = priceDraft.amount;
-  if (commentInput.value !== priceDraft.comment) commentInput.value = priceDraft.comment;
   amountInput.disabled = !editable;
-  commentInput.disabled = !editable;
+  renderPersonalNoteFields("player-price-comments", priceDraft.comments, editable);
   $("lock-price-guess").disabled = !editable || parseEuroAmount(priceDraft.amount) === null;
   $("lock-price-guess").textContent = priceSubmissionPending
     ? "Wird eingeloggt…"
