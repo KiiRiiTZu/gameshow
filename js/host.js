@@ -361,6 +361,13 @@ function render() {
   renderPlayers("blue");
   renderPlayers("red");
 
+  const nextGame = getNextGameDefinition(state.game.id);
+  $("moderator-test-controls").classList.toggle("hidden", !nextGame);
+  $("moderator-next-game-hint").textContent = nextGame
+    ? `Überspringt den aktuellen Stand und startet ${nextGame.name}.`
+    : "";
+  $("force-next-game").disabled = moderatorActionPending;
+
   const spotifyIsActive = state.game.id === top20Game.id;
   const mapIsActive = state.game.id === germanyMapGame.id;
   const matchingIsActive = state.game.id === matchingGame.id;
@@ -395,6 +402,18 @@ function renderPriceDraft(team) {
   renderHostPersonalNotes(`price-${team}-comments`, team, draft.comments);
   $(`price-${team}-lock`).textContent = locked ? "Eingeloggt ✓" : "Offen";
   $(`price-${team}-lock`).className = `status-pill ${locked ? "open" : ""}`;
+}
+
+function getNextGameDefinition(gameId) {
+  const games = [
+    { id: buzzerGame.id, name: buzzerGame.name },
+    { id: guessThePriceGame.id, name: guessThePriceGame.name },
+    { id: top20Game.id, name: top20Game.name },
+    { id: germanyMapGame.id, name: germanyMapGame.name },
+    { id: matchingGame.id, name: matchingGame.name }
+  ];
+  const currentIndex = games.findIndex((game) => game.id === gameId);
+  return currentIndex >= 0 ? games[currentIndex + 1] || null : null;
 }
 
 function renderHostPersonalNotes(containerId, team, notes = {}) {
@@ -1169,6 +1188,57 @@ function startRealtime() {
     }
   });
 }
+
+$("force-next-game").addEventListener("click", async () => {
+  $("force-next-game-error").textContent = "";
+  const currentGameId = state.game.id;
+  const assignerOrder = currentGameId === germanyMapGame.id
+    ? getMatchingAssignerOrder()
+    : [];
+
+  if (currentGameId === germanyMapGame.id && assignerOrder.some((item) => !item)) {
+    $("force-next-game-error").textContent =
+      "Für Da seh ich dich müssen zwei Spieler pro Team im Raum sein.";
+    return;
+  }
+
+  const accepted = await runModeratorAction(() => {
+    if (currentGameId === buzzerGame.id) {
+      guessThePriceGame.start(state);
+      priceDrafts = emptyPriceDrafts(0);
+      savePriceDrafts();
+      return true;
+    }
+    if (currentGameId === guessThePriceGame.id) {
+      top20Game.start(state);
+      top20Notes = emptyTop20Notes(0);
+      saveTop20Notes();
+      return true;
+    }
+    if (currentGameId === top20Game.id) {
+      germanyMapGame.start(state);
+      mapNotes = emptyMapNotes(0);
+      saveMapNotes();
+      return true;
+    }
+    if (currentGameId === germanyMapGame.id) {
+      if (!matchingGame.start(state, assignerOrder)) return false;
+      matchingAssignments = emptyMatchingAssignments();
+      saveMatchingAssignments();
+      return true;
+    }
+    return false;
+  });
+
+  if (!accepted) {
+    $("force-next-game-error").textContent = "Das nächste Spiel konnte nicht gestartet werden.";
+    return;
+  }
+
+  if (state.game.id === guessThePriceGame.id) await syncAllPriceTeams();
+  if (state.game.id === top20Game.id) await syncAllTop20Teams();
+  if (state.game.id === germanyMapGame.id) await syncAllMapTeams();
+});
 
 $("open-buzzer").addEventListener("click", async () => {
   await runModeratorAction(() => buzzerGame.open(state));
