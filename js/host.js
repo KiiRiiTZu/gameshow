@@ -47,6 +47,14 @@ import {
 } from "./matching-crypto.js";
 import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
 import { showGameTransition } from "./game-effects.js";
+import {
+  addTeamChatMessage,
+  clearExpiredTeamChatTyping,
+  createTeamChat,
+  getTeamChatView,
+  setTeamChatTyping,
+  supportsTeamChat
+} from "./team-chat.js";
 
 registerGame(buzzerGame);
 registerGame(top20Game);
@@ -69,6 +77,7 @@ let matchingPublicKey;
 let top20Notes = emptyTop20Notes();
 let mapNotes = emptyMapNotes();
 let priceDrafts = emptyPriceDrafts();
+let teamChat = createTeamChat();
 let estimationDrafts = emptyEstimationDrafts();
 let wordMatchDrafts = emptyWordMatchDrafts();
 const pricePlayerKeys = new Map();
@@ -230,8 +239,8 @@ function restoreTop20Notes() {
 function emptyPriceDrafts(roundIndex = 0) {
   return {
     roundIndex,
-    blue: { amount: "", comments: {}, updatedBy: null },
-    red: { amount: "", comments: {}, updatedBy: null }
+    blue: { amount: "", updatedBy: null },
+    red: { amount: "", updatedBy: null }
   };
 }
 
@@ -252,11 +261,6 @@ function restorePriceDrafts() {
     for (const team of ["blue", "red"]) {
       priceDrafts[team] = {
         amount: String(saved[team]?.amount || "").slice(0, 40),
-        comments: normalizePersonalNotes(
-          saved[team]?.comments,
-          saved[team]?.comment,
-          saved[team]?.updatedBy
-        ),
         updatedBy: saved[team]?.updatedBy || null
       };
     }
@@ -396,6 +400,7 @@ async function initializeHost() {
   const players = await getPlayers(roomRecord.id);
   state = createRoomStateFromRecords(roomCode, roomRecord, players);
   restoreLocalGameState();
+  teamChat = createTeamChat(supportsTeamChat(state.game.id) ? state.game.id : null);
 
   if (state.game.id === top20Game.id) {
     top20Game.normalize(state);
@@ -507,7 +512,6 @@ function renderPriceDraft(team) {
   $(`price-${team}-guess`).textContent = parsedAmount === null
     ? draft.amount || "Noch keine Eingabe"
     : formatEuroAmount(parsedAmount);
-  renderHostPersonalNotes(`price-${team}-comments`, team, draft.comments);
   $(`price-${team}-lock`).textContent = locked ? "Eingeloggt ✓" : "Offen";
   $(`price-${team}-lock`).className = `status-pill ${locked ? "open" : ""}`;
 }
@@ -758,6 +762,7 @@ function renderPriceGame() {
 
   renderPriceDraft("blue");
   renderPriceDraft("red");
+  renderHostTeamChats("price-team-chats");
 
   $("reveal-price-round").classList.toggle("hidden", isRevealed);
   $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
@@ -884,8 +889,7 @@ function renderSpotifyGame() {
   $("blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("red-strikes").textContent = renderStrikes(game.strikes?.red);
   $("spotify-board").innerHTML = renderSpotifySlots(revealed, list, interactionLocked);
-  renderHostPersonalNotes("top20-blue-notes", "blue", top20Notes.blue.notes);
-  renderHostPersonalNotes("top20-red-notes", "red", top20Notes.red.notes);
+  renderHostTeamChats("top20-team-chats");
   $("spotify-finished").classList.toggle("hidden", !interactionLocked);
   $("spotify-winner-message").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20 mit ${game.roundWins[game.winningTeam]} Rundensiegen!`
@@ -933,8 +937,7 @@ function renderMapGame() {
     <span class="${game.lockedTeams?.blue ? "ready" : ""}">Blau: ${game.lockedTeams?.blue ? "eingeloggt ✓" : game.pins?.blue ? "Pin gesetzt" : "wartet…"}</span>
     <span class="${game.lockedTeams?.red ? "ready" : ""}">Rot: ${game.lockedTeams?.red ? "eingeloggt ✓" : game.pins?.red ? "Pin gesetzt" : "wartet…"}</span>
   `;
-  renderHostPersonalNotes("map-blue-notes", "blue", mapNotes.blue.notes);
-  renderHostPersonalNotes("map-red-notes", "red", mapNotes.red.notes);
+  renderHostTeamChats("map-team-chats");
 
   $("reveal-map-round").classList.toggle("hidden", isRevealed);
   $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady || !bothTeamsLocked;
@@ -1148,16 +1151,45 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function formatChatTime(sentAt) {
+  return new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" })
+    .format(new Date(sentAt));
+}
+
+function renderTypingIndicator(names) {
+  if (!names.length) return "";
+  return `<div class="team-chat-typing"><span>${escapeHtml(names.join(" & "))} tippt</span>` +
+    '<i></i><i></i><i></i></div>';
+}
+
+function renderHostTeamChats(containerId) {
+  const container = $(containerId);
+  if (!container) return;
+  container.innerHTML = ["blue", "red"].map((team) => {
+    const view = getTeamChatView(teamChat, team);
+    const messages = view.messages.length
+      ? view.messages.map((message) => `
+        <div class="team-chat-message">
+          <div class="team-chat-meta"><strong>${escapeHtml(message.senderName)}</strong><time>${formatChatTime(message.sentAt)}</time></div>
+          <p>${escapeHtml(message.text)}</p>
+        </div>`).join("")
+      : '<p class="team-chat-empty">Noch keine Nachrichten</p>';
+    return `<article class="team-chat moderator ${team}">
+      <header><strong>Team ${team === "blue" ? "Blau" : "Rot"} · Chat</strong><span>privat</span></header>
+      <div class="team-chat-messages">${messages}</div>
+      ${renderTypingIndicator(view.typing.map((entry) => entry.name))}
+    </article>`;
+  }).join("");
+  for (const list of container.querySelectorAll(".team-chat-messages")) list.scrollTop = list.scrollHeight;
+}
+
 async function broadcastState() {
   const publicState = structuredClone(state);
+  if (supportsTeamChat(state.game.id)) {
+    publicState.teamChatSubmissionKey = matchingPublicKey;
+  }
   if (state.game.id === guessThePriceGame.id) {
     publicState.priceSubmissionKey = matchingPublicKey;
-  }
-  if (state.game.id === top20Game.id) {
-    publicState.top20SubmissionKey = matchingPublicKey;
-  }
-  if (state.game.id === germanyMapGame.id) {
-    publicState.mapSubmissionKey = matchingPublicKey;
   }
   if (state.game.id === estimationGame.id) {
     publicState.estimationSubmissionKey = matchingPublicKey;
@@ -1185,7 +1217,11 @@ async function runModeratorAction(action) {
   moderatorActionPending = true;
 
   try {
+    const previousActionGameId = state.game.id;
     if (!action()) return false;
+    if (state.game.id !== previousActionGameId) {
+      teamChat = createTeamChat(supportsTeamChat(state.game.id) ? state.game.id : null);
+    }
     await persistRenderAndBroadcast();
     return true;
   } finally {
@@ -1322,11 +1358,72 @@ async function handlePriceKeyRegistration(payload) {
   const roomPlayer = state.players.find((item) => item.id === payload?.playerId);
   if (!roomPlayer || !payload?.publicKey || payload.publicKey.kty !== "RSA") return;
   pricePlayerKeys.set(roomPlayer.id, payload.publicKey);
-  if (state.game.id === top20Game.id) await sendTop20PrivateState(roomPlayer.id);
-  if (state.game.id === germanyMapGame.id) await sendMapPrivateState(roomPlayer.id);
   if (state.game.id === guessThePriceGame.id) await sendPricePrivateState(roomPlayer.id);
   if (state.game.id === estimationGame.id) await sendEstimationPrivateState(roomPlayer.id);
   if (state.game.id === wordMatchGame.id) await sendWordMatchPrivateState(roomPlayer.id);
+}
+
+function teamChatIsWritable(team) {
+  if (state.game.id === top20Game.id) return state.game.status === "playing";
+  if (state.game.id === germanyMapGame.id) {
+    return state.game.status === "placing" && !state.game.lockedTeams?.[team];
+  }
+  if (state.game.id === guessThePriceGame.id) {
+    return state.game.status === "guessing" && !state.game.lockedTeams?.[team];
+  }
+  return false;
+}
+
+async function sendTeamChatPrivateUpdate(playerId, team, update) {
+  if (!supportsTeamChat(state.game.id) || teamChat.gameId !== state.game.id) return false;
+  const roomPlayer = state.players.find((item) => item.id === playerId);
+  const publicKey = pricePlayerKeys.get(playerId);
+  if (!roomPlayer || roomPlayer.team !== team || !publicKey) return false;
+  try {
+    const encrypted = await encryptPrivatePayload(publicKey, {
+      gameId: state.game.id,
+      team,
+      ...update
+    });
+    await realtime.send("team_chat_private_update", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.warn("Private team chat update could not be encrypted:", error);
+    return false;
+  }
+}
+
+async function syncTeamChatUpdate(team, update) {
+  const teamPlayers = state.players.filter((item) => item.team === team);
+  await Promise.all(teamPlayers.map((item) => sendTeamChatPrivateUpdate(item.id, team, update)));
+}
+
+async function handleTeamChatSubmission(payload) {
+  if (!supportsTeamChat(state.game.id) || teamChat.gameId !== state.game.id ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+  const player = state.players.find((item) => item.id === payload.playerId);
+  if (!player || !teamChatIsWritable(player.team)) return;
+  try {
+    const submission = await decryptPrivatePayload(matchingKeyPair.privateKey, payload.encrypted);
+    if (submission?.playerId !== player.id || submission.gameId !== state.game.id) return;
+    let update;
+    if (submission.type === "message") {
+      if (!addTeamChatMessage(teamChat, player.team, player, submission.text, crypto.randomUUID())) return;
+      update = { type: "message", message: teamChat[player.team].messages.at(-1) };
+    } else if (submission.type === "typing") {
+      const isTyping = Boolean(submission.isTyping);
+      setTeamChatTyping(teamChat, player.team, player, isTyping);
+      update = {
+        type: "typing",
+        player: { playerId: player.id, name: player.name },
+        isTyping
+      };
+    } else return;
+    render();
+    await syncTeamChatUpdate(player.team, update);
+  } catch (error) {
+    console.warn("Encrypted team chat submission could not be processed:", error);
+  }
 }
 
 async function sendWordMatchPrivateState(playerId) {
@@ -1554,18 +1651,14 @@ async function handlePriceSubmission(payload) {
     );
     const valid = submission?.playerId === player.id &&
       submission.roundIndex === state.game.roundIndex &&
-      ["amount", "comment", "lock"].includes(submission.type);
+      ["amount", "lock"].includes(submission.type);
     if (!valid) return;
 
     const amount = String(submission.amount || "").slice(0, 40);
-    const comment = String(submission.comment || "").slice(0, 280);
     const teamDraft = priceDrafts[player.team];
     if (submission.type === "amount" || submission.type === "lock") {
       teamDraft.amount = amount;
       teamDraft.updatedBy = player.id;
-    }
-    if (submission.type === "comment" || submission.type === "lock") {
-      teamDraft.comments[player.id] = comment;
     }
     savePriceDrafts();
     render();
@@ -1623,13 +1716,8 @@ async function handleEvent(event, payload) {
     return;
   }
 
-  if (event === "top20_private_submission") {
-    await handleTop20Submission(payload);
-    return;
-  }
-
-  if (event === "map_private_submission") {
-    await handleMapSubmission(payload);
+  if (event === "team_chat_private_submission") {
+    await handleTeamChatSubmission(payload);
     return;
   }
 
@@ -2140,6 +2228,20 @@ async function tickWordMatchTimer() {
 }
 
 setInterval(() => void tickWordMatchTimer(), 250);
+
+setInterval(() => {
+  if (!supportsTeamChat(state?.game?.id) || teamChat.gameId !== state.game.id) return;
+  const expiredEntries = clearExpiredTeamChatTyping(teamChat);
+  if (!expiredEntries.length) return;
+  render();
+  for (const entry of expiredEntries) {
+    void syncTeamChatUpdate(entry.team, {
+      type: "typing",
+      player: { playerId: entry.playerId, name: entry.name },
+      isTyping: false
+    });
+  }
+}, 750);
 
 $("start-top20-game").addEventListener("click", async () => {
   const accepted = await runModeratorAction(() => {

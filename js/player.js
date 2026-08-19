@@ -30,6 +30,7 @@ import {
   exportEncryptionPublicKey
 } from "./private-channel-crypto.js";
 import { showGameTransition } from "./game-effects.js";
+import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
 const TOP_20_SLOT_COUNT = 20;
@@ -59,16 +60,15 @@ let joined = false;
 let sendingBuzz = false;
 let realtime = null;
 let playerMap = null;
-let top20Notes = { roundIndex: -1, notes: {} };
-let top20NoteTimer = null;
-let mapNotes = { roundIndex: -1, notes: {} };
-let mapNoteTimer = null;
 let priceKeyPair = null;
 let pricePublicKey = null;
-let priceDraft = { roundIndex: -1, amount: "", comments: {}, locked: false };
+let priceDraft = { roundIndex: -1, amount: "", locked: false };
 let priceAmountTimer = null;
-let priceCommentTimer = null;
 let priceSubmissionPending = false;
+let teamChatState = { gameId: null, team: null, messages: [], typing: [] };
+let teamChatDraft = "";
+let teamChatTypingTimer = null;
+let lastTypingSentAt = 0;
 let estimationDraft = {
   roundIndex: -1,
   value: "",
@@ -131,6 +131,12 @@ async function initializePlayer() {
 
   const players = await getPlayers(room.id);
   roomState = createRoomStateFromRecords(roomCode, room, players);
+  teamChatState = {
+    gameId: supportsTeamChat(roomState.game?.id) ? roomState.game.id : null,
+    team: null,
+    messages: [],
+    typing: []
+  };
   previousGameId = roomState.game.id;
   previousBuzzerStatus = roomState.game.id === "buzzer" ? roomState.game.status : null;
 
@@ -195,67 +201,78 @@ async function registerPriceKey() {
   await realtime.send("price_key_registration", { playerId, publicKey: pricePublicKey });
 }
 
-async function sendTop20Note() {
-  if (!player || roomState?.game?.id !== TOP_20_GAME_ID ||
-      roomState.game.status !== "playing" || !roomState.top20SubmissionKey) return false;
+function teamChatIsWritable() {
+  if (!player || !roomState || teamChatState.gameId !== roomState.game.id) return false;
+  if (roomState.game.id === TOP_20_GAME_ID) return roomState.game.status === "playing";
+  if (roomState.game.id === GERMANY_MAP_GAME_ID) {
+    return roomState.game.status === "placing" && !roomState.game.lockedTeams?.[player.team];
+  }
+  if (roomState.game.id === PRICE_GAME_ID) {
+    return roomState.game.status === "guessing" && !roomState.game.lockedTeams?.[player.team];
+  }
+  return false;
+}
 
+async function sendTeamChatSubmission(type, extra = {}) {
+  if (!teamChatIsWritable() || !roomState.teamChatSubmissionKey) return false;
   try {
-    const encrypted = await encryptPrivatePayload(roomState.top20SubmissionKey, {
+    const encrypted = await encryptPrivatePayload(roomState.teamChatSubmissionKey, {
+      type,
       playerId,
-      roundIndex: roomState.game.roundIndex,
-      text: top20Notes.notes[playerId] || ""
+      gameId: roomState.game.id,
+      ...extra
     });
-    await realtime.send("top20_private_submission", { playerId, encrypted });
+    await realtime.send("team_chat_private_submission", { playerId, encrypted });
     return true;
   } catch (error) {
-    console.error("Private Top 20 note could not be encrypted:", error);
+    console.error("Private team chat could not be encrypted:", error);
     return false;
   }
 }
 
-$("player-top20-notes").addEventListener("input", (event) => {
-  if (event.target.dataset.notePlayerId !== playerId) return;
-  top20Notes.notes[playerId] = event.target.value.slice(0, 280);
-  clearTimeout(top20NoteTimer);
-  top20NoteTimer = setTimeout(() => {
-    void sendTop20Note();
-  }, 300);
-});
-
-$("player-top20-notes").addEventListener("focusout", (event) => {
-  if (event.target.dataset.notePlayerId !== playerId) return;
-  clearTimeout(top20NoteTimer);
-  void sendTop20Note();
-});
-
-async function sendMapNote() {
-  if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
-      roomState.game.status !== "placing" || !roomState.mapSubmissionKey) return false;
-  try {
-    const encrypted = await encryptPrivatePayload(roomState.mapSubmissionKey, {
-      playerId,
-      roundIndex: roomState.game.roundIndex,
-      text: mapNotes.notes[playerId] || ""
-    });
-    await realtime.send("map_private_submission", { playerId, encrypted });
-    return true;
-  } catch (error) {
-    console.error("Private map note could not be encrypted:", error);
-    return false;
-  }
+function stopTeamChatTyping() {
+  clearTimeout(teamChatTypingTimer);
+  teamChatTypingTimer = null;
+  void sendTeamChatSubmission("typing", { isTyping: false });
 }
 
-$("player-map-notes").addEventListener("input", (event) => {
-  if (event.target.dataset.notePlayerId !== playerId) return;
-  mapNotes.notes[playerId] = event.target.value.slice(0, 280);
-  clearTimeout(mapNoteTimer);
-  mapNoteTimer = setTimeout(() => void sendMapNote(), 300);
+document.addEventListener("input", (event) => {
+  if (!event.target.matches("[data-team-chat-input]")) return;
+  teamChatDraft = event.target.value.slice(0, TEAM_CHAT_TEXT_LIMIT);
+  const sendButton = event.target.closest("form")?.querySelector("button[type='submit']");
+  if (sendButton) sendButton.disabled = !teamChatIsWritable() || !teamChatDraft.trim();
+  const now = Date.now();
+  if (now - lastTypingSentAt > 600) {
+    lastTypingSentAt = now;
+    void sendTeamChatSubmission("typing", { isTyping: true });
+  }
+  clearTimeout(teamChatTypingTimer);
+  teamChatTypingTimer = setTimeout(stopTeamChatTyping, 1200);
 });
 
-$("player-map-notes").addEventListener("focusout", (event) => {
-  if (event.target.dataset.notePlayerId !== playerId) return;
-  clearTimeout(mapNoteTimer);
-  void sendMapNote();
+document.addEventListener("keydown", (event) => {
+  if (!event.target.matches("[data-team-chat-input]") || event.key !== "Enter" || event.shiftKey) return;
+  event.preventDefault();
+  event.target.closest("form")?.requestSubmit();
+});
+
+document.addEventListener("focusout", (event) => {
+  if (event.target.matches("[data-team-chat-input]")) stopTeamChatTyping();
+});
+
+document.addEventListener("submit", async (event) => {
+  if (!event.target.matches("[data-team-chat-form]")) return;
+  event.preventDefault();
+  const text = teamChatDraft.trim();
+  if (!text || !teamChatIsWritable()) return;
+  stopTeamChatTyping();
+  if (await sendTeamChatSubmission("message", { text })) {
+    teamChatDraft = "";
+    const input = event.target.querySelector("[data-team-chat-input]");
+    if (input) input.value = "";
+    const button = event.target.querySelector("button[type='submit']");
+    if (button) button.disabled = true;
+  }
 });
 
 $("lock-map-pin").addEventListener("click", async () => {
@@ -276,8 +293,7 @@ async function sendPriceSubmission(type = "amount") {
       type,
       playerId,
       roundIndex: roomState.game.roundIndex,
-      amount: priceDraft.amount,
-      comment: priceDraft.comments[playerId] || ""
+      amount: priceDraft.amount
     });
     await realtime.send("price_private_submission", { playerId, encrypted });
     return true;
@@ -295,22 +311,9 @@ $("player-price-amount").addEventListener("input", (event) => {
   priceAmountTimer = setTimeout(() => void sendPriceSubmission("amount"), 300);
 });
 
-$("player-price-comments").addEventListener("input", (event) => {
-  if (event.target.dataset.notePlayerId !== playerId) return;
-  priceDraft.comments[playerId] = event.target.value.slice(0, 280);
-  $("player-price-error").textContent = "";
-  clearTimeout(priceCommentTimer);
-  priceCommentTimer = setTimeout(() => void sendPriceSubmission("comment"), 300);
-});
-
 $("player-price-amount").addEventListener("blur", () => {
   clearTimeout(priceAmountTimer);
   void sendPriceSubmission("amount");
-});
-$("player-price-comments").addEventListener("focusout", (event) => {
-  if (event.target.dataset.notePlayerId !== playerId) return;
-  clearTimeout(priceCommentTimer);
-  void sendPriceSubmission("comment");
 });
 
 $("lock-price-guess").addEventListener("click", async () => {
@@ -320,7 +323,6 @@ $("lock-price-guess").addEventListener("click", async () => {
   }
 
   clearTimeout(priceAmountTimer);
-  clearTimeout(priceCommentTimer);
   priceSubmissionPending = true;
   $("player-price-error").textContent = "Preis wird eingeloggt…";
   renderPriceGame();
@@ -459,20 +461,11 @@ async function handleEvent(event, payload) {
       const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
       if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
       const amountIsFocused = document.activeElement === $("player-price-amount");
-      const ownComment = document.querySelector(
-        `#player-price-comments [data-note-player-id="${CSS.escape(playerId)}"]`
-      );
-      const commentIsFocused = document.activeElement === ownComment;
-      const incomingComments = privateState.draft?.comments || {};
       priceDraft = {
         roundIndex: privateState.roundIndex,
         amount: amountIsFocused
           ? priceDraft.amount
           : String(privateState.draft?.amount || ""),
-        comments: {
-          ...incomingComments,
-          ...(commentIsFocused ? { [playerId]: priceDraft.comments[playerId] || "" } : {})
-        },
         locked: Boolean(privateState.locked)
       };
       priceSubmissionPending = false;
@@ -483,48 +476,27 @@ async function handleEvent(event, payload) {
     return;
   }
 
-  if (event === "top20_private_state" && payload.playerId === playerId &&
+  if (event === "team_chat_private_update" && payload.playerId === playerId &&
       payload.encrypted && priceKeyPair?.privateKey) {
     try {
-      const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
-      if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
-      const ownNote = document.querySelector(
-        `#player-top20-notes [data-note-player-id="${CSS.escape(playerId)}"]`
-      );
-      const ownIsFocused = document.activeElement === ownNote;
-      top20Notes = {
-        roundIndex: privateState.roundIndex,
-        notes: {
-          ...(privateState.notes || {}),
-          ...(ownIsFocused ? { [playerId]: top20Notes.notes[playerId] || "" } : {})
-        }
-      };
+      const update = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
+      if (update.gameId !== roomState?.game?.id || update.team !== player?.team ||
+          teamChatState.gameId !== update.gameId) return;
+      if (update.type === "message" && update.message?.id &&
+          !teamChatState.messages.some((message) => message.id === update.message.id)) {
+        teamChatState.messages.push(update.message);
+        teamChatState.typing = teamChatState.typing.filter(
+          (entry) => entry.playerId !== update.message.senderId
+        );
+      } else if (update.type === "typing" && update.player?.playerId) {
+        teamChatState.typing = teamChatState.typing.filter(
+          (entry) => entry.playerId !== update.player.playerId
+        );
+        if (update.isTyping) teamChatState.typing.push(update.player);
+      }
       render();
     } catch (error) {
-      console.warn("Private Top 20 note could not be decrypted:", error);
-    }
-    return;
-  }
-
-  if (event === "map_private_state" && payload.playerId === playerId &&
-      payload.encrypted && priceKeyPair?.privateKey) {
-    try {
-      const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
-      if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
-      const ownNote = document.querySelector(
-        `#player-map-notes [data-note-player-id="${CSS.escape(playerId)}"]`
-      );
-      const ownIsFocused = document.activeElement === ownNote;
-      mapNotes = {
-        roundIndex: privateState.roundIndex,
-        notes: {
-          ...(privateState.notes || {}),
-          ...(ownIsFocused ? { [playerId]: mapNotes.notes[playerId] || "" } : {})
-        }
-      };
-      render();
-    } catch (error) {
-      console.warn("Private map notes could not be decrypted:", error);
+      console.warn("Private team chat update could not be decrypted:", error);
     }
     return;
   }
@@ -618,20 +590,21 @@ async function handleEvent(event, payload) {
 
     sendingBuzz = false;
     if (player) await registerPriceKey();
-    if (roomState.game?.id === TOP_20_GAME_ID &&
-        top20Notes.roundIndex !== roomState.game.roundIndex) {
-      top20Notes = { roundIndex: roomState.game.roundIndex, notes: {} };
-    }
-    if (roomState.game?.id === GERMANY_MAP_GAME_ID &&
-        mapNotes.roundIndex !== roomState.game.roundIndex) {
-      mapNotes = { roundIndex: roomState.game.roundIndex, notes: {} };
+    if (teamChatState.gameId !== roomState.game?.id) {
+      teamChatState = {
+        gameId: supportsTeamChat(roomState.game?.id) ? roomState.game.id : null,
+        team: player?.team || null,
+        messages: [],
+        typing: []
+      };
+      teamChatDraft = "";
+      clearTimeout(teamChatTypingTimer);
     }
     if (roomState.game?.id === PRICE_GAME_ID) {
       if (priceDraft.roundIndex !== roomState.game.roundIndex) {
         priceDraft = {
           roundIndex: roomState.game.roundIndex,
           amount: "",
-          comments: {},
           locked: Boolean(roomState.game.lockedTeams?.[player?.team])
         };
       }
@@ -773,6 +746,54 @@ function render() {
   $("player-message").textContent = "Warte auf den Moderator…";
 }
 
+function formatChatTime(sentAt) {
+  return new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" })
+    .format(new Date(sentAt));
+}
+
+function renderPlayerTeamChat(containerId, writable) {
+  const container = $(containerId);
+  if (!container.querySelector(".team-chat")) {
+    container.innerHTML = `<article class="team-chat player ${player.team}">
+      <header><strong>Team-Chat</strong><span>nur euer Team</span></header>
+      <div class="team-chat-messages" aria-live="polite"></div>
+      <div class="team-chat-typing hidden"><span></span><i></i><i></i><i></i></div>
+      <form class="team-chat-form" data-team-chat-form>
+        <textarea data-team-chat-input rows="2" maxlength="${TEAM_CHAT_TEXT_LIMIT}"
+          placeholder="Nachricht an deinen Teampartner…" aria-label="Team-Nachricht"></textarea>
+        <button class="button primary" type="submit" aria-label="Nachricht senden">Senden</button>
+      </form>
+    </article>`;
+  }
+
+  const list = container.querySelector(".team-chat-messages");
+  const previousCount = Number(list.dataset.messageCount || -1);
+  list.innerHTML = teamChatState.messages.length
+    ? teamChatState.messages.map((message) => `
+      <div class="team-chat-message ${message.senderId === playerId ? "own" : "other"}">
+        <div class="team-chat-meta"><strong>${escapeHtml(message.senderName)}</strong><time>${formatChatTime(message.sentAt)}</time></div>
+        <p>${escapeHtml(message.text)}</p>
+      </div>`).join("")
+    : '<p class="team-chat-empty">Noch keine Nachrichten</p>';
+  list.dataset.messageCount = String(teamChatState.messages.length);
+  if (previousCount !== teamChatState.messages.length) list.scrollTop = list.scrollHeight;
+
+  const typingNames = teamChatState.typing
+    .filter((entry) => entry.playerId !== playerId)
+    .map((entry) => entry.name);
+  const typing = container.querySelector(".team-chat-typing");
+  typing.classList.toggle("hidden", !typingNames.length);
+  typing.querySelector("span").textContent = typingNames.length
+    ? `${typingNames.join(" & ")} tippt`
+    : "";
+
+  const input = container.querySelector("[data-team-chat-input]");
+  const button = container.querySelector("button[type='submit']");
+  if (document.activeElement !== input && input.value !== teamChatDraft) input.value = teamChatDraft;
+  input.disabled = !writable;
+  button.disabled = !writable || !teamChatDraft.trim();
+}
+
 function renderSpotifyGame() {
   const game = roomState.game;
   const isFinished = game.status === "finished";
@@ -793,7 +814,7 @@ function renderSpotifyGame() {
   $("player-blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("player-red-strikes").textContent = renderStrikes(game.strikes?.red);
   $("player-spotify-board").innerHTML = renderSpotifySlots(game.revealed);
-  renderPersonalNoteFields("player-top20-notes", top20Notes.notes, game.status === "playing");
+  renderPlayerTeamChat("player-top20-chat", teamChatIsWritable());
   $("player-spotify-result").classList.toggle("hidden", !isFinished && !isRoundFinished);
   $("player-spotify-result").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20!`
@@ -888,11 +909,7 @@ function renderMapGame() {
   $("lock-map-pin").textContent = ownTeamLocked
     ? "Antwort eingeloggt ✓"
     : "Antwort einloggen";
-  renderPersonalNoteFields(
-    "player-map-notes",
-    mapNotes.notes,
-    game.status === "placing" && !ownTeamLocked
-  );
+  renderPlayerTeamChat("player-map-chat", teamChatIsWritable());
 
   playerMap?.render({
     pins: isRevealed || bothTeamsLocked
@@ -1022,7 +1039,7 @@ function renderPriceGame() {
   const amountInput = $("player-price-amount");
   if (amountInput.value !== priceDraft.amount) amountInput.value = priceDraft.amount;
   amountInput.disabled = !editable;
-  renderPersonalNoteFields("player-price-comments", priceDraft.comments, editable);
+  renderPlayerTeamChat("player-price-chat", teamChatIsWritable());
   $("lock-price-guess").disabled = !editable || parseEuroAmount(priceDraft.amount) === null;
   $("lock-price-guess").textContent = priceSubmissionPending
     ? "Wird eingeloggt…"

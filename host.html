@@ -120,16 +120,7 @@
         <button id="spotify-miss" class="button danger" type="button">✕ Nicht dabei</button>
       </div>
 
-      <div class="top20-team-notes">
-        <article class="top20-team-note blue">
-          <strong>Team Blau · interne Notiz</strong>
-          <div id="top20-blue-notes" class="private-note-list"></div>
-        </article>
-        <article class="top20-team-note red">
-          <strong>Team Rot · interne Notiz</strong>
-          <div id="top20-red-notes" class="private-note-list"></div>
-        </article>
-      </div>
+      <div id="top20-team-chats" class="team-chat-host-grid"></div>
 
       <p id="spotify-error" class="error"></p>
       <div id="spotify-board" class="spotify-board"></div>
@@ -171,16 +162,7 @@
       </div>
 
       <div id="map-pin-status" class="map-pin-status"></div>
-      <div class="top20-team-notes">
-        <article class="top20-team-note blue">
-          <strong>Team Blau · interne Notizen</strong>
-          <div id="map-blue-notes" class="private-note-list"></div>
-        </article>
-        <article class="top20-team-note red">
-          <strong>Team Rot · interne Notizen</strong>
-          <div id="map-red-notes" class="private-note-list"></div>
-        </article>
-      </div>
+      <div id="map-team-chats" class="team-chat-host-grid"></div>
       <div id="map-result" class="map-result hidden"></div>
 
       <div class="controls">
@@ -254,7 +236,6 @@
               <span id="price-blue-lock" class="status-pill">Offen</span>
             </div>
             <div id="price-blue-guess" class="price-guess-value">Noch keine Eingabe</div>
-            <div id="price-blue-comments" class="private-note-list"></div>
           </article>
           <article class="price-team-draft red">
             <div class="price-team-heading">
@@ -262,10 +243,11 @@
               <span id="price-red-lock" class="status-pill">Offen</span>
             </div>
             <div id="price-red-guess" class="price-guess-value">Noch keine Eingabe</div>
-            <div id="price-red-comments" class="private-note-list"></div>
           </article>
         </div>
       </div>
+
+      <div id="price-team-chats" class="team-chat-host-grid"></div>
 
       <div id="price-round-result" class="map-result hidden"></div>
       <p id="price-error" class="error"></p>
@@ -274,6 +256,7 @@
         <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
         <button id="start-top20-game" class="button primary hidden">Top 20 starten</button>
       </div>
+
     </section>
 
     <section id="estimation-game-panel" class="card game-panel hidden">

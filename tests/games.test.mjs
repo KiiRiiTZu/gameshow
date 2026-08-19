@@ -55,6 +55,41 @@ import {
 } from "../js/private-channel-crypto.js";
 import { createInitialRoomState } from "../js/room.js";
 import { getGamePresentation } from "../js/game-effects.js";
+import {
+  addTeamChatMessage,
+  clearExpiredTeamChatTyping,
+  createTeamChat,
+  getTeamChatView,
+  setTeamChatTyping
+} from "../js/team-chat.js";
+
+test("keeps session chat private per team and expires typing indicators", () => {
+  const chat = createTeamChat("guess-the-price");
+  const bluePlayer = { id: "b1", name: "Blau 1" };
+  const redPlayer = { id: "r1", name: "Rot 1" };
+
+  addTeamChatMessage(chat, "blue", bluePlayer, "Unser Tipp ist 25 €", "m1", 1_000);
+  addTeamChatMessage(chat, "red", redPlayer, "Vielleicht 30 €", "m2", 1_100);
+  setTeamChatTyping(chat, "blue", bluePlayer, true, 2_000);
+
+  assert.deepEqual(getTeamChatView(chat, "blue", 2_100).messages.map((item) => item.id), ["m1"]);
+  assert.deepEqual(getTeamChatView(chat, "red", 2_100).messages.map((item) => item.id), ["m2"]);
+  assert.equal(getTeamChatView(chat, "blue", 2_100).typing[0].name, "Blau 1");
+  assert.deepEqual(clearExpiredTeamChatTyping(chat, 4_501), [
+    { team: "blue", playerId: "b1", name: "Blau 1" }
+  ]);
+  assert.deepEqual(getTeamChatView(chat, "blue", 4_501).typing, []);
+});
+
+test("does not truncate a busy session chat after 100 messages", () => {
+  const chat = createTeamChat("spotify-top-artists");
+  const player = { id: "b1", name: "Blau 1" };
+  for (let index = 0; index < 150; index += 1) {
+    addTeamChatMessage(chat, "blue", player, `Nachricht ${index + 1}`, `m${index + 1}`, index);
+  }
+  assert.equal(chat.blue.messages.length, 150);
+  assert.equal(chat.blue.messages[0].text, "Nachricht 1");
+});
 
 test("contains presentation cards for all seven games", () => {
   assert.deepEqual([
