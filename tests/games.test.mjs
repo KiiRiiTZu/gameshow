@@ -69,7 +69,7 @@ test("contains presentation cards for all seven games", () => {
   assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");
   assert.equal(getGamePresentation("germany-map").name, "Kartenwissen");
   assert.equal(getGamePresentation("matching-game").name, "Da seh ich dich");
-  assert.equal(getGamePresentation("estimation-game").name, "Schätzfragen");
+  assert.equal(getGamePresentation("estimation-game").name, "Mittelwert");
   assert.equal(getGamePresentation("word-match-game").name, "Begriffsmatch");
 });
 
@@ -95,6 +95,11 @@ test("alternates Begriffsmatch roles with 80 seconds to write and 60 seconds to 
   wordMatchGame.finishGuessPhase(state, "blue");
   wordMatchGame.startGuessPhase(state, "red", 3_000);
   wordMatchGame.finishGuessPhase(state, "red");
+  assert.equal(state.game.status, "results-pending");
+  assert.equal(state.game.roundResults.length, 0);
+  assert.deepEqual(state.game.scores, { blue: 0, red: 0 });
+  assert.equal(wordMatchGame.revealRound(state, { blue: ["A"], red: ["B"] }), true);
+  assert.equal(state.game.revealedLists.blue[0], "A");
   wordMatchGame.startNextRound(state);
   roles = getWordMatchRoles(state.game);
   assert.equal(roles.seeders.blue.id, "b2");
@@ -121,6 +126,11 @@ test("ends Begriffsmatch early when the trailing team cannot catch up", () => {
     wordMatchGame.finishGuessPhase(state, "blue");
     wordMatchGame.startGuessPhase(state, "red");
     wordMatchGame.finishGuessPhase(state, "red");
+    assert.equal(state.game.status, "results-pending");
+    wordMatchGame.revealRound(state, {
+      blue: Array(WORD_MATCH_TERM_COUNT).fill("Blau"),
+      red: Array(WORD_MATCH_TERM_COUNT).fill("Rot")
+    });
     if (round < 2) wordMatchGame.startNextRound(state);
   }
 
@@ -178,10 +188,10 @@ test("scores estimation rounds from both team averages and finishes at five poin
       true
     );
     assert.deepEqual(state.game.averages, { blue: 100, red: 20 });
-    estimationGame.revealRound(state, 100, "100");
+    estimationGame.revealRound(state, { b1: 90, b2: 110, r1: 0, r2: 40 }, 100, "100");
     assert.equal(state.game.revealed.averages.blue, 100);
     assert.equal(state.game.revealed.averages.red, 20);
-    assert.equal("guesses" in state.game.revealed, false);
+    assert.deepEqual(state.game.revealed.guesses, { b1: 90, b2: 110, r1: 0, r2: 40 });
   }
 
   assert.equal(state.game.status, "finished");

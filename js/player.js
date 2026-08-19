@@ -69,10 +69,22 @@ let priceDraft = { roundIndex: -1, amount: "", comments: {}, locked: false };
 let priceAmountTimer = null;
 let priceCommentTimer = null;
 let priceSubmissionPending = false;
-let estimationDraft = { roundIndex: -1, value: "", locked: false };
+let estimationDraft = {
+  roundIndex: -1,
+  value: "",
+  locked: false,
+  partnerName: "",
+  partnerValue: "",
+  teamAverage: null
+};
 let estimationDraftTimer = null;
 let estimationSubmissionPending = false;
-let wordMatchDraft = { roundIndex: -1, terms: Array(WORD_MATCH_TERM_COUNT).fill(""), locked: false };
+let wordMatchDraft = {
+  roundIndex: -1,
+  terms: Array(WORD_MATCH_TERM_COUNT).fill(""),
+  locked: false,
+  lists: null
+};
 let wordMatchDraftTimer = null;
 let wordMatchSubmissionPending = false;
 let previousGameId = null;
@@ -526,7 +538,12 @@ async function handleEvent(event, payload) {
       estimationDraft = {
         roundIndex: privateState.roundIndex,
         value: valueIsFocused ? estimationDraft.value : String(privateState.value || ""),
-        locked: Boolean(privateState.locked)
+        locked: Boolean(privateState.locked),
+        partnerName: String(privateState.partnerName || ""),
+        partnerValue: String(privateState.partnerValue || ""),
+        teamAverage: Number.isFinite(privateState.teamAverage)
+          ? Number(privateState.teamAverage)
+          : null
       };
       estimationSubmissionPending = false;
       render();
@@ -549,7 +566,13 @@ async function handleEvent(event, payload) {
           : Array.from({ length: WORD_MATCH_TERM_COUNT }, (_, index) =>
             String(privateState.terms?.[index] || "")
           ),
-        locked: Boolean(privateState.locked)
+        locked: Boolean(privateState.locked),
+        lists: privateState.lists && ["blue", "red"].every((team) =>
+          Array.isArray(privateState.lists[team])
+        ) ? {
+            blue: privateState.lists.blue.slice(0, WORD_MATCH_TERM_COUNT).map(String),
+            red: privateState.lists.red.slice(0, WORD_MATCH_TERM_COUNT).map(String)
+          } : null
       };
       wordMatchSubmissionPending = false;
       render();
@@ -618,16 +641,21 @@ async function handleEvent(event, payload) {
       estimationDraft = {
         roundIndex: roomState.game.roundIndex,
         value: "",
-        locked: roomState.game.lockedPlayerIds?.includes(playerId) || false
+        locked: false,
+        partnerName: "",
+        partnerValue: "",
+        teamAverage: null
       };
       estimationSubmissionPending = false;
+      $("player-estimation-error").textContent = "";
     }
     if (roomState.game?.id === WORD_MATCH_GAME_ID &&
         wordMatchDraft.roundIndex !== roomState.game.roundIndex) {
       wordMatchDraft = {
         roundIndex: roomState.game.roundIndex,
         terms: Array(WORD_MATCH_TERM_COUNT).fill(""),
-        locked: roomState.game.lockedSeederIds?.includes(playerId) || false
+        locked: false,
+        lists: null
       };
       wordMatchSubmissionPending = false;
     }
@@ -1041,8 +1069,8 @@ function renderEstimationGame() {
   const isGuessing = game.status === "guessing";
   const isReady = game.status === "ready-to-reveal";
   const isRevealed = ["revealed", "finished"].includes(game.status);
-  const hasAverages = Number.isFinite(game.averages?.blue) && Number.isFinite(game.averages?.red);
-  const locked = game.lockedPlayerIds?.includes(playerId) || estimationDraft.locked;
+  const hasTeamAverage = Number.isFinite(estimationDraft.teamAverage);
+  const locked = game.lockedPlayerIds?.includes(playerId) || false;
   const editable = isGuessing && !locked && !estimationSubmissionPending;
 
   $("player-estimation-round").textContent =
@@ -1078,27 +1106,33 @@ function renderEstimationGame() {
   }
   if (isRevealed) {
     const result = game.revealed;
+    const individual = (game.participants || []).map((item) =>
+      `${escapeHtml(item.name)}: ${formatEstimate(result.guesses[item.id])}`
+    ).join(" · ");
     const winnerText = result.roundWinner
       ? `${getTeamName(result.roundWinner)} liegt näher.`
       : "Beide Teams sind gleich weit entfernt.";
     $("player-estimation-result").innerHTML = `
       <strong>Richtige Antwort: ${escapeHtml(result.answerDisplay)}</strong><br>
+      ${individual}<br>
       Team Blau: Ø ${formatEstimate(result.averages.blue)} · Team Rot: Ø ${formatEstimate(result.averages.red)}<br>
       ${winnerText}
       ${game.status === "finished"
         ? game.winningTeam
-          ? `<br>🏆 ${getTeamName(game.winningTeam)} gewinnt Schätzfragen!`
-          : "<br>Schätzfragen endet unentschieden."
+          ? `<br>🏆 ${getTeamName(game.winningTeam)} gewinnt Mittelwert!`
+          : "<br>Mittelwert endet unentschieden."
         : ""}
     `;
     return;
   }
   if (isReady) {
-    $("player-estimation-result").innerHTML = hasAverages
+    const partnerEstimate = parseEstimate(estimationDraft.partnerValue);
+    $("player-estimation-result").innerHTML = hasTeamAverage && partnerEstimate !== null
       ? `<strong>Alle vier Schätzungen sind eingeloggt.</strong><br>
-        Team Blau: Ø ${formatEstimate(game.averages.blue)} · Team Rot: Ø ${formatEstimate(game.averages.red)}<br>
+        ${escapeHtml(estimationDraft.partnerName || "Dein Partner")}: ${formatEstimate(partnerEstimate)}<br>
+        Euer Mittelwert: Ø ${formatEstimate(estimationDraft.teamAverage)}<br>
         Der Moderator deckt gleich die richtige Antwort auf.`
-      : "Die Team-Mittelwerte werden berechnet…";
+      : "Euer Mittelwert wird berechnet…";
     return;
   }
   $("player-estimation-result").textContent = locked
@@ -1144,6 +1178,21 @@ function renderWordFields(editable) {
   }
 }
 
+function renderWordMatchLists(lists, matches = { blue: [], red: [] }) {
+  return ["blue", "red"].map((team) => `
+    <article class="word-match-list ${team}">
+      <strong>${getTeamName(team)}</strong>
+      ${Array.from({ length: WORD_MATCH_TERM_COUNT }, (_, index) => {
+        const term = String(lists?.[team]?.[index] || "");
+        const matched = matches?.[team]?.includes(index);
+        return `<div class="word-match-term${matched ? " matched" : ""}${term ? "" : " empty"}">
+          ${index + 1}. ${escapeHtml(term || "Leer")}${matched ? " ✓" : ""}
+        </div>`;
+      }).join("")}
+    </article>
+  `).join("");
+}
+
 function renderWordMatchGame() {
   const game = roomState.game;
   const roles = getWordMatchRoles(game);
@@ -1153,11 +1202,12 @@ function renderWordMatchGame() {
   const isGuesser = roles.guessers[ownTeam]?.id === playerId;
   const activeSeeder = game.status === "seed-collecting" && isSeeder;
   const activeGuesser = game.status === `${ownTeam}-guessing` && isGuesser;
-  const seederTermsVisible = isSeeder && [
-    "seed-collecting", "blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing"
+  const seederRoundActive = isSeeder && [
+    "seed-collecting", "blue-guess-pending", "blue-guessing",
+    "red-guess-pending", "red-guessing", "results-pending"
   ].includes(game.status);
-  const categoryVisible = seederTermsVisible || activeGuesser;
-  const locked = game.lockedSeederIds.includes(playerId) || wordMatchDraft.locked;
+  const categoryVisible = seederRoundActive || activeGuesser || Boolean(game.revealedLists);
+  const locked = game.lockedSeederIds.includes(playerId) || false;
   const editable = activeSeeder && !locked && !wordMatchSubmissionPending;
   $("player-word-match-round").textContent =
     `Runde ${game.roundIndex + 1} von ${WORD_MATCH_CATEGORIES.length}`;
@@ -1167,7 +1217,7 @@ function renderWordMatchGame() {
   $("player-word-match-category").textContent = categoryVisible ? game.category : "";
   updatePlayerWordMatchTimer();
 
-  $("player-word-seed-form").classList.toggle("hidden", !seederTermsVisible);
+  $("player-word-seed-form").classList.toggle("hidden", !activeSeeder);
   renderWordFields(editable);
   $("lock-word-list").disabled = !editable;
   $("lock-word-list").textContent = wordMatchSubmissionPending
@@ -1197,6 +1247,7 @@ function renderWordMatchGame() {
     "red-guessing": activeGuesser
       ? "Nenne jetzt so viele passende Begriffe wie möglich."
       : `${activeName} aus Team Rot rät gerade.`,
+    "results-pending": "Beide Ratephasen sind beendet. Der Moderator deckt gleich auf.",
     "round-finished": "Die Runde ist beendet.",
     finished: game.winningTeam
       ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Begriffsmatch!`
@@ -1205,6 +1256,13 @@ function renderWordMatchGame() {
   $("player-word-match-role").textContent = messages[game.status] || "";
 
   const result = game.roundResults[game.roundIndex];
+  const revealedLists = result ? game.revealedLists : null;
+  const privateLists = !result && isSeeder ? wordMatchDraft.lists : null;
+  const visibleLists = revealedLists || privateLists;
+  $("player-word-match-lists").classList.toggle("hidden", !visibleLists);
+  $("player-word-match-lists").innerHTML = visibleLists
+    ? renderWordMatchLists(visibleLists, revealedLists ? game.currentMatches : undefined)
+    : "";
   $("player-word-match-result").textContent = result
     ? `Runde ${game.roundIndex + 1}: Blau ${result.blue} Treffer · Rot ${result.red} Treffer`
     : "";

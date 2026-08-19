@@ -4,7 +4,7 @@ const GAME_PRESENTATIONS = {
   "spotify-top-artists": { number: 3, name: "Top 20" },
   "germany-map": { number: 4, name: "Kartenwissen" },
   "matching-game": { number: 5, name: "Da seh ich dich" },
-  "estimation-game": { number: 6, name: "Schätzfragen" },
+  "estimation-game": { number: 6, name: "Mittelwert" },
   "word-match-game": { number: 7, name: "Begriffsmatch" }
 };
 

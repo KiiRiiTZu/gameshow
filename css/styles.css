@@ -762,6 +762,16 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .word-match-term:disabled { opacity: .7; cursor: default; }
 .word-match-term.matched { border-color: #35d08a; background: rgba(53,208,138,.16); color: #8bf0bd; }
 .word-match-term.empty { color: #72798b; }
+.word-match-term-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px;
+  background: #171b27;
+  color: #f0f1f6;
+}
+.word-match-term-input:focus { border-color: #f4c451; outline: none; }
 
 .word-match-fields {
   display: grid;

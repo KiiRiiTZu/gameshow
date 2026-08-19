@@ -72,6 +72,7 @@ export const wordMatchGame = {
       participants: publicParticipants(participants),
       lockedSeederIds: [],
       currentMatches: emptyMatches(),
+      revealedLists: null,
       phaseEndsAt: null,
       roundResults: [],
       winningTeam: null,
@@ -100,6 +101,13 @@ export const wordMatchGame = {
       blue: Array.isArray(state.game.currentMatches?.blue) ? state.game.currentMatches.blue : [],
       red: Array.isArray(state.game.currentMatches?.red) ? state.game.currentMatches.red : []
     };
+    state.game.revealedLists = state.game.revealedLists &&
+      ["blue", "red"].every((team) => Array.isArray(state.game.revealedLists[team]))
+      ? {
+          blue: state.game.revealedLists.blue.slice(0, WORD_MATCH_TERM_COUNT).map(String),
+          red: state.game.revealedLists.red.slice(0, WORD_MATCH_TERM_COUNT).map(String)
+        }
+      : null;
     state.game.phaseEndsAt = Number(state.game.phaseEndsAt) || null;
     state.game.roundResults = Array.isArray(state.game.roundResults)
       ? state.game.roundResults.slice(0, WORD_MATCH_CATEGORIES.length) : [];
@@ -114,6 +122,7 @@ export const wordMatchGame = {
     state.game.category = String(category || "");
     state.game.lockedSeederIds = [];
     state.game.currentMatches = emptyMatches();
+    state.game.revealedLists = null;
     state.game.phaseEndsAt = now + WORD_MATCH_SEED_SECONDS * 1000;
     return Boolean(state.game.category);
   },
@@ -165,6 +174,22 @@ export const wordMatchGame = {
       return true;
     }
 
+    state.game.status = "results-pending";
+    return true;
+  },
+
+  revealRound(state, lists) {
+    if (state.game.id !== this.id || state.game.status !== "results-pending") return false;
+    if (!["blue", "red"].every((team) => Array.isArray(lists?.[team]))) return false;
+    state.game.revealedLists = {
+      blue: Array.from({ length: WORD_MATCH_TERM_COUNT }, (_, index) =>
+        String(lists.blue[index] || "").slice(0, 60)
+      ),
+      red: Array.from({ length: WORD_MATCH_TERM_COUNT }, (_, index) =>
+        String(lists.red[index] || "").slice(0, 60)
+      )
+    };
+
     const result = {
       blue: state.game.currentMatches.blue.length,
       red: state.game.currentMatches.red.length
@@ -189,6 +214,7 @@ export const wordMatchGame = {
     state.game.category = "";
     state.game.lockedSeederIds = [];
     state.game.currentMatches = emptyMatches();
+    state.game.revealedLists = null;
     state.game.phaseEndsAt = null;
     return true;
   }

@@ -158,9 +158,9 @@
 
       <div id="player-estimation-game" class="hidden">
         <p class="eyebrow">SPIEL 6 · BEST OF 9</p>
-        <h2>Schätzfragen</h2>
+        <h2>Mittelwert</h2>
         <p id="player-estimation-round" class="muted">Frage 1 von 9</p>
-        <div class="round-score" aria-label="Punktestand bei den Schätzfragen">
+        <div class="round-score" aria-label="Punktestand bei Mittelwert">
           <span>Blau <strong id="player-estimation-blue-score">0</strong></span>
           <span>Rundensiege</span>
           <span><strong id="player-estimation-red-score">0</strong> Rot</span>
@@ -179,7 +179,7 @@
           <input id="player-estimation-value" type="text" inputmode="decimal"
             autocomplete="off" placeholder="z. B. 12,5 oder -4">
           <button id="lock-estimation-value" class="button primary full">Schätzung einloggen</button>
-          <p class="muted small">Dein Teampartner sieht deine Schätzung erst beim Aufdecken.</p>
+          <p class="muted small">Nach dem Lock-in aller Spieler siehst du den Tipp deines Partners und euren Mittelwert.</p>
           <p id="player-estimation-error" class="error"></p>
         </div>
         <div id="player-estimation-locks" class="map-pin-status"></div>
@@ -209,6 +209,7 @@
           <p id="player-word-match-error" class="error"></p>
         </div>
         <div id="player-word-match-locks" class="map-pin-status"></div>
+        <div id="player-word-match-lists" class="word-match-lists hidden"></div>
         <div id="player-word-match-result" class="player-message"></div>
       </div>
     </section>
