@@ -183,7 +183,7 @@ test("scores estimation rounds from both team averages and finishes at five poin
   assert.equal(state.scores.blue, 1);
 });
 
-test("finishes the buzzer game at 20 points with three points per correct answer", () => {
+test("finishes the buzzer game at 30 points with three points per correct answer", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
     id: "buzzer",
@@ -364,18 +364,16 @@ test("normalizes a persisted single-round Spotify state", () => {
   assert.equal("slots" in state.game, false);
 });
 
-test("contains eleven prepared Germany map questions", () => {
-  assert.equal(GERMANY_MAP_QUESTIONS.length, 11);
+test("contains seven prepared Germany map questions", () => {
+  assert.equal(GERMANY_MAP_QUESTIONS.length, 7);
   assert.ok(GERMANY_MAP_QUESTIONS.every((question) =>
     question.prompt && question.answer && Number.isFinite(question.target.lat) && Number.isFinite(question.target.lng)
   ));
 });
 
 test("mixes full map questions with city-only rounds", () => {
-  assert.deepEqual(
-    [1, 3, 5, 7, 9].map((index) => GERMANY_MAP_QUESTIONS[index].prompt),
-    ["Hannover", "Dresden", "Saarbrücken", "Freiburg", "Erfurt"]
-  );
+  assert.equal(GERMANY_MAP_QUESTIONS[1].prompt, "Hannover");
+  assert.ok(GERMANY_MAP_QUESTIONS.filter((question) => question.prompt === question.answer).length === 1);
 });
 
 test("calculates geographic distances in kilometers", () => {
@@ -403,7 +401,7 @@ test("shares one map pin per team and awards the closer team", () => {
   assert.equal(state.game.distances.blue, 0);
 });
 
-test("finishes the best of eleven map game at six points", () => {
+test("finishes the best of seven map game at four points", () => {
   const state = createInitialRoomState("TEST");
   germanyMapGame.start(state);
   state.game.roundScores.blue = GERMANY_MAP_ROUNDS_TO_WIN - 1;
@@ -558,8 +556,8 @@ test("uses player one then player two and alternates the active team per round",
   assert.equal(getMatchingTurn(3, 0).team, "red");
 });
 
-test("contains nine complete price products without public prices", () => {
-  assert.equal(PRICE_PRODUCTS.length, 9);
+test("contains seven complete price products without public prices", () => {
+  assert.equal(PRICE_PRODUCTS.length, 7);
   assert.ok(PRICE_PRODUCTS.every((product) => product.id && product.name &&
     product.src.endsWith(".webp") && !("price" in product)));
   assert.ok(PRICE_PRODUCTS.every((product) =>
@@ -572,9 +570,7 @@ test("contains nine complete price products without public prices", () => {
     "der-nachbar",
     "iphone-17-pro-max",
     "hyperx-cloud-3",
-    "cat-toy",
-    "rtx-5090",
-    "mercedes"
+    "cat-toy"
   ]);
 });
 
@@ -606,7 +602,7 @@ test("locks both teams and awards the closer price guess", () => {
   assert.equal(state.game.status, "revealed");
 });
 
-test("finishes the best of nine price game at five wins", () => {
+test("finishes the best of seven price game at four wins", () => {
   const state = createInitialRoomState("TEST");
   guessThePriceGame.start(state);
 
@@ -619,14 +615,14 @@ test("finishes the best of nine price game at five wins", () => {
 
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "blue");
-  assert.deepEqual(state.game.roundScores, { blue: 5, red: 0 });
+  assert.deepEqual(state.game.roundScores, { blue: 4, red: 0 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
   assert.equal(guessThePriceGame.startNextRound(state), false);
 });
 
 test("uses the requested product order with matching prices", () => {
   const state = createInitialRoomState("TEST");
-  const expectedPrices = [29.99, 59.99, 548, 25, 2269, 94.36, 22.94, 4746.04, 144.48];
+  const expectedPrices = [29.99, 59.99, 548, 25, 2269, 94.36, 22.94];
   guessThePriceGame.start(state);
 
   expectedPrices.forEach((expectedPrice, index) => {

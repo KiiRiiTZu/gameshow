@@ -1,9 +1,9 @@
 import { PRICE_PRODUCTS } from "./guess-the-price-products.js";
 export { formatEuroAmount, formatSignedEuroDifference, parseEuroAmount } from "../euro.js";
 
-export const PRICE_GAME_WINNING_SCORE = 5;
+export const PRICE_GAME_WINNING_SCORE = 4;
 
-const PRODUCT_PRICES = [29.99, 59.99, 548, 25, 2269, 94.36, 22.94, 4746.04, 144.48];
+const PRODUCT_PRICES = [29.99, 59.99, 548, 25, 2269, 94.36, 22.94];
 
 function emptyTeams(value) {
   return { blue: structuredClone(value), red: structuredClone(value) };

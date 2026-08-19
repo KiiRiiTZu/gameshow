@@ -1,6 +1,6 @@
 import { BUZZER_QUESTIONS } from "./buzzer-questions.js";
 
-export const BUZZER_WINNING_SCORE = 20;
+export const BUZZER_WINNING_SCORE = 30;
 export const BUZZER_CORRECT_POINTS = 3;
 export const BUZZER_WRONG_POINTS = 1;
 const SCORE_SYSTEM_VERSION = 2;

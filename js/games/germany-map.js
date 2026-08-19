@@ -1,4 +1,4 @@
-export const GERMANY_MAP_ROUNDS_TO_WIN = 6;
+export const GERMANY_MAP_ROUNDS_TO_WIN = 4;
 
 export const GERMANY_MAP_QUESTIONS = [
   {
@@ -17,19 +17,9 @@ export const GERMANY_MAP_QUESTIONS = [
     target: { lat: 50.7374, lng: 7.0982 }
   },
   {
-    prompt: "Dresden",
-    answer: "Dresden",
-    target: { lat: 51.0542, lng: 13.7353 }
-  },
-  {
     prompt: "Wo befindet sich Schloss Neuschwanstein?",
     answer: "Schloss Neuschwanstein · Schwangau",
     target: { lat: 47.5576, lng: 10.7498 }
-  },
-  {
-    prompt: "Saarbrücken",
-    answer: "Saarbrücken",
-    target: { lat: 49.2402, lng: 6.9969 }
   },
   {
     prompt: "Wo befindet sich Deutschlands älteste Universität, gegründet 1386?",
@@ -37,19 +27,9 @@ export const GERMANY_MAP_QUESTIONS = [
     target: { lat: 49.4094, lng: 8.6947 }
   },
   {
-    prompt: "Freiburg",
-    answer: "Freiburg",
-    target: { lat: 47.9959, lng: 7.8522 }
-  },
-  {
     prompt: "Wo steht das Brandenburger Tor?",
     answer: "Berlin",
     target: { lat: 52.5163, lng: 13.3777 }
-  },
-  {
-    prompt: "Erfurt",
-    answer: "Erfurt",
-    target: { lat: 50.9781, lng: 11.0292 }
   },
   {
     prompt: "Wo liegt laut der Deutschen Zentrale für Tourismus die beliebteste deutsche Sehenswürdigkeit?",

@@ -35,16 +35,6 @@ export const PRICE_PRODUCTS = [
     id: "cat-toy",
     name: "Katzenspielzeug",
     src: `${IMAGE_ROOT}/Katzenspielzeug%20(22,94%E2%82%AC).webp`
-  },
-  {
-    id: "rtx-5090",
-    name: "NVIDIA GeForce RTX 5090",
-    src: `${IMAGE_ROOT}/RTX%205090%20(4.746,04%E2%82%AC).webp`
-  },
-  {
-    id: "mercedes",
-    name: "Mercedes-AMG G 63 Kinderauto",
-    src: `${IMAGE_ROOT}/Mercedes%20(144,48%E2%82%AC%20).webp`
   }
 ];
 
