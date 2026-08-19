@@ -7,7 +7,10 @@
   <link rel="stylesheet" href="./css/styles.css" />
 </head>
 <body class="host-page">
-  <main class="shell">
+  <div id="host-layout" class="host-layout">
+    <aside id="host-chat-blue" class="host-chat-rail blue hidden" aria-label="Chat von Team Blau"></aside>
+
+    <main class="shell">
     <header class="topbar">
       <h1 class="host-room-title">Moderator <span aria-hidden="true">|</span> Raum <span id="room-code">----</span></h1>
       <div class="connection">
@@ -120,8 +123,6 @@
         <button id="spotify-miss" class="button danger" type="button">✕ Nicht dabei</button>
       </div>
 
-      <div id="top20-team-chats" class="team-chat-host-grid"></div>
-
       <p id="spotify-error" class="error"></p>
       <div id="spotify-board" class="spotify-board"></div>
 
@@ -162,7 +163,6 @@
       </div>
 
       <div id="map-pin-status" class="map-pin-status"></div>
-      <div id="map-team-chats" class="team-chat-host-grid"></div>
       <div id="map-result" class="map-result hidden"></div>
 
       <div class="controls">
@@ -246,8 +246,6 @@
           </article>
         </div>
       </div>
-
-      <div id="price-team-chats" class="team-chat-host-grid"></div>
 
       <div id="price-round-result" class="map-result hidden"></div>
       <p id="price-error" class="error"></p>
@@ -336,7 +334,10 @@
       </div>
     </section>
 
-  </main>
+    </main>
+
+    <aside id="host-chat-red" class="host-chat-rail red hidden" aria-label="Chat von Team Rot"></aside>
+  </div>
 
   <script type="module" src="./js/host.js"></script>
 </body>

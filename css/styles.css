@@ -24,6 +24,27 @@ button, input, select, textarea { font: inherit; }
   padding: 42px 0 64px;
 }
 
+.host-layout.chat-active {
+  width: min(1050px, calc(100% - 32px));
+  margin: 0 auto;
+  display: grid;
+  grid-template-areas:
+    "main"
+    "blue"
+    "red";
+  gap: 18px;
+}
+
+.host-layout.chat-active > .shell {
+  grid-area: main;
+  width: 100%;
+  margin: 0;
+}
+
+.host-chat-rail.blue { grid-area: blue; }
+.host-chat-rail.red { grid-area: red; }
+.host-chat-rail { height: 420px; }
+
 .landing {
   min-height: 100vh;
   display: grid;
@@ -372,13 +393,6 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .player-private-note textarea { min-height: 92px; resize: vertical; }
 .player-private-note textarea[readonly] { opacity: .72; cursor: default; }
 
-.team-chat-host-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  margin-top: 18px;
-}
-
 .team-chat {
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.12);
@@ -470,6 +484,18 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .team-chat-form textarea { min-height: 52px; max-height: 110px; resize: vertical; padding: 10px 12px; }
 .team-chat-form .button { align-self: end; padding: 11px 14px; }
 #player-top20-chat, #player-map-chat, #player-price-chat { margin-top: 16px; }
+
+.host-chat-rail .team-chat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.host-chat-rail .team-chat-messages {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
 
 .spotify-board {
   display: grid;
@@ -1112,11 +1138,37 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   }
 }
 
+@media (min-width: 701px) and (max-width: 1699px) {
+  .host-layout.chat-active {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "main main"
+      "blue red";
+  }
+}
+
+@media (min-width: 1700px) {
+  .host-layout.chat-active {
+    width: min(2300px, calc(100% - 48px));
+    grid-template-columns: minmax(260px, .34fr) minmax(820px, 1fr) minmax(260px, .34fr);
+    grid-template-areas: "blue main red";
+    gap: 24px;
+    align-items: start;
+  }
+
+  .host-layout.chat-active .host-chat-rail {
+    position: sticky;
+    top: 24px;
+    height: min(720px, calc(100vh - 48px));
+    margin-top: 42px;
+  }
+}
+
 @media (max-width: 700px) {
   .shell { padding-top: 24px; }
   .hero-card { padding: 27px; }
   .choice-grid, .scoreboard { grid-template-columns: 1fr; }
-  .spotify-meta, .spotify-board, .top20-team-notes, .team-chat-host-grid, .estimation-submissions,
+  .spotify-meta, .spotify-board, .top20-team-notes, .estimation-submissions,
   .word-match-lists, .word-match-fields { grid-template-columns: 1fr; }
   .matching-board, .price-host-layout, .player-price-layout { grid-template-columns: 1fr; }
   .top20-actions { align-items: stretch; flex-direction: column; }

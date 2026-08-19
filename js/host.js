@@ -481,6 +481,11 @@ function render() {
   const priceIsActive = state.game.id === guessThePriceGame.id;
   const estimationIsActive = state.game.id === estimationGame.id;
   const wordMatchIsActive = state.game.id === wordMatchGame.id;
+  const chatIsActive = supportsTeamChat(state.game.id);
+  $("host-layout").classList.toggle("chat-active", chatIsActive);
+  $("host-chat-blue").classList.toggle("hidden", !chatIsActive);
+  $("host-chat-red").classList.toggle("hidden", !chatIsActive);
+  if (chatIsActive) renderHostTeamChats();
   document.querySelector(".shell").classList.toggle(
     "wide-game",
     spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
@@ -762,7 +767,6 @@ function renderPriceGame() {
 
   renderPriceDraft("blue");
   renderPriceDraft("red");
-  renderHostTeamChats("price-team-chats");
 
   $("reveal-price-round").classList.toggle("hidden", isRevealed);
   $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
@@ -889,7 +893,6 @@ function renderSpotifyGame() {
   $("blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("red-strikes").textContent = renderStrikes(game.strikes?.red);
   $("spotify-board").innerHTML = renderSpotifySlots(revealed, list, interactionLocked);
-  renderHostTeamChats("top20-team-chats");
   $("spotify-finished").classList.toggle("hidden", !interactionLocked);
   $("spotify-winner-message").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20 mit ${game.roundWins[game.winningTeam]} Rundensiegen!`
@@ -937,7 +940,6 @@ function renderMapGame() {
     <span class="${game.lockedTeams?.blue ? "ready" : ""}">Blau: ${game.lockedTeams?.blue ? "eingeloggt ✓" : game.pins?.blue ? "Pin gesetzt" : "wartet…"}</span>
     <span class="${game.lockedTeams?.red ? "ready" : ""}">Rot: ${game.lockedTeams?.red ? "eingeloggt ✓" : game.pins?.red ? "Pin gesetzt" : "wartet…"}</span>
   `;
-  renderHostTeamChats("map-team-chats");
 
   $("reveal-map-round").classList.toggle("hidden", isRevealed);
   $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady || !bothTeamsLocked;
@@ -1162,10 +1164,9 @@ function renderTypingIndicator(names) {
     '<i></i><i></i><i></i></div>';
 }
 
-function renderHostTeamChats(containerId) {
-  const container = $(containerId);
-  if (!container) return;
-  container.innerHTML = ["blue", "red"].map((team) => {
+function renderHostTeamChats() {
+  for (const team of ["blue", "red"]) {
+    const container = $(`host-chat-${team}`);
     const view = getTeamChatView(teamChat, team);
     const messages = view.messages.length
       ? view.messages.map((message) => `
@@ -1174,13 +1175,14 @@ function renderHostTeamChats(containerId) {
           <p>${escapeHtml(message.text)}</p>
         </div>`).join("")
       : '<p class="team-chat-empty">Noch keine Nachrichten</p>';
-    return `<article class="team-chat moderator ${team}">
+    container.innerHTML = `<article class="team-chat moderator ${team}">
       <header><strong>Team ${team === "blue" ? "Blau" : "Rot"} · Chat</strong><span>privat</span></header>
       <div class="team-chat-messages">${messages}</div>
       ${renderTypingIndicator(view.typing.map((entry) => entry.name))}
     </article>`;
-  }).join("");
-  for (const list of container.querySelectorAll(".team-chat-messages")) list.scrollTop = list.scrollHeight;
+    const list = container.querySelector(".team-chat-messages");
+    list.scrollTop = list.scrollHeight;
+  }
 }
 
 async function broadcastState() {
