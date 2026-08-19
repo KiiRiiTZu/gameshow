@@ -1168,15 +1168,20 @@ function renderHostTeamChats() {
   for (const team of ["blue", "red"]) {
     const container = $(`host-chat-${team}`);
     const view = getTeamChatView(teamChat, team);
+    const teamPlayers = state.players.filter((item) => item.team === team);
     const messages = view.messages.length
-      ? view.messages.map((message) => `
-        <div class="team-chat-message">
+      ? view.messages.map((message) => {
+        const playerIndex = teamPlayers.findIndex((item) => item.id === message.senderId);
+        const side = playerIndex === 1 ? "right" : "left";
+        return `
+        <div class="team-chat-message ${side}">
           <div class="team-chat-meta"><strong>${escapeHtml(message.senderName)}</strong><time>${formatChatTime(message.sentAt)}</time></div>
           <p>${escapeHtml(message.text)}</p>
-        </div>`).join("")
+        </div>`;
+      }).join("")
       : '<p class="team-chat-empty">Noch keine Nachrichten</p>';
     container.innerHTML = `<article class="team-chat moderator ${team}">
-      <header><strong>Team ${team === "blue" ? "Blau" : "Rot"} · Chat</strong><span>privat</span></header>
+      <header><strong>Team ${team === "blue" ? "Blau" : "Rot"} · Chat</strong></header>
       <div class="team-chat-messages">${messages}</div>
       ${renderTypingIndicator(view.typing.map((entry) => entry.name))}
     </article>`;
