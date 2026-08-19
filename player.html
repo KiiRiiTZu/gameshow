@@ -185,6 +185,33 @@
         <div id="player-estimation-locks" class="map-pin-status"></div>
         <div id="player-estimation-result" class="player-message"></div>
       </div>
+
+      <div id="player-word-match-game" class="hidden">
+        <p class="eyebrow">SPIEL 7 · 4 RUNDEN</p>
+        <h2>Begriffsmatch</h2>
+        <p id="player-word-match-round" class="muted">Runde 1 von 4</p>
+        <div class="round-score" aria-label="Punktestand bei Begriffsmatch">
+          <span>Blau <strong id="player-word-match-blue-score">0</strong></span>
+          <span>Treffer</span>
+          <span><strong id="player-word-match-red-score">0</strong> Rot</span>
+        </div>
+
+        <div id="player-word-match-category-card" class="word-match-category-card hidden">
+          <span class="eyebrow">OBERBEGRIFF</span>
+          <h3 id="player-word-match-category"></h3>
+          <strong id="player-word-match-timer" class="word-match-timer">01:00</strong>
+        </div>
+        <div id="player-word-match-role" class="player-message"></div>
+
+        <div id="player-word-seed-form" class="hidden">
+          <div id="player-word-fields" class="word-match-fields"></div>
+          <button id="lock-word-list" class="button primary full">Liste einloggen</button>
+          <p class="muted small">Leere Felder werden beim Ablauf der Zeit unverändert übernommen.</p>
+          <p id="player-word-match-error" class="error"></p>
+        </div>
+        <div id="player-word-match-locks" class="map-pin-status"></div>
+        <div id="player-word-match-result" class="player-message"></div>
+      </div>
     </section>
   </main>
 

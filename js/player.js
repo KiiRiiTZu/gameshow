@@ -17,6 +17,12 @@ import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-product
 import { formatEuroAmount, formatSignedEuroDifference, parseEuroAmount } from "./euro.js";
 import { ESTIMATION_ROUND_COUNT, parseEstimate } from "./games/estimation-game.js";
 import {
+  WORD_MATCH_CATEGORIES,
+  WORD_MATCH_PHASE_SECONDS,
+  WORD_MATCH_TERM_COUNT,
+  getWordMatchRoles
+} from "./games/word-match-game.js";
+import {
   createEncryptionKeyPair,
   decryptPrivatePayload,
   encryptPrivatePayload,
@@ -30,6 +36,7 @@ const GERMANY_MAP_GAME_ID = "germany-map";
 const MATCHING_GAME_ID = "matching-game";
 const PRICE_GAME_ID = "guess-the-price";
 const ESTIMATION_GAME_ID = "estimation-game";
+const WORD_MATCH_GAME_ID = "word-match-game";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -64,6 +71,9 @@ let priceSubmissionPending = false;
 let estimationDraft = { roundIndex: -1, value: "", locked: false };
 let estimationDraftTimer = null;
 let estimationSubmissionPending = false;
+let wordMatchDraft = { roundIndex: -1, terms: Array(WORD_MATCH_TERM_COUNT).fill(""), locked: false };
+let wordMatchDraftTimer = null;
+let wordMatchSubmissionPending = false;
 let previousGameId = null;
 let previousBuzzerStatus = null;
 
@@ -357,6 +367,54 @@ $("lock-estimation-value").addEventListener("click", async () => {
   }
 });
 
+async function sendWordMatchSubmission(type = "draft") {
+  if (!player || roomState?.game?.id !== WORD_MATCH_GAME_ID ||
+      roomState.game.status !== "seed-collecting" || wordMatchDraft.locked ||
+      !roomState.wordMatchSubmissionKey) return false;
+  try {
+    const encrypted = await encryptPrivatePayload(roomState.wordMatchSubmissionKey, {
+      type,
+      playerId,
+      roundIndex: roomState.game.roundIndex,
+      terms: wordMatchDraft.terms
+    });
+    await realtime.send("word_match_private_submission", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.error("Private word list could not be encrypted:", error);
+    $("player-word-match-error").textContent = "Die Liste konnte nicht synchronisiert werden.";
+    return false;
+  }
+}
+
+$("player-word-fields").addEventListener("input", (event) => {
+  const input = event.target.closest("[data-word-field-index]");
+  if (!input) return;
+  wordMatchDraft.terms[Number(input.dataset.wordFieldIndex)] = input.value.slice(0, 60);
+  $("player-word-match-error").textContent = "";
+  clearTimeout(wordMatchDraftTimer);
+  wordMatchDraftTimer = setTimeout(() => void sendWordMatchSubmission("draft"), 250);
+});
+
+$("player-word-fields").addEventListener("focusout", (event) => {
+  if (!event.target.matches("[data-word-field-index]")) return;
+  clearTimeout(wordMatchDraftTimer);
+  void sendWordMatchSubmission("draft");
+});
+
+$("lock-word-list").addEventListener("click", async () => {
+  if (wordMatchSubmissionPending || wordMatchDraft.locked) return;
+  clearTimeout(wordMatchDraftTimer);
+  wordMatchSubmissionPending = true;
+  $("player-word-match-error").textContent = "Liste wird eingeloggt…";
+  renderWordMatchGame();
+  const sent = await sendWordMatchSubmission("lock");
+  if (!sent) {
+    wordMatchSubmissionPending = false;
+    renderWordMatchGame();
+  }
+});
+
 async function handleEvent(event, payload) {
   if (event === "buzz_winner") {
     void playBuzzerSound();
@@ -477,6 +535,29 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "word_match_private_state" && payload.playerId === playerId &&
+      payload.encrypted && priceKeyPair?.privateKey) {
+    try {
+      const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
+      if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
+      const fieldIsFocused = document.activeElement?.matches?.("[data-word-field-index]");
+      wordMatchDraft = {
+        roundIndex: privateState.roundIndex,
+        terms: fieldIsFocused
+          ? wordMatchDraft.terms
+          : Array.from({ length: WORD_MATCH_TERM_COUNT }, (_, index) =>
+            String(privateState.terms?.[index] || "")
+          ),
+        locked: Boolean(privateState.locked)
+      };
+      wordMatchSubmissionPending = false;
+      render();
+    } catch (error) {
+      console.warn("Private word list could not be decrypted:", error);
+    }
+    return;
+  }
+
   if (event === "price_lock_result" && payload.playerId === playerId) {
     priceSubmissionPending = false;
     $("player-price-error").textContent = payload.accepted
@@ -491,6 +572,15 @@ async function handleEvent(event, payload) {
     $("player-estimation-error").textContent = payload.accepted
       ? "Deine Schätzung ist eingeloggt."
       : payload.reason || "Die Schätzung konnte nicht eingeloggt werden.";
+    render();
+    return;
+  }
+
+  if (event === "word_match_lock_result" && payload.playerId === playerId) {
+    wordMatchSubmissionPending = false;
+    $("player-word-match-error").textContent = payload.accepted
+      ? "Deine Liste ist eingeloggt."
+      : payload.reason || "Die Liste konnte nicht eingeloggt werden.";
     render();
     return;
   }
@@ -531,6 +621,15 @@ async function handleEvent(event, payload) {
       };
       estimationSubmissionPending = false;
     }
+    if (roomState.game?.id === WORD_MATCH_GAME_ID &&
+        wordMatchDraft.roundIndex !== roomState.game.roundIndex) {
+      wordMatchDraft = {
+        roundIndex: roomState.game.roundIndex,
+        terms: Array(WORD_MATCH_TERM_COUNT).fill(""),
+        locked: roomState.game.lockedSeederIds?.includes(playerId) || false
+      };
+      wordMatchSubmissionPending = false;
+    }
     render();
   }
 }
@@ -559,19 +658,26 @@ function render() {
   const matchingIsActive = roomState.game?.id === MATCHING_GAME_ID;
   const priceIsActive = roomState.game?.id === PRICE_GAME_ID;
   const estimationIsActive = roomState.game?.id === ESTIMATION_GAME_ID;
+  const wordMatchIsActive = roomState.game?.id === WORD_MATCH_GAME_ID;
   document.querySelector(".player-shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("player-buzzer-game").classList.toggle(
     "hidden",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("player-spotify-game").classList.toggle("hidden", !spotifyIsActive);
   $("player-map-game").classList.toggle("hidden", !mapIsActive);
   $("player-matching-game").classList.toggle("hidden", !matchingIsActive);
   $("player-price-game").classList.toggle("hidden", !priceIsActive);
   $("player-estimation-game").classList.toggle("hidden", !estimationIsActive);
+  $("player-word-match-game").classList.toggle("hidden", !wordMatchIsActive);
+
+  if (wordMatchIsActive) {
+    renderWordMatchGame();
+    return;
+  }
 
   if (estimationIsActive) {
     renderEstimationGame();
@@ -995,8 +1101,125 @@ function renderEstimationGame() {
       ? "Deine Schätzung ist eingeloggt. Warte auf die anderen Spieler."
       : roomState.estimationSubmissionKey
         ? "Gib deine persönliche Schätzung ohne Absprache ein."
-        : "Die sichere Verbindung wird aufgebaut…";
+      : "Die sichere Verbindung wird aufgebaut…";
 }
+
+function wordMatchSecondsRemaining() {
+  if (!roomState?.game?.phaseEndsAt) return WORD_MATCH_PHASE_SECONDS;
+  return Math.max(0, Math.ceil((roomState.game.phaseEndsAt - Date.now()) / 1000));
+}
+
+function updatePlayerWordMatchTimer() {
+  if (roomState?.game?.id !== WORD_MATCH_GAME_ID) return;
+  const seconds = wordMatchSecondsRemaining();
+  $("player-word-match-timer").textContent =
+    `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function renderWordFields(editable) {
+  const container = $("player-word-fields");
+  for (let index = 0; index < WORD_MATCH_TERM_COUNT; index += 1) {
+    let input = container.querySelector(`[data-word-field-index="${index}"]`);
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "text";
+      input.autocomplete = "off";
+      input.maxLength = 60;
+      input.dataset.wordFieldIndex = index;
+      input.placeholder = `${index + 1}. Begriff`;
+      container.append(input);
+    }
+    if (document.activeElement !== input && input.value !== wordMatchDraft.terms[index]) {
+      input.value = wordMatchDraft.terms[index];
+    }
+    input.disabled = !editable;
+  }
+}
+
+function renderWordMatchGame() {
+  const game = roomState.game;
+  const roles = getWordMatchRoles(game);
+  const participant = game.participants.find((item) => item.id === playerId);
+  const ownTeam = participant?.team;
+  const isSeeder = roles.seeders[ownTeam]?.id === playerId;
+  const isGuesser = roles.guessers[ownTeam]?.id === playerId;
+  const activeSeeder = game.status === "seed-collecting" && isSeeder;
+  const activeGuesser = game.status === `${ownTeam}-guessing` && isGuesser;
+  const categoryVisible = activeSeeder || activeGuesser;
+  const locked = game.lockedSeederIds.includes(playerId) || wordMatchDraft.locked;
+  const editable = activeSeeder && !locked && !wordMatchSubmissionPending;
+  const roundInProgress = [
+    "blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing"
+  ].includes(game.status);
+
+  $("player-word-match-round").textContent =
+    `Runde ${game.roundIndex + 1} von ${WORD_MATCH_CATEGORIES.length}`;
+  $("player-word-match-blue-score").textContent =
+    game.scores.blue + (roundInProgress ? game.currentMatches.blue.length : 0);
+  $("player-word-match-red-score").textContent =
+    game.scores.red + (roundInProgress ? game.currentMatches.red.length : 0);
+  $("player-word-match-category-card").classList.toggle("hidden", !categoryVisible);
+  $("player-word-match-category").textContent = categoryVisible ? game.category : "";
+  updatePlayerWordMatchTimer();
+
+  $("player-word-seed-form").classList.toggle("hidden", !activeSeeder);
+  renderWordFields(editable);
+  $("lock-word-list").disabled = !editable;
+  $("lock-word-list").textContent = wordMatchSubmissionPending
+    ? "Wird eingeloggt…" : locked ? "Liste eingeloggt ✓" : "Liste einloggen";
+
+  $("player-word-match-locks").innerHTML = Object.values(roles.seeders).map((item) => {
+    const hasLocked = game.lockedSeederIds.includes(item?.id);
+    return `<span class="${hasLocked ? "ready" : ""}">${escapeHtml(item?.name || "Spieler fehlt")}: ${hasLocked ? "eingeloggt ✓" : "schreibt…"}</span>`;
+  }).join("");
+  $("player-word-match-locks").classList.toggle(
+    "hidden",
+    !["seed-collecting", "blue-guess-pending"].includes(game.status)
+  );
+
+  const activeName = game.status.startsWith("blue-")
+    ? roles.guessers.blue?.name : roles.guessers.red?.name;
+  const messages = {
+    "round-pending": "Wartet darauf, dass der Moderator die Listenphase startet.",
+    "seed-collecting": activeSeeder
+      ? "Trage bis zu zehn Begriffe ein. Leere Felder sind erlaubt."
+      : `${roles.seeders.blue?.name} und ${roles.seeders.red?.name} erstellen ihre Listen.`,
+    "blue-guess-pending": `Wartet auf den Start von ${roles.guessers.blue?.name}.`,
+    "blue-guessing": activeGuesser
+      ? "Nenne jetzt so viele passende Begriffe wie möglich."
+      : `${activeName} aus Team Blau rät gerade.`,
+    "red-guess-pending": `Wartet auf den Start von ${roles.guessers.red?.name}.`,
+    "red-guessing": activeGuesser
+      ? "Nenne jetzt so viele passende Begriffe wie möglich."
+      : `${activeName} aus Team Rot rät gerade.`,
+    "round-finished": "Die Runde ist beendet.",
+    finished: game.winningTeam
+      ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Begriffsmatch!`
+      : "Begriffsmatch endet unentschieden."
+  };
+  $("player-word-match-role").textContent = messages[game.status] || "";
+
+  const result = game.roundResults[game.roundIndex];
+  $("player-word-match-result").textContent = result
+    ? `Runde ${game.roundIndex + 1}: Blau ${result.blue} Treffer · Rot ${result.red} Treffer`
+    : "";
+}
+
+async function tickPlayerWordMatchTimer() {
+  if (roomState?.game?.id !== WORD_MATCH_GAME_ID) return;
+  updatePlayerWordMatchTimer();
+  if (roomState.game.status !== "seed-collecting" || !roomState.game.phaseEndsAt ||
+      Date.now() < roomState.game.phaseEndsAt || wordMatchSubmissionPending || wordMatchDraft.locked) return;
+  const roles = getWordMatchRoles(roomState.game);
+  const isSeeder = Object.values(roles.seeders).some((item) => item?.id === playerId);
+  if (!isSeeder) return;
+  clearTimeout(wordMatchDraftTimer);
+  wordMatchSubmissionPending = true;
+  const sent = await sendWordMatchSubmission("lock");
+  if (!sent) wordMatchSubmissionPending = false;
+}
+
+setInterval(() => void tickPlayerWordMatchTimer(), 250);
 
 function getTeamName(team) {
   return team === "blue" ? "Team Blau" : "Team Rot";

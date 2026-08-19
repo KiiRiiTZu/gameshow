@@ -9,7 +9,7 @@ import {
   SHOW_WINNING_SCORE
 } from "../js/room.js";
 
-test("ends the best-of-five show at three game wins", () => {
+test("ends the best-of-seven show at four game wins", () => {
   const state = createInitialRoomState("TEST");
   state.scores.blue = SHOW_WINNING_SCORE - 1;
   assert.equal(getShowWinner(state), null);

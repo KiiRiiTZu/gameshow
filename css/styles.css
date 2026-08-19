@@ -715,6 +715,62 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .estimation-player-form input { font-size: 1.25rem; font-weight: 900; }
 .estimation-player-form p { margin: 0; }
 
+.word-match-category-card {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  margin: 16px 0;
+  padding: 18px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 18px;
+  background: radial-gradient(circle at top, rgba(90,114,246,.16), #11141e 70%);
+  text-align: center;
+}
+
+.word-match-category-card h3 { margin: 0; font-size: clamp(1.7rem, 4vw, 2.8rem); }
+.word-match-category-card p { margin: 2px 0; }
+.word-match-timer { font-size: 2rem; font-variant-numeric: tabular-nums; color: #f5b83d; }
+
+.word-match-lists {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0;
+}
+
+.word-match-list {
+  display: grid;
+  gap: 8px;
+  padding: 15px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px;
+  background: rgba(255,255,255,.03);
+}
+
+.word-match-list.blue { border-color: rgba(90,114,246,.48); }
+.word-match-list.red { border-color: rgba(210,55,80,.48); }
+.word-match-term {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  background: #171b27;
+  color: #f0f1f6;
+  text-align: left;
+}
+.word-match-term:disabled { opacity: .7; cursor: default; }
+.word-match-term.matched { border-color: #35d08a; background: rgba(53,208,138,.16); color: #8bf0bd; }
+.word-match-term.empty { color: #72798b; }
+
+.word-match-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 16px 0;
+}
+.word-match-fields input { min-width: 0; }
+
 .price-team-form.locked { border-color: rgba(53,208,138,.55); }
 .price-team-form.locked input,
 .price-team-form.locked textarea { opacity: .7; }
@@ -939,7 +995,8 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   .shell { padding-top: 24px; }
   .hero-card { padding: 27px; }
   .choice-grid, .scoreboard { grid-template-columns: 1fr; }
-  .spotify-meta, .spotify-board, .top20-team-notes, .estimation-submissions { grid-template-columns: 1fr; }
+  .spotify-meta, .spotify-board, .top20-team-notes, .estimation-submissions,
+  .word-match-lists, .word-match-fields { grid-template-columns: 1fr; }
   .matching-board, .price-host-layout, .player-price-layout { grid-template-columns: 1fr; }
   .top20-actions { align-items: stretch; flex-direction: column; }
   .versus { text-align: center; }

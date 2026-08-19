@@ -309,6 +309,46 @@
         <button id="start-estimation-question" class="button primary">Erste Frage starten</button>
         <button id="reveal-estimation-round" class="button primary hidden">Antwort und Mittelwerte aufdecken</button>
         <button id="next-estimation-question" class="button primary hidden">Nächste Frage starten</button>
+        <button id="start-word-match-game" class="button primary hidden">Begriffsmatch starten</button>
+      </div>
+    </section>
+
+    <section id="word-match-game-panel" class="card game-panel hidden">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 7 · 4 RUNDEN</p>
+          <h2>Begriffsmatch</h2>
+          <p id="word-match-round-label" class="muted">Runde 1 von 4</p>
+        </div>
+        <span id="word-match-status" class="status-pill closed">Runde bereit</span>
+      </div>
+
+      <div class="round-score" aria-label="Punktestand bei Begriffsmatch">
+        <span>Blau <strong id="word-match-blue-score">0</strong></span>
+        <span>Treffer</span>
+        <span><strong id="word-match-red-score">0</strong> Rot</span>
+      </div>
+
+      <div class="word-match-category-card">
+        <span class="eyebrow">OBERBEGRIFF</span>
+        <h3 id="word-match-category"></h3>
+        <p id="word-match-roles" class="muted"></p>
+        <strong id="word-match-timer" class="word-match-timer">01:00</strong>
+      </div>
+
+      <div id="word-match-seed-status" class="map-pin-status"></div>
+      <div id="word-match-lists" class="word-match-lists"></div>
+      <div id="word-match-result" class="map-result hidden"></div>
+      <p id="word-match-error" class="error"></p>
+
+      <div class="controls">
+        <button id="start-word-seed-phase" class="button primary">Listenphase starten</button>
+        <button id="finish-word-seed-phase" class="button secondary hidden">Listenphase jetzt beenden</button>
+        <button id="start-blue-guess-phase" class="button primary hidden">Team Blau · 60 Sekunden starten</button>
+        <button id="finish-blue-guess-phase" class="button secondary hidden">Zeit für Blau beenden</button>
+        <button id="start-red-guess-phase" class="button primary hidden">Team Rot · 60 Sekunden starten</button>
+        <button id="finish-red-guess-phase" class="button secondary hidden">Zeit für Rot beenden</button>
+        <button id="next-word-match-round" class="button primary hidden">Nächste Runde</button>
       </div>
     </section>
 

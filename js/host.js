@@ -34,6 +34,13 @@ import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-product
 import { estimationGame, parseEstimate } from "./games/estimation-game.js";
 import { ESTIMATION_QUESTIONS, getEstimationQuestion } from "./games/estimation-questions.js";
 import {
+  WORD_MATCH_CATEGORIES,
+  WORD_MATCH_PHASE_SECONDS,
+  WORD_MATCH_TERM_COUNT,
+  getWordMatchRoles,
+  wordMatchGame
+} from "./games/word-match-game.js";
+import {
   createMatchingKeyPair,
   exportMatchingPublicKey
 } from "./matching-crypto.js";
@@ -46,6 +53,7 @@ registerGame(germanyMapGame);
 registerGame(matchingGame);
 registerGame(guessThePriceGame);
 registerGame(estimationGame);
+registerGame(wordMatchGame);
 
 let roomCode;
 let roomRecord;
@@ -61,7 +69,9 @@ let top20Notes = emptyTop20Notes();
 let mapNotes = emptyMapNotes();
 let priceDrafts = emptyPriceDrafts();
 let estimationDrafts = emptyEstimationDrafts();
+let wordMatchDrafts = emptyWordMatchDrafts();
 const pricePlayerKeys = new Map();
+let wordTimerActionPending = false;
 let previousGameId = null;
 let previousBuzzerStatus = null;
 
@@ -89,6 +99,44 @@ function mapNotesStorageKey() {
 
 function estimationStorageKey() {
   return `gameshow-estimation-drafts-${roomRecord.id}`;
+}
+
+function wordMatchStorageKey() {
+  return `gameshow-word-match-drafts-${roomRecord.id}`;
+}
+
+function emptyWordTerms() {
+  return Array.from({ length: WORD_MATCH_TERM_COUNT }, () => "");
+}
+
+function emptyWordMatchDrafts(roundIndex = 0) {
+  return { roundIndex, terms: {} };
+}
+
+function saveWordMatchDrafts() {
+  try {
+    localStorage.setItem(wordMatchStorageKey(), JSON.stringify(wordMatchDrafts));
+  } catch (error) {
+    console.warn("Private word lists could not be saved:", error);
+  }
+}
+
+function restoreWordMatchDrafts() {
+  wordMatchDrafts = emptyWordMatchDrafts(state.game.roundIndex);
+  try {
+    const saved = JSON.parse(localStorage.getItem(wordMatchStorageKey()));
+    if (!saved || saved.roundIndex !== state.game.roundIndex) return false;
+    for (const participant of state.game.participants || []) {
+      if (!Array.isArray(saved.terms?.[participant.id])) continue;
+      wordMatchDrafts.terms[participant.id] = emptyWordTerms().map((_, index) =>
+        String(saved.terms[participant.id][index] || "").slice(0, 60)
+      );
+    }
+    return true;
+  } catch (error) {
+    console.warn("Private word lists could not be restored:", error);
+    return false;
+  }
 }
 
 function emptyEstimationDrafts(roundIndex = 0) {
@@ -363,6 +411,10 @@ async function initializeHost() {
     estimationGame.normalize(state);
     restoreEstimationDrafts();
   }
+  if (state.game.id === wordMatchGame.id) {
+    wordMatchGame.normalize(state);
+    restoreWordMatchDrafts();
+  }
 
   $("room-code").textContent = roomCode;
   hostMap = createGermanyMap($("host-germany-map"));
@@ -413,21 +465,24 @@ function render() {
   const matchingIsActive = state.game.id === matchingGame.id;
   const priceIsActive = state.game.id === guessThePriceGame.id;
   const estimationIsActive = state.game.id === estimationGame.id;
+  const wordMatchIsActive = state.game.id === wordMatchGame.id;
   document.querySelector(".shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("buzzer-game-panel").classList.toggle(
     "hidden",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
   $("map-game-panel").classList.toggle("hidden", !mapIsActive);
   $("matching-game-panel").classList.toggle("hidden", !matchingIsActive);
   $("price-game-panel").classList.toggle("hidden", !priceIsActive);
   $("estimation-game-panel").classList.toggle("hidden", !estimationIsActive);
+  $("word-match-game-panel").classList.toggle("hidden", !wordMatchIsActive);
 
-  if (estimationIsActive) renderEstimationGame();
+  if (wordMatchIsActive) renderWordMatchGame();
+  else if (estimationIsActive) renderEstimationGame();
   else if (priceIsActive) renderPriceGame();
   else if (matchingIsActive) renderMatchingGame();
   else if (mapIsActive) renderMapGame();
@@ -454,7 +509,8 @@ function getNextGameDefinition(gameId) {
     { id: top20Game.id, name: top20Game.name },
     { id: germanyMapGame.id, name: germanyMapGame.name },
     { id: matchingGame.id, name: matchingGame.name },
-    { id: estimationGame.id, name: estimationGame.name }
+    { id: estimationGame.id, name: estimationGame.name },
+    { id: wordMatchGame.id, name: wordMatchGame.name }
   ];
   const currentIndex = games.findIndex((game) => game.id === gameId);
   return currentIndex >= 0 ? games[currentIndex + 1] || null : null;
@@ -521,6 +577,8 @@ function renderEstimationGame() {
   $("reveal-estimation-round").disabled = moderatorActionPending || !isReady;
   $("next-estimation-question").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-estimation-question").disabled = moderatorActionPending;
+  $("start-word-match-game").classList.toggle("hidden", !isFinished);
+  $("start-word-match-game").disabled = moderatorActionPending;
   $("estimation-result").classList.toggle("hidden", !isRevealed);
 
   if (!isRevealed) return;
@@ -540,6 +598,110 @@ function renderEstimationGame() {
     <p>${winnerText}</p>
     ${finalText}
   `;
+}
+
+function wordMatchSecondsRemaining() {
+  if (!state.game.phaseEndsAt) return WORD_MATCH_PHASE_SECONDS;
+  return Math.max(0, Math.ceil((state.game.phaseEndsAt - Date.now()) / 1000));
+}
+
+function formatCountdown(seconds) {
+  const safeSeconds = Math.max(0, Number(seconds) || 0);
+  return `${String(Math.floor(safeSeconds / 60)).padStart(2, "0")}:${String(safeSeconds % 60).padStart(2, "0")}`;
+}
+
+function updateHostWordMatchTimer() {
+  if (state?.game?.id !== wordMatchGame.id || !$("word-match-timer")) return;
+  $("word-match-timer").textContent = formatCountdown(wordMatchSecondsRemaining());
+}
+
+function renderWordMatchGame() {
+  const game = state.game;
+  const roles = getWordMatchRoles(game);
+  const category = WORD_MATCH_CATEGORIES[game.roundIndex];
+  const isSeedCollecting = game.status === "seed-collecting";
+  const isRoundFinished = game.status === "round-finished";
+  const isFinished = game.status === "finished";
+  const roundInProgress = [
+    "blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing"
+  ].includes(game.status);
+  const visibleScores = {
+    blue: game.scores.blue + (roundInProgress ? game.currentMatches.blue.length : 0),
+    red: game.scores.red + (roundInProgress ? game.currentMatches.red.length : 0)
+  };
+
+  $("word-match-round-label").textContent =
+    `Runde ${game.roundIndex + 1} von ${WORD_MATCH_CATEGORIES.length}`;
+  $("word-match-blue-score").textContent = visibleScores.blue;
+  $("word-match-red-score").textContent = visibleScores.red;
+  $("word-match-category").textContent = category;
+  $("word-match-roles").textContent =
+    `${roles.seeders.blue?.name || "Blau fehlt"} und ${roles.seeders.red?.name || "Rot fehlt"} schreiben · ` +
+    `${roles.guessers.blue?.name || "Blau fehlt"} und ${roles.guessers.red?.name || "Rot fehlt"} raten`;
+  updateHostWordMatchTimer();
+
+  const statusLabels = {
+    "round-pending": "Runde bereit",
+    "seed-collecting": "Listen werden geschrieben",
+    "blue-guess-pending": "Team Blau bereit",
+    "blue-guessing": "Team Blau rät",
+    "red-guess-pending": "Team Rot bereit",
+    "red-guessing": "Team Rot rät",
+    "round-finished": "Runde beendet",
+    finished: "Spiel beendet"
+  };
+  $("word-match-status").textContent = statusLabels[game.status] || game.status;
+  $("word-match-status").className = `status-pill ${game.phaseEndsAt ? "open" : "closed"}`;
+
+  $("word-match-seed-status").innerHTML = ["blue", "red"].map((team) => {
+    const seeder = roles.seeders[team];
+    const locked = game.lockedSeederIds.includes(seeder?.id);
+    return `<span class="${locked ? "ready" : ""}">${escapeHtml(seeder?.name || getTeamName(team))}: ${locked ? "eingeloggt ✓" : isSeedCollecting ? "schreibt…" : "wartet"}</span>`;
+  }).join("");
+
+  $("word-match-lists").innerHTML = ["blue", "red"].map((team) => {
+    const seeder = roles.seeders[team];
+    const terms = wordMatchDrafts.terms[seeder?.id] || emptyWordTerms();
+    const clickable = game.status === `${team}-guessing`;
+    return `<article class="word-match-list ${team}">
+      <strong>${getTeamName(team)} · Liste von ${escapeHtml(seeder?.name || "")}</strong>
+      ${terms.map((term, index) => {
+        const matched = game.currentMatches[team].includes(index);
+        const disabled = !clickable || !term ? " disabled" : "";
+        return `<button class="word-match-term${matched ? " matched" : ""}${term ? "" : " empty"}"
+          type="button" data-word-team="${team}" data-word-index="${index}"${disabled}>
+          ${index + 1}. ${escapeHtml(term || "Leer")}${matched ? " ✓" : ""}
+        </button>`;
+      }).join("")}
+    </article>`;
+  }).join("");
+
+  $("start-word-seed-phase").classList.toggle("hidden", game.status !== "round-pending");
+  $("finish-word-seed-phase").classList.toggle("hidden", !isSeedCollecting);
+  $("start-blue-guess-phase").classList.toggle("hidden", game.status !== "blue-guess-pending");
+  $("finish-blue-guess-phase").classList.toggle("hidden", game.status !== "blue-guessing");
+  $("start-red-guess-phase").classList.toggle("hidden", game.status !== "red-guess-pending");
+  $("finish-red-guess-phase").classList.toggle("hidden", game.status !== "red-guessing");
+  $("next-word-match-round").classList.toggle("hidden", !isRoundFinished);
+  for (const id of [
+    "start-word-seed-phase", "finish-word-seed-phase", "start-blue-guess-phase",
+    "finish-blue-guess-phase", "start-red-guess-phase", "finish-red-guess-phase",
+    "next-word-match-round"
+  ]) $(id).disabled = moderatorActionPending || wordTimerActionPending;
+
+  const result = game.roundResults[game.roundIndex];
+  $("word-match-result").classList.toggle("hidden", !result);
+  if (result) {
+    const conclusion = isFinished
+      ? game.winningTeam
+        ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Begriffsmatch!`
+        : "Begriffsmatch endet unentschieden."
+      : "Bereit für die nächste Runde.";
+    $("word-match-result").innerHTML = `
+      <strong>Runde ${game.roundIndex + 1}: Blau ${result.blue} · Rot ${result.red}</strong>
+      <span>${conclusion}</span>
+    `;
+  }
 }
 
 function renderHostPersonalNotes(containerId, team, notes = {}) {
@@ -980,6 +1142,9 @@ async function broadcastState() {
   if (state.game.id === estimationGame.id) {
     publicState.estimationSubmissionKey = matchingPublicKey;
   }
+  if (state.game.id === wordMatchGame.id) {
+    publicState.wordMatchSubmissionKey = matchingPublicKey;
+  }
   await realtime.send("room_state", publicState);
 }
 
@@ -1136,6 +1301,66 @@ async function handlePriceKeyRegistration(payload) {
   if (state.game.id === germanyMapGame.id) await sendMapPrivateState(roomPlayer.id);
   if (state.game.id === guessThePriceGame.id) await sendPricePrivateState(roomPlayer.id);
   if (state.game.id === estimationGame.id) await sendEstimationPrivateState(roomPlayer.id);
+  if (state.game.id === wordMatchGame.id) await sendWordMatchPrivateState(roomPlayer.id);
+}
+
+async function sendWordMatchPrivateState(playerId) {
+  if (state.game.id !== wordMatchGame.id) return false;
+  const participant = state.game.participants?.find((item) => item.id === playerId);
+  const publicKey = pricePlayerKeys.get(playerId);
+  if (!participant || !publicKey) return false;
+  try {
+    const encrypted = await encryptPrivatePayload(publicKey, {
+      roundIndex: state.game.roundIndex,
+      terms: wordMatchDrafts.terms[playerId] || emptyWordTerms(),
+      locked: state.game.lockedSeederIds.includes(playerId)
+    });
+    await realtime.send("word_match_private_state", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.warn("Private word list could not be encrypted:", error);
+    return false;
+  }
+}
+
+async function syncWordMatchSeeders() {
+  const roles = getWordMatchRoles(state.game);
+  await Promise.all(Object.values(roles.seeders).map((item) =>
+    item ? sendWordMatchPrivateState(item.id) : false
+  ));
+}
+
+async function handleWordMatchSubmission(payload) {
+  if (state.game.id !== wordMatchGame.id || state.game.status !== "seed-collecting" ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+  const roles = getWordMatchRoles(state.game);
+  const seeder = Object.values(roles.seeders).find((item) => item?.id === payload.playerId);
+  if (!seeder || state.game.lockedSeederIds.includes(seeder.id)) return;
+  try {
+    const submission = await decryptPrivatePayload(matchingKeyPair.privateKey, payload.encrypted);
+    const valid = submission?.playerId === seeder.id &&
+      submission.roundIndex === state.game.roundIndex &&
+      ["draft", "lock"].includes(submission.type) && Array.isArray(submission.terms);
+    if (!valid) return;
+    wordMatchDrafts.terms[seeder.id] = emptyWordTerms().map((_, index) =>
+      String(submission.terms[index] || "").trim().slice(0, 60)
+    );
+    saveWordMatchDrafts();
+    render();
+
+    if (submission.type === "lock") {
+      const accepted = wordMatchGame.lockSeeder(state, seeder.id);
+      await realtime.send("word_match_lock_result", {
+        playerId: seeder.id,
+        accepted,
+        reason: accepted ? "" : "Die Liste konnte nicht eingeloggt werden."
+      });
+      if (accepted) await persistRenderAndBroadcast();
+    }
+    await sendWordMatchPrivateState(seeder.id);
+  } catch (error) {
+    console.warn("Encrypted word list could not be processed:", error);
+  }
 }
 
 async function sendEstimationPrivateState(playerId) {
@@ -1348,6 +1573,11 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "word_match_private_submission") {
+    await handleWordMatchSubmission(payload);
+    return;
+  }
+
   if (event === "map_pin") {
     const player = state.players.find((item) => item.id === payload.playerId);
     if (!player || !germanyMapGame.placePin(state, player.team, payload.position)) return;
@@ -1409,6 +1639,11 @@ $("force-next-game").addEventListener("click", async () => {
       "Für Schätzfragen müssen alle vier Spieler im Raum sein.";
     return;
   }
+  if (currentGameId === estimationGame.id && state.players.length !== 4) {
+    $("force-next-game-error").textContent =
+      "Für Begriffsmatch müssen alle vier Spieler im Raum sein.";
+    return;
+  }
 
   const accepted = await runModeratorAction(() => {
     if (currentGameId === buzzerGame.id) {
@@ -1441,6 +1676,12 @@ $("force-next-game").addEventListener("click", async () => {
       saveEstimationDrafts();
       return true;
     }
+    if (currentGameId === estimationGame.id) {
+      if (!wordMatchGame.start(state, state.players)) return false;
+      wordMatchDrafts = emptyWordMatchDrafts(0);
+      saveWordMatchDrafts();
+      return true;
+    }
     return false;
   });
 
@@ -1453,6 +1694,7 @@ $("force-next-game").addEventListener("click", async () => {
   if (state.game.id === top20Game.id) await syncAllTop20Teams();
   if (state.game.id === germanyMapGame.id) await syncAllMapTeams();
   if (state.game.id === estimationGame.id) await syncAllEstimationPlayers();
+  if (state.game.id === wordMatchGame.id) await syncWordMatchSeeders();
 });
 
 $("open-buzzer").addEventListener("click", async () => {
@@ -1714,6 +1956,106 @@ $("next-estimation-question").addEventListener("click", async () => {
   });
   if (accepted) await syncAllEstimationPlayers();
 });
+
+$("start-word-match-game").addEventListener("click", async () => {
+  $("estimation-error").textContent = "";
+  if (state.players.length !== 4) {
+    $("estimation-error").textContent = "Für Begriffsmatch müssen alle vier Spieler im Raum sein.";
+    return;
+  }
+  const accepted = await runModeratorAction(() => {
+    if (state.game.id !== estimationGame.id || state.game.status !== "finished") return false;
+    if (!wordMatchGame.start(state, state.players)) return false;
+    wordMatchDrafts = emptyWordMatchDrafts(0);
+    saveWordMatchDrafts();
+    return true;
+  });
+  if (accepted) await syncWordMatchSeeders();
+});
+
+$("start-word-seed-phase").addEventListener("click", async () => {
+  $("word-match-error").textContent = "";
+  const accepted = await runModeratorAction(() => {
+    if (!wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[state.game.roundIndex])) return false;
+    wordMatchDrafts = emptyWordMatchDrafts(state.game.roundIndex);
+    const roles = getWordMatchRoles(state.game);
+    for (const seeder of Object.values(roles.seeders)) {
+      wordMatchDrafts.terms[seeder.id] = emptyWordTerms();
+    }
+    saveWordMatchDrafts();
+    return true;
+  });
+  if (accepted) await syncWordMatchSeeders();
+});
+
+$("finish-word-seed-phase").addEventListener("click", async () => {
+  const accepted = await runModeratorAction(() => wordMatchGame.finishSeedPhase(state));
+  if (accepted) await syncWordMatchSeeders();
+});
+
+$("start-blue-guess-phase").addEventListener("click", async () => {
+  await runModeratorAction(() => wordMatchGame.startGuessPhase(state, "blue"));
+});
+
+$("finish-blue-guess-phase").addEventListener("click", async () => {
+  await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "blue"));
+});
+
+$("start-red-guess-phase").addEventListener("click", async () => {
+  await runModeratorAction(() => wordMatchGame.startGuessPhase(state, "red"));
+});
+
+$("finish-red-guess-phase").addEventListener("click", async () => {
+  await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "red"));
+});
+
+$("word-match-lists").addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-word-team][data-word-index]");
+  if (!button || button.disabled) return;
+  await runModeratorAction(() => wordMatchGame.toggleMatch(
+    state,
+    button.dataset.wordTeam,
+    Number(button.dataset.wordIndex)
+  ));
+});
+
+$("next-word-match-round").addEventListener("click", async () => {
+  const nextRoundIndex = state.game.roundIndex + 1;
+  const accepted = await runModeratorAction(() => {
+    if (!wordMatchGame.startNextRound(state)) return false;
+    wordMatchDrafts = emptyWordMatchDrafts(nextRoundIndex);
+    saveWordMatchDrafts();
+    return true;
+  });
+  if (accepted) await syncWordMatchSeeders();
+});
+
+async function tickWordMatchTimer() {
+  if (state?.game?.id !== wordMatchGame.id) return;
+  updateHostWordMatchTimer();
+  const status = state.game.status;
+  if (!state.game.phaseEndsAt || wordTimerActionPending || moderatorActionPending) return;
+  const grace = status === "seed-collecting" ? 600 : 0;
+  if (Date.now() < state.game.phaseEndsAt + grace) return;
+
+  wordTimerActionPending = true;
+  try {
+    let accepted = false;
+    if (status === "seed-collecting") {
+      accepted = await runModeratorAction(() => wordMatchGame.finishSeedPhase(state));
+      if (accepted) await syncWordMatchSeeders();
+    } else if (status === "blue-guessing") {
+      accepted = await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "blue"));
+    } else if (status === "red-guessing") {
+      accepted = await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "red"));
+    }
+  } finally {
+    wordTimerActionPending = false;
+    render();
+  }
+}
+
+setInterval(() => void tickWordMatchTimer(), 250);
 
 $("start-top20-game").addEventListener("click", async () => {
   const accepted = await runModeratorAction(() => {

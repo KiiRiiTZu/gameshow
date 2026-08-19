@@ -40,6 +40,13 @@ import {
 } from "../js/games/estimation-game.js";
 import { ESTIMATION_QUESTIONS } from "../js/games/estimation-questions.js";
 import {
+  WORD_MATCH_CATEGORIES,
+  WORD_MATCH_PHASE_SECONDS,
+  WORD_MATCH_TERM_COUNT,
+  getWordMatchRoles,
+  wordMatchGame
+} from "../js/games/word-match-game.js";
+import {
   createEncryptionKeyPair,
   decryptPrivatePayload,
   encryptPrivatePayload,
@@ -48,19 +55,79 @@ import {
 import { createInitialRoomState } from "../js/room.js";
 import { getGamePresentation } from "../js/game-effects.js";
 
-test("contains presentation cards for all six games", () => {
+test("contains presentation cards for all seven games", () => {
   assert.deepEqual([
     "buzzer",
     "guess-the-price",
     "spotify-top-artists",
     "germany-map",
     "matching-game",
-    "estimation-game"
-  ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6]);
+    "estimation-game",
+    "word-match-game"
+  ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6, 7]);
   assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");
   assert.equal(getGamePresentation("germany-map").name, "Kartenwissen");
   assert.equal(getGamePresentation("matching-game").name, "Da seh ich dich");
   assert.equal(getGamePresentation("estimation-game").name, "Schätzfragen");
+  assert.equal(getGamePresentation("word-match-game").name, "Begriffsmatch");
+});
+
+test("alternates Begriffsmatch roles and starts each phase with 60 seconds", () => {
+  const state = createInitialRoomState("TEST");
+  const participants = [
+    { id: "b1", name: "B1", team: "blue" },
+    { id: "b2", name: "B2", team: "blue" },
+    { id: "r1", name: "R1", team: "red" },
+    { id: "r2", name: "R2", team: "red" }
+  ];
+  wordMatchGame.start(state, participants);
+  let roles = getWordMatchRoles(state.game);
+  assert.equal(roles.seeders.blue.id, "b1");
+  assert.equal(roles.guessers.blue.id, "b2");
+  assert.equal(wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[0], 1_000), true);
+  assert.equal(state.game.phaseEndsAt, 1_000 + WORD_MATCH_PHASE_SECONDS * 1000);
+  wordMatchGame.lockSeeder(state, "b1");
+  wordMatchGame.lockSeeder(state, "r1");
+  assert.equal(state.game.status, "blue-guess-pending");
+  wordMatchGame.startGuessPhase(state, "blue", 2_000);
+  assert.equal(state.game.phaseEndsAt, 2_000 + WORD_MATCH_PHASE_SECONDS * 1000);
+  wordMatchGame.finishGuessPhase(state, "blue");
+  wordMatchGame.startGuessPhase(state, "red", 3_000);
+  wordMatchGame.finishGuessPhase(state, "red");
+  wordMatchGame.startNextRound(state);
+  roles = getWordMatchRoles(state.game);
+  assert.equal(roles.seeders.blue.id, "b2");
+  assert.equal(roles.guessers.blue.id, "b1");
+});
+
+test("ends Begriffsmatch early when the trailing team cannot catch up", () => {
+  const state = createInitialRoomState("TEST");
+  const participants = [
+    { id: "b1", name: "B1", team: "blue" },
+    { id: "b2", name: "B2", team: "blue" },
+    { id: "r1", name: "R1", team: "red" },
+    { id: "r2", name: "R2", team: "red" }
+  ];
+  wordMatchGame.start(state, participants);
+
+  for (let round = 0; round < 3; round += 1) {
+    wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[round]);
+    wordMatchGame.finishSeedPhase(state);
+    wordMatchGame.startGuessPhase(state, "blue");
+    for (let index = 0; index < WORD_MATCH_TERM_COUNT; index += 1) {
+      wordMatchGame.toggleMatch(state, "blue", index);
+    }
+    wordMatchGame.finishGuessPhase(state, "blue");
+    wordMatchGame.startGuessPhase(state, "red");
+    wordMatchGame.finishGuessPhase(state, "red");
+    if (round < 2) wordMatchGame.startNextRound(state);
+  }
+
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.roundIndex, 2);
+  assert.equal(state.game.winningTeam, "blue");
+  assert.deepEqual(state.game.scores, { blue: 30, red: 0 });
+  assert.equal(state.scores.blue, 1);
 });
 
 test("contains nine estimation questions and keeps the first question hidden until started", () => {
@@ -633,6 +700,23 @@ test("encrypts an individual estimation without exposing it to teammates", async
   const encrypted = await encryptPrivatePayload(publicKey, payload);
 
   assert.equal(JSON.stringify(encrypted).includes("-12,75"), false);
+  assert.deepEqual(await decryptPrivatePayload(keyPair.privateKey, encrypted), payload);
+  await assert.rejects(() => decryptPrivatePayload(otherKeyPair.privateKey, encrypted));
+});
+
+test("encrypts a Begriffsmatch list so the guessing partner cannot read it", async () => {
+  const keyPair = await createEncryptionKeyPair();
+  const otherKeyPair = await createEncryptionKeyPair();
+  const publicKey = await exportEncryptionPublicKey(keyPair.publicKey);
+  const payload = {
+    type: "lock",
+    playerId: "red-1",
+    roundIndex: 0,
+    terms: ["Märchen", "Legende", ...Array(8).fill("")]
+  };
+  const encrypted = await encryptPrivatePayload(publicKey, payload);
+
+  assert.equal(JSON.stringify(encrypted).includes("Märchen"), false);
   assert.deepEqual(await decryptPrivatePayload(keyPair.privateKey, encrypted), payload);
   await assert.rejects(() => decryptPrivatePayload(otherKeyPair.privateKey, encrypted));
 });
