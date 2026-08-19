@@ -700,6 +700,18 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .estimation-player-entry { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .estimation-player-entry span:last-child { font-weight: 850; text-align: right; }
 .estimation-player-entry .locked { color: #65e3a8; }
+.estimation-submissions.single-team {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 620px;
+  margin-right: auto;
+  margin-left: auto;
+}
+.estimation-average-entry {
+  margin-top: 3px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.estimation-result-summary { display: block; margin: 8px 0; }
 
 .estimation-player-form {
   display: grid;

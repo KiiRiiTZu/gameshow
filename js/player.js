@@ -1063,6 +1063,23 @@ function formatEstimate(value) {
   return Number(value).toLocaleString("de-DE", { maximumFractionDigits: 3 });
 }
 
+function renderEstimationTeamBox(game, team, guesses, average, participants = null) {
+  const teamParticipants = participants || (game.participants || []).filter((item) => item.team === team);
+  return `<article class="estimation-team ${team}">
+    <strong>${getTeamName(team)}</strong>
+    ${teamParticipants.map((item) => `
+      <div class="estimation-player-entry">
+        <span>${escapeHtml(item.name)}</span>
+        <span>${formatEstimate(guesses[item.id])}</span>
+      </div>
+    `).join("")}
+    <div class="estimation-player-entry estimation-average-entry">
+      <span>Mittelwert</span>
+      <span>Ø ${formatEstimate(average)}</span>
+    </div>
+  </article>`;
+}
+
 function renderEstimationGame() {
   const game = roomState.game;
   const isPending = game.status === "question-pending";
@@ -1072,6 +1089,8 @@ function renderEstimationGame() {
   const hasTeamAverage = Number.isFinite(estimationDraft.teamAverage);
   const locked = game.lockedPlayerIds?.includes(playerId) || false;
   const editable = isGuessing && !locked && !estimationSubmissionPending;
+  const resultElement = $("player-estimation-result");
+  resultElement.classList.remove("hidden");
 
   $("player-estimation-round").textContent =
     `Frage ${game.roundIndex + 1} von ${ESTIMATION_ROUND_COUNT}`;
@@ -1100,23 +1119,22 @@ function renderEstimationGame() {
   }).join("");
 
   if (isPending) {
-    $("player-estimation-result").textContent =
+    resultElement.textContent =
       "Wartet darauf, dass der Moderator die Frage startet.";
     return;
   }
   if (isRevealed) {
     const result = game.revealed;
-    const individual = (game.participants || []).map((item) =>
-      `${escapeHtml(item.name)}: ${formatEstimate(result.guesses[item.id])}`
-    ).join(" · ");
     const winnerText = result.roundWinner
       ? `${getTeamName(result.roundWinner)} liegt näher.`
       : "Beide Teams sind gleich weit entfernt.";
-    $("player-estimation-result").innerHTML = `
-      <strong>Richtige Antwort: ${escapeHtml(result.answerDisplay)}</strong><br>
-      ${individual}<br>
-      Team Blau: Ø ${formatEstimate(result.averages.blue)} · Team Rot: Ø ${formatEstimate(result.averages.red)}<br>
-      ${winnerText}
+    resultElement.innerHTML = `
+      <strong class="estimation-result-summary">Richtige Antwort: ${escapeHtml(result.answerDisplay)}</strong>
+      <div class="estimation-submissions">
+        ${renderEstimationTeamBox(game, "blue", result.guesses, result.averages.blue)}
+        ${renderEstimationTeamBox(game, "red", result.guesses, result.averages.red)}
+      </div>
+      <span class="estimation-result-summary">${winnerText}</span>
       ${game.status === "finished"
         ? game.winningTeam
           ? `<br>🏆 ${getTeamName(game.winningTeam)} gewinnt Mittelwert!`
@@ -1127,19 +1145,33 @@ function renderEstimationGame() {
   }
   if (isReady) {
     const partnerEstimate = parseEstimate(estimationDraft.partnerValue);
-    $("player-estimation-result").innerHTML = hasTeamAverage && partnerEstimate !== null
-      ? `<strong>Alle vier Schätzungen sind eingeloggt.</strong><br>
-        ${escapeHtml(estimationDraft.partnerName || "Dein Partner")}: ${formatEstimate(partnerEstimate)}<br>
-        Euer Mittelwert: Ø ${formatEstimate(estimationDraft.teamAverage)}<br>
-        Der Moderator deckt gleich die richtige Antwort auf.`
+    const ownTeam = game.participants?.find((item) => item.id === playerId)?.team || player?.team;
+    const partner = {
+      id: "partner",
+      name: estimationDraft.partnerName || "Dein Partner",
+      team: ownTeam
+    };
+    resultElement.innerHTML = hasTeamAverage && partnerEstimate !== null
+      ? `<div class="estimation-submissions single-team">
+          ${renderEstimationTeamBox(
+            game,
+            ownTeam,
+            { partner: partnerEstimate },
+            estimationDraft.teamAverage,
+            [partner]
+          )}
+        </div>`
       : "Euer Mittelwert wird berechnet…";
     return;
   }
-  $("player-estimation-result").textContent = locked
-      ? "Deine Schätzung ist eingeloggt. Warte auf die anderen Spieler."
-      : roomState.estimationSubmissionKey
-        ? "Gib deine persönliche Schätzung ohne Absprache ein."
-      : "Die sichere Verbindung wird aufgebaut…";
+  if (!locked && roomState.estimationSubmissionKey) {
+    resultElement.textContent = "";
+    resultElement.classList.add("hidden");
+    return;
+  }
+  resultElement.textContent = locked
+    ? "Deine Schätzung ist eingeloggt. Warte auf die anderen Spieler."
+    : "Die sichere Verbindung wird aufgebaut…";
 }
 
 function wordMatchSecondsRemaining() {
