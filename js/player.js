@@ -88,7 +88,7 @@ let wordMatchDraft = {
 let wordMatchDraftTimer = null;
 let wordMatchSubmissionPending = false;
 let previousGameId = null;
-let previousBuzzerStatus = null;
+let previousGameStatus = null;
 
 function showPlayerGame() {
   if (!player) return;
@@ -138,7 +138,7 @@ async function initializePlayer() {
     typing: []
   };
   previousGameId = roomState.game.id;
-  previousBuzzerStatus = roomState.game.id === "buzzer" ? roomState.game.status : null;
+  previousGameStatus = roomState.game.status;
 
   const restoredPlayer = roomState.players.find((item) => item.id === playerId);
 
@@ -642,12 +642,13 @@ function render() {
   const currentGameId = roomState.game?.id;
   if (previousGameId && previousGameId !== currentGameId) {
     showGameTransition(currentGameId);
-  } else if (currentGameId === "buzzer" && previousBuzzerStatus === "not-started" &&
+  } else if (["buzzer", ESTIMATION_GAME_ID].includes(currentGameId) &&
+      previousGameStatus === "not-started" &&
       roomState.game.status !== "not-started") {
     showGameTransition(currentGameId);
   }
   previousGameId = currentGameId;
-  previousBuzzerStatus = currentGameId === "buzzer" ? roomState.game.status : null;
+  previousGameStatus = roomState.game.status;
 
   const showWinner = getShowWinner(roomState);
   $("player-show-winner-banner").classList.toggle("hidden", !showWinner);
@@ -1099,6 +1100,7 @@ function renderEstimationTeamBox(game, team, guesses, average, participants = nu
 
 function renderEstimationGame() {
   const game = roomState.game;
+  const isGameNotStarted = game.status === "not-started";
   const isPending = game.status === "question-pending";
   const isGuessing = game.status === "guessing";
   const isReady = game.status === "ready-to-reveal";
@@ -1113,12 +1115,14 @@ function renderEstimationGame() {
     `Frage ${game.roundIndex + 1} von ${ESTIMATION_ROUND_COUNT}`;
   $("player-estimation-blue-score").textContent = game.roundScores.blue;
   $("player-estimation-red-score").textContent = game.roundScores.red;
-  $("player-estimation-question-card").classList.toggle("hidden", isPending);
+  $("player-estimation-question-card").classList.toggle("hidden", isPending || isGameNotStarted);
   $("player-estimation-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
   $("player-estimation-question").textContent = game.questionPrompt || "";
-  $("player-estimation-waiting").classList.toggle("hidden", !isPending);
-  document.querySelector(".estimation-player-form").classList.toggle("hidden", isPending || isReady || isRevealed);
-  $("player-estimation-locks").classList.toggle("hidden", isPending || isReady || isRevealed);
+  $("player-estimation-waiting").classList.toggle("hidden", !isPending && !isGameNotStarted);
+  document.querySelector(".estimation-player-form").classList.toggle(
+    "hidden", isPending || isGameNotStarted || isReady || isRevealed
+  );
+  $("player-estimation-locks").classList.toggle("hidden", isPending || isGameNotStarted || isReady || isRevealed);
 
   const valueInput = $("player-estimation-value");
   if (document.activeElement !== valueInput && valueInput.value !== estimationDraft.value) {
@@ -1135,9 +1139,11 @@ function renderEstimationGame() {
     return `<span class="${hasLocked ? "ready" : ""}">${escapeHtml(item.name)}: ${hasLocked ? "eingeloggt ✓" : "schätzt…"}</span>`;
   }).join("");
 
-  if (isPending) {
+  if (isGameNotStarted || isPending) {
     resultElement.textContent =
-      "Wartet darauf, dass der Moderator die Frage startet.";
+      isGameNotStarted
+        ? "Wartet darauf, dass der Moderator Spiel 1 startet."
+        : "Wartet darauf, dass der Moderator die Frage startet.";
     return;
   }
   if (isRevealed) {

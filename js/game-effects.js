@@ -1,11 +1,11 @@
 const GAME_PRESENTATIONS = {
-  buzzer: { number: 1, name: "Buzzer Quiz" },
-  "guess-the-price": { number: 2, name: "Thrifty" },
-  "spotify-top-artists": { number: 3, name: "Top 20" },
-  "germany-map": { number: 4, name: "Kartenwissen" },
-  "matching-game": { number: 5, name: "Da seh ich dich" },
-  "estimation-game": { number: 6, name: "Mittelwert" },
-  "word-match-game": { number: 7, name: "Begriffsmatch" }
+  "estimation-game": { number: 1, name: "Mittelwert" },
+  "matching-game": { number: 2, name: "Da seh ich dich" },
+  "germany-map": { number: 3, name: "Kartenwissen" },
+  "word-match-game": { number: 4, name: "Begriffsmatch" },
+  "guess-the-price": { number: 5, name: "Thrifty" },
+  "spotify-top-artists": { number: 6, name: "Top 20" },
+  buzzer: { number: 7, name: "Buzzer Quiz" }
 };
 
 function removeEffect(selector) {

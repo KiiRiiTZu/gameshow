@@ -12,6 +12,23 @@ function emptyTeamScores() {
   return { blue: 0, red: 0 };
 }
 
+function createInitialGame() {
+  return {
+    id: "estimation-game",
+    status: "not-started",
+    roundIndex: 0,
+    roundScores: emptyTeamScores(),
+    participants: [],
+    lockedPlayerIds: [],
+    questionPrompt: "",
+    averages: null,
+    revealed: null,
+    roundResults: [],
+    winningTeam: null,
+    scoreSystemVersion: SCORE_SYSTEM_VERSION
+  };
+}
+
 function normalizeTeamScores(scores) {
   return {
     blue: Number(scores?.blue) || 0,
@@ -68,15 +85,7 @@ export function createInitialRoomState(roomCode) {
     roomCode,
     scores: emptyTeamScores(),
     players: [],
-    game: {
-      id: "buzzer",
-      status: "not-started",
-      winner: null,
-      winningTeam: null,
-      scores: emptyTeamScores(),
-      questionIndex: 0,
-      scoreSystemVersion: SCORE_SYSTEM_VERSION
-    }
+    game: createInitialGame()
   };
 }
 
@@ -91,8 +100,10 @@ export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
     blue: room.blue_score,
     red: room.red_score
   });
-  const game = persistedGame || {
-    id: room.current_game || "buzzer",
+  const fallbackGame = room.current_game === "estimation-game" || !room.current_game
+    ? { ...createInitialGame(), status: room.game_status || "not-started" }
+    : {
+    id: room.current_game,
     status: room.game_status || "waiting",
     winner: room.buzzer_winner_id
       ? {
@@ -107,6 +118,7 @@ export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
     scores: emptyTeamScores(),
     scoreSystemVersion: SCORE_SYSTEM_VERSION
   };
+  const game = persistedGame || fallbackGame;
   const isLegacyPersistedGame = Boolean(persistedGame) &&
     persistedGame.scoreSystemVersion !== SCORE_SYSTEM_VERSION;
 

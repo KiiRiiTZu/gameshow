@@ -93,19 +93,25 @@ test("does not truncate a busy session chat after 100 messages", () => {
 
 test("contains presentation cards for all seven games", () => {
   assert.deepEqual([
-    "buzzer",
+    "estimation-game",
+    "matching-game",
+    "germany-map",
+    "word-match-game",
     "guess-the-price",
     "spotify-top-artists",
-    "germany-map",
-    "matching-game",
-    "estimation-game",
-    "word-match-game"
+    "buzzer"
   ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6, 7]);
   assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");
   assert.equal(getGamePresentation("germany-map").name, "Kartenwissen");
   assert.equal(getGamePresentation("matching-game").name, "Da seh ich dich");
   assert.equal(getGamePresentation("estimation-game").name, "Mittelwert");
   assert.equal(getGamePresentation("word-match-game").name, "Begriffsmatch");
+});
+
+test("starts a new show with Mittelwert waiting for the moderator", () => {
+  const state = createInitialRoomState("TEST");
+  assert.equal(state.game.id, "estimation-game");
+  assert.equal(state.game.status, "not-started");
 });
 
 test("alternates Begriffsmatch roles with 80 seconds to write and 60 seconds to guess", () => {
@@ -257,7 +263,12 @@ test("finishes the buzzer game at 30 points with three points per correct answer
 
 test("keeps buzzer quiz points when the next question starts", () => {
   const state = createInitialRoomState("TEST");
-  state.game.scores = { blue: 2, red: 1 };
+  state.game = {
+    id: "buzzer",
+    status: "not-started",
+    scores: { blue: 2, red: 1 },
+    questionIndex: 0
+  };
 
   assert.equal(state.game.status, "not-started");
   assert.equal(buzzerGame.start(state), true);

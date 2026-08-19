@@ -53,7 +53,7 @@
     <section id="buzzer-game-panel" class="card game-panel">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 1</p>
+          <p class="eyebrow">SPIEL 7</p>
           <h2>Buzzer Quiz</h2>
         </div>
         <span id="buzzer-status" class="status-pill closed">Buzzer geschlossen</span>
@@ -67,7 +67,7 @@
 
       <div id="buzzer-start-controls" class="game-finished">
         <p>Bereit für das erste Spiel?</p>
-        <button id="start-buzzer-game" class="button primary">Spiel 1 starten</button>
+        <button id="start-buzzer-game" class="button primary">Spiel 7 starten</button>
       </div>
 
       <div id="buzzer-question-card" class="map-question-card buzzer-question-card">
@@ -92,7 +92,6 @@
 
       <div id="buzzer-finished-controls" class="game-finished hidden">
         <p id="buzzer-winner-message"></p>
-        <button id="start-price-game-after-buzzer" class="button primary">Thrifty starten</button>
       </div>
       <p id="buzzer-next-game-error" class="error"></p>
     </section>
@@ -100,7 +99,7 @@
     <section id="spotify-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 3 · BEST OF 3</p>
+          <p class="eyebrow">SPIEL 6 · BEST OF 3</p>
           <h2 id="top20-title">Top 20</h2>
           <p id="top20-description" class="muted"></p>
         </div>
@@ -126,14 +125,14 @@
       <div id="spotify-finished" class="game-finished hidden">
         <p id="spotify-winner-message"></p>
         <button id="next-top20-round" class="button primary">Nächste Liste starten</button>
-        <button id="start-map-game" class="button primary hidden">Kartenwissen starten</button>
+        <button id="start-buzzer-game-after-top20" class="button primary hidden">Buzzer Quiz starten</button>
       </div>
     </section>
 
     <section id="map-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 4 · BEST OF 7</p>
+          <p class="eyebrow">SPIEL 3 · BEST OF 7</p>
           <h2>Kartenwissen</h2>
           <p id="map-round-label" class="muted">Frage 1 von 7</p>
         </div>
@@ -165,7 +164,7 @@
       <div class="controls">
         <button id="reveal-map-round" class="button primary">Distanz zum Ziel aufdecken</button>
         <button id="next-map-round" class="button primary hidden">Nächste Frage</button>
-        <button id="start-matching-game" class="button primary hidden">Da seh ich dich starten</button>
+        <button id="start-word-match-game" class="button primary hidden">Begriffsmatch starten</button>
       </div>
       <p id="map-next-game-error" class="error"></p>
     </section>
@@ -173,7 +172,7 @@
     <section id="matching-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 5 · 4 RUNDEN</p>
+          <p class="eyebrow">SPIEL 2 · 4 RUNDEN</p>
           <h2>Da seh ich dich</h2>
           <p id="matching-round-label" class="muted">Runde 1 von 4</p>
         </div>
@@ -197,7 +196,7 @@
         <button id="complete-matching-turn" class="button secondary hidden">Nächste Spieler</button>
         <button id="reveal-matching-all" class="button primary hidden">Antworten aufdecken</button>
         <button id="next-matching-round" class="button primary hidden">Nächste Runde</button>
-        <button id="start-estimation-game" class="button primary hidden">Mittelwert starten</button>
+        <button id="start-map-game" class="button primary hidden">Kartenwissen starten</button>
       </div>
       <p id="matching-next-game-error" class="error"></p>
     </section>
@@ -205,7 +204,7 @@
     <section id="price-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 2 · BEST OF 7</p>
+          <p class="eyebrow">SPIEL 5 · BEST OF 7</p>
           <h2>Thrifty</h2>
           <p id="price-round-label" class="muted">Produkt 1 von 7</p>
         </div>
@@ -257,7 +256,7 @@
     <section id="estimation-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 6 · BEST OF 9</p>
+          <p class="eyebrow">SPIEL 1 · BEST OF 9</p>
           <h2>Mittelwert</h2>
           <p id="estimation-round-label" class="muted">Frage 1 von 9</p>
         </div>
@@ -287,14 +286,14 @@
         <button id="start-estimation-question" class="button primary">Erste Frage starten</button>
         <button id="reveal-estimation-round" class="button primary hidden">Richtige Antwort und Sieger aufdecken</button>
         <button id="next-estimation-question" class="button primary hidden">Nächste Frage starten</button>
-        <button id="start-word-match-game" class="button primary hidden">Begriffsmatch starten</button>
+        <button id="start-matching-game" class="button primary hidden">Da seh ich dich starten</button>
       </div>
     </section>
 
     <section id="word-match-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 7 · 4 RUNDEN</p>
+          <p class="eyebrow">SPIEL 4 · 4 RUNDEN</p>
           <h2>Begriffsmatch</h2>
           <p id="word-match-round-label" class="muted">Runde 1 von 4</p>
         </div>
@@ -328,6 +327,7 @@
         <button id="finish-red-guess-phase" class="button secondary hidden">Zeit für Rot beenden</button>
         <button id="reveal-word-match-round" class="button primary hidden">Ergebnisse aufdecken</button>
         <button id="next-word-match-round" class="button primary hidden">Nächste Runde</button>
+        <button id="start-price-game" class="button primary hidden">Thrifty starten</button>
       </div>
     </section>
 

@@ -28,8 +28,20 @@ export const buzzerGame = {
   name: "Buzzer Quiz",
 
   start(state) {
-    if (state.game.id !== this.id || state.game.status !== "not-started") return false;
-    state.game.status = "waiting";
+    if (state.game.id === this.id && state.game.status === "not-started") {
+      state.game.status = "waiting";
+      return true;
+    }
+    if (state.game.id === this.id) return false;
+    state.game = {
+      id: this.id,
+      status: "waiting",
+      winner: null,
+      winningTeam: null,
+      scores: { blue: 0, red: 0 },
+      questionIndex: 0,
+      scoreSystemVersion: SCORE_SYSTEM_VERSION
+    };
     return true;
   },
 
