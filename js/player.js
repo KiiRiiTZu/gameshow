@@ -1144,21 +1144,27 @@ function renderEstimationGame() {
     return;
   }
   if (isReady) {
+    const ownEstimate = parseEstimate(estimationDraft.value);
     const partnerEstimate = parseEstimate(estimationDraft.partnerValue);
     const ownTeam = game.participants?.find((item) => item.id === playerId)?.team || player?.team;
-    const partner = {
-      id: "partner",
-      name: estimationDraft.partnerName || "Dein Partner",
+    const ownPlayer = {
+      id: "self",
+      name: "Du",
       team: ownTeam
     };
-    resultElement.innerHTML = hasTeamAverage && partnerEstimate !== null
+    const partner = {
+      id: "partner",
+      name: estimationDraft.partnerName || "Partner",
+      team: ownTeam
+    };
+    resultElement.innerHTML = hasTeamAverage && ownEstimate !== null && partnerEstimate !== null
       ? `<div class="estimation-submissions single-team">
           ${renderEstimationTeamBox(
             game,
             ownTeam,
-            { partner: partnerEstimate },
+            { self: ownEstimate, partner: partnerEstimate },
             estimationDraft.teamAverage,
-            [partner]
+            [ownPlayer, partner]
           )}
         </div>`
       : "Euer Mittelwert wird berechnet…";
