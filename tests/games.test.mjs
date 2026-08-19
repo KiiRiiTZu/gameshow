@@ -182,7 +182,7 @@ test("ends Begriffsmatch early when the trailing team cannot catch up", () => {
   assert.equal(state.scores.blue, 1);
 });
 
-test("contains nine estimation questions and keeps the first question hidden until started", () => {
+test("contains fifteen estimation questions and keeps the first question hidden until started", () => {
   const state = createInitialRoomState("TEST");
   const participants = [
     { id: "b1", name: "B1", team: "blue" },
@@ -191,7 +191,7 @@ test("contains nine estimation questions and keeps the first question hidden unt
     { id: "r2", name: "R2", team: "red" }
   ];
 
-  assert.equal(ESTIMATION_QUESTIONS.length, 9);
+  assert.equal(ESTIMATION_QUESTIONS.length, 15);
   assert.equal(estimationGame.start(state, participants), true);
   assert.equal(state.game.status, "question-pending");
   assert.equal(state.game.questionPrompt, "");
@@ -207,6 +207,28 @@ test("parses comma decimals and negative estimates", () => {
   assert.equal(parseEstimate("1.700"), 1700);
   assert.equal(parseEstimate("1,2,3"), null);
   assert.equal(parseEstimate(""), null);
+});
+
+test("continues Mittelwert after a tied question without awarding a point", () => {
+  const state = createInitialRoomState("TEST");
+  const participants = [
+    { id: "b1", name: "B1", team: "blue" },
+    { id: "b2", name: "B2", team: "blue" },
+    { id: "r1", name: "R1", team: "red" },
+    { id: "r2", name: "R2", team: "red" }
+  ];
+
+  estimationGame.start(state, participants);
+  estimationGame.startQuestion(state, "Testfrage");
+  participants.forEach((item) => estimationGame.lockPlayer(state, item.id));
+  const estimates = { b1: 90, b2: 110, r1: 80, r2: 120 };
+  estimationGame.prepareRound(state, estimates);
+  estimationGame.revealRound(state, estimates, 100, "100");
+
+  assert.equal(state.game.revealed.roundWinner, null);
+  assert.deepEqual(state.game.roundScores, { blue: 0, red: 0 });
+  assert.equal(state.game.status, "revealed");
+  assert.equal(estimationGame.startNextQuestion(state, "Nächste Frage"), true);
 });
 
 test("scores estimation rounds from both team averages and finishes at five points", () => {

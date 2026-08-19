@@ -52,6 +52,42 @@ export const ESTIMATION_QUESTIONS = [
     answer: 51,
     answerDisplay: "51 kg",
     moderatorHint: ""
+  },
+  {
+    prompt: "Wie viele Kilometer misst der Äquator?",
+    answer: 40075,
+    answerDisplay: "40.075 km",
+    moderatorHint: ""
+  },
+  {
+    prompt: "Wie viele Zeitzonen hat Russland?",
+    answer: 11,
+    answerDisplay: "11 Zeitzonen",
+    moderatorHint: ""
+  },
+  {
+    prompt: "Wie lange dauerte der Bau des Kölner Doms?",
+    answer: 632,
+    answerDisplay: "632 Jahre",
+    moderatorHint: ""
+  },
+  {
+    prompt: "Wie lang war der längste nach wissenschaftlichen Methoden vermessene Blauwal?",
+    answer: 33.58,
+    answerDisplay: "33,58 m",
+    moderatorHint: ""
+  },
+  {
+    prompt: "Auf welcher Höhe hängt ein Basketballkorb?",
+    answer: 3.05,
+    answerDisplay: "3,05 m",
+    moderatorHint: ""
+  },
+  {
+    prompt: "In welchem Jahr wurde das erste Automobil erfunden?",
+    answer: 1886,
+    answerDisplay: "1886",
+    moderatorHint: ""
   }
 ];
 

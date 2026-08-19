@@ -1,5 +1,5 @@
 export const ESTIMATION_ROUNDS_TO_WIN = 5;
-export const ESTIMATION_ROUND_COUNT = 9;
+export const ESTIMATION_ROUND_COUNT = 15;
 
 export function parseEstimate(value) {
   const compact = String(value ?? "").trim().replaceAll(" ", "");
