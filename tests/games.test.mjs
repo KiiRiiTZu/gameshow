@@ -34,6 +34,12 @@ import {
 } from "../js/games/guess-the-price.js";
 import { PRICE_PRODUCTS } from "../js/games/guess-the-price-products.js";
 import {
+  ESTIMATION_ROUNDS_TO_WIN,
+  estimationGame,
+  parseEstimate
+} from "../js/games/estimation-game.js";
+import { ESTIMATION_QUESTIONS } from "../js/games/estimation-questions.js";
+import {
   createEncryptionKeyPair,
   decryptPrivatePayload,
   encryptPrivatePayload,
@@ -42,17 +48,72 @@ import {
 import { createInitialRoomState } from "../js/room.js";
 import { getGamePresentation } from "../js/game-effects.js";
 
-test("contains presentation cards for all five games", () => {
+test("contains presentation cards for all six games", () => {
   assert.deepEqual([
     "buzzer",
     "guess-the-price",
     "spotify-top-artists",
     "germany-map",
-    "matching-game"
-  ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5]);
+    "matching-game",
+    "estimation-game"
+  ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6]);
   assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");
   assert.equal(getGamePresentation("germany-map").name, "Kartenwissen");
   assert.equal(getGamePresentation("matching-game").name, "Da seh ich dich");
+  assert.equal(getGamePresentation("estimation-game").name, "Schätzfragen");
+});
+
+test("contains nine estimation questions and keeps the first question hidden until started", () => {
+  const state = createInitialRoomState("TEST");
+  const participants = [
+    { id: "b1", name: "B1", team: "blue" },
+    { id: "b2", name: "B2", team: "blue" },
+    { id: "r1", name: "R1", team: "red" },
+    { id: "r2", name: "R2", team: "red" }
+  ];
+
+  assert.equal(ESTIMATION_QUESTIONS.length, 9);
+  assert.equal(estimationGame.start(state, participants), true);
+  assert.equal(state.game.status, "question-pending");
+  assert.equal(state.game.questionPrompt, "");
+  assert.equal(estimationGame.startQuestion(state, ESTIMATION_QUESTIONS[0].prompt), true);
+  assert.equal(state.game.status, "guessing");
+  assert.equal(state.game.questionPrompt, ESTIMATION_QUESTIONS[0].prompt);
+});
+
+test("parses comma decimals and negative estimates", () => {
+  assert.equal(parseEstimate("12,5"), 12.5);
+  assert.equal(parseEstimate("-4,25"), -4.25);
+  assert.equal(parseEstimate("+3"), 3);
+  assert.equal(parseEstimate("1.700"), 1700);
+  assert.equal(parseEstimate("1,2,3"), null);
+  assert.equal(parseEstimate(""), null);
+});
+
+test("scores estimation rounds from both team averages and finishes at five points", () => {
+  const state = createInitialRoomState("TEST");
+  const participants = [
+    { id: "b1", name: "B1", team: "blue" },
+    { id: "b2", name: "B2", team: "blue" },
+    { id: "r1", name: "R1", team: "red" },
+    { id: "r2", name: "R2", team: "red" }
+  ];
+  estimationGame.start(state, participants);
+
+  for (let round = 0; round < ESTIMATION_ROUNDS_TO_WIN; round += 1) {
+    if (round === 0) estimationGame.startQuestion(state, `Frage ${round + 1}`);
+    else estimationGame.startNextQuestion(state, `Frage ${round + 1}`);
+    participants.forEach((item) => estimationGame.lockPlayer(state, item.id));
+    assert.equal(state.game.status, "ready-to-reveal");
+    estimationGame.revealRound(state, { b1: 90, b2: 110, r1: 0, r2: 40 }, 100, "100");
+    assert.equal(state.game.revealed.averages.blue, 100);
+    assert.equal(state.game.revealed.averages.red, 20);
+  }
+
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "blue");
+  assert.equal(state.game.roundScores.blue, 5);
+  assert.equal(state.scores.blue, 1);
 });
 
 test("finishes the buzzer game at 20 points with three points per correct answer", () => {
@@ -557,4 +618,21 @@ test("encrypts separate Kartenwissen notes for both teammates", async () => {
   assert.equal(JSON.stringify(encrypted).includes("Westen"), false);
   assert.equal(JSON.stringify(encrypted).includes("Süden"), false);
   assert.deepEqual(await decryptPrivatePayload(keyPair.privateKey, encrypted), payload);
+});
+
+test("encrypts an individual estimation without exposing it to teammates", async () => {
+  const keyPair = await createEncryptionKeyPair();
+  const otherKeyPair = await createEncryptionKeyPair();
+  const publicKey = await exportEncryptionPublicKey(keyPair.publicKey);
+  const payload = {
+    type: "lock",
+    playerId: "blue-1",
+    roundIndex: 3,
+    value: "-12,75"
+  };
+  const encrypted = await encryptPrivatePayload(publicKey, payload);
+
+  assert.equal(JSON.stringify(encrypted).includes("-12,75"), false);
+  assert.deepEqual(await decryptPrivatePayload(keyPair.privateKey, encrypted), payload);
+  await assert.rejects(() => decryptPrivatePayload(otherKeyPair.privateKey, encrypted));
 });

@@ -3,7 +3,8 @@ const GAME_PRESENTATIONS = {
   "guess-the-price": { number: 2, name: "Thrifty" },
   "spotify-top-artists": { number: 3, name: "Top 20" },
   "germany-map": { number: 4, name: "Kartenwissen" },
-  "matching-game": { number: 5, name: "Da seh ich dich" }
+  "matching-game": { number: 5, name: "Da seh ich dich" },
+  "estimation-game": { number: 6, name: "Schätzfragen" }
 };
 
 function removeEffect(selector) {

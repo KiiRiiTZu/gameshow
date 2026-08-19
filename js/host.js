@@ -31,6 +31,8 @@ import {
   parseEuroAmount
 } from "./games/guess-the-price.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
+import { estimationGame, parseEstimate } from "./games/estimation-game.js";
+import { ESTIMATION_QUESTIONS, getEstimationQuestion } from "./games/estimation-questions.js";
 import {
   createMatchingKeyPair,
   exportMatchingPublicKey
@@ -43,6 +45,7 @@ registerGame(top20Game);
 registerGame(germanyMapGame);
 registerGame(matchingGame);
 registerGame(guessThePriceGame);
+registerGame(estimationGame);
 
 let roomCode;
 let roomRecord;
@@ -57,6 +60,7 @@ let matchingPublicKey;
 let top20Notes = emptyTop20Notes();
 let mapNotes = emptyMapNotes();
 let priceDrafts = emptyPriceDrafts();
+let estimationDrafts = emptyEstimationDrafts();
 const pricePlayerKeys = new Map();
 let previousGameId = null;
 let previousBuzzerStatus = null;
@@ -81,6 +85,38 @@ function priceStorageKey() {
 
 function mapNotesStorageKey() {
   return `gameshow-map-notes-${roomRecord.id}`;
+}
+
+function estimationStorageKey() {
+  return `gameshow-estimation-drafts-${roomRecord.id}`;
+}
+
+function emptyEstimationDrafts(roundIndex = 0) {
+  return { roundIndex, values: {} };
+}
+
+function saveEstimationDrafts() {
+  try {
+    localStorage.setItem(estimationStorageKey(), JSON.stringify(estimationDrafts));
+  } catch (error) {
+    console.warn("Private estimation drafts could not be saved:", error);
+  }
+}
+
+function restoreEstimationDrafts() {
+  estimationDrafts = emptyEstimationDrafts(state.game.roundIndex);
+  try {
+    const saved = JSON.parse(localStorage.getItem(estimationStorageKey()));
+    if (!saved || saved.roundIndex !== state.game.roundIndex) return false;
+    for (const participant of state.game.participants || []) {
+      const value = String(saved.values?.[participant.id] || "").slice(0, 40);
+      if (value) estimationDrafts.values[participant.id] = value;
+    }
+    return true;
+  } catch (error) {
+    console.warn("Private estimation drafts could not be restored:", error);
+    return false;
+  }
 }
 
 function normalizePersonalNotes(value, legacyText = "", legacyUpdatedBy = null) {
@@ -323,6 +359,10 @@ async function initializeHost() {
     guessThePriceGame.normalize(state);
     restorePriceDrafts();
   }
+  if (state.game.id === estimationGame.id) {
+    estimationGame.normalize(state);
+    restoreEstimationDrafts();
+  }
 
   $("room-code").textContent = roomCode;
   hostMap = createGermanyMap($("host-germany-map"));
@@ -372,20 +412,23 @@ function render() {
   const mapIsActive = state.game.id === germanyMapGame.id;
   const matchingIsActive = state.game.id === matchingGame.id;
   const priceIsActive = state.game.id === guessThePriceGame.id;
+  const estimationIsActive = state.game.id === estimationGame.id;
   document.querySelector(".shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive
   );
   $("buzzer-game-panel").classList.toggle(
     "hidden",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive
   );
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
   $("map-game-panel").classList.toggle("hidden", !mapIsActive);
   $("matching-game-panel").classList.toggle("hidden", !matchingIsActive);
   $("price-game-panel").classList.toggle("hidden", !priceIsActive);
+  $("estimation-game-panel").classList.toggle("hidden", !estimationIsActive);
 
-  if (priceIsActive) renderPriceGame();
+  if (estimationIsActive) renderEstimationGame();
+  else if (priceIsActive) renderPriceGame();
   else if (matchingIsActive) renderMatchingGame();
   else if (mapIsActive) renderMapGame();
   else if (spotifyIsActive) renderSpotifyGame();
@@ -410,10 +453,93 @@ function getNextGameDefinition(gameId) {
     { id: guessThePriceGame.id, name: guessThePriceGame.name },
     { id: top20Game.id, name: top20Game.name },
     { id: germanyMapGame.id, name: germanyMapGame.name },
-    { id: matchingGame.id, name: matchingGame.name }
+    { id: matchingGame.id, name: matchingGame.name },
+    { id: estimationGame.id, name: estimationGame.name }
   ];
   const currentIndex = games.findIndex((game) => game.id === gameId);
   return currentIndex >= 0 ? games[currentIndex + 1] || null : null;
+}
+
+function formatEstimate(value) {
+  return Number(value).toLocaleString("de-DE", { maximumFractionDigits: 3 });
+}
+
+function renderEstimationGame() {
+  const game = state.game;
+  const question = getEstimationQuestion(game.roundIndex);
+  const isPending = game.status === "question-pending";
+  const isGuessing = game.status === "guessing";
+  const isReady = game.status === "ready-to-reveal";
+  const isRevealed = ["revealed", "finished"].includes(game.status);
+  const isFinished = game.status === "finished";
+
+  $("estimation-round-label").textContent =
+    `Frage ${game.roundIndex + 1} von ${ESTIMATION_QUESTIONS.length}`;
+  $("estimation-blue-score").textContent = game.roundScores.blue;
+  $("estimation-red-score").textContent = game.roundScores.red;
+  $("estimation-status").textContent = isPending
+    ? "Frage noch nicht gestartet"
+    : isGuessing ? "Spieler schätzen"
+      : isReady ? "Bereit zum Aufdecken"
+        : isFinished ? "Spiel beendet" : "Ergebnis aufgedeckt";
+  $("estimation-status").className = `status-pill ${isGuessing ? "open" : "closed"}`;
+
+  $("estimation-question-card").classList.toggle("hidden", isPending);
+  $("estimation-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
+  $("estimation-question").textContent = game.questionPrompt || question.prompt;
+  $("estimation-hint").textContent = question.moderatorHint;
+  $("estimation-hint").classList.toggle("hidden", !question.moderatorHint || isPending);
+  $("estimation-waiting").classList.toggle("hidden", !isPending);
+  $("estimation-submissions").classList.toggle("hidden", isPending);
+
+  $("estimation-submissions").innerHTML = ["blue", "red"].map((team) => {
+    const participants = game.participants.filter((item) => item.team === team);
+    return `
+      <article class="estimation-team ${team}">
+        <strong>${getTeamName(team)}</strong>
+        ${participants.map((item) => {
+          const locked = game.lockedPlayerIds.includes(item.id);
+          const revealedValue = game.revealed?.guesses?.[item.id];
+          const rawValue = estimationDrafts.values[item.id] || "";
+          const displayValue = revealedValue !== undefined
+            ? formatEstimate(revealedValue)
+            : rawValue || "Noch keine Eingabe";
+          return `<div class="estimation-player-entry">
+            <span>${escapeHtml(item.name)}</span>
+            <span class="${locked ? "locked" : ""}">${escapeHtml(displayValue)}${locked ? " · ✓" : ""}</span>
+          </div>`;
+        }).join("")}
+      </article>
+    `;
+  }).join("");
+
+  $("start-estimation-question").classList.toggle("hidden", !isPending);
+  $("start-estimation-question").textContent = game.roundIndex === 0
+    ? "Erste Frage starten" : "Frage starten";
+  $("start-estimation-question").disabled = moderatorActionPending;
+  $("reveal-estimation-round").classList.toggle("hidden", !isGuessing && !isReady);
+  $("reveal-estimation-round").disabled = moderatorActionPending || !isReady;
+  $("next-estimation-question").classList.toggle("hidden", !isRevealed || isFinished);
+  $("next-estimation-question").disabled = moderatorActionPending;
+  $("estimation-result").classList.toggle("hidden", !isRevealed);
+
+  if (!isRevealed) return;
+  const result = game.revealed;
+  const winnerText = result.roundWinner
+    ? `${getTeamName(result.roundWinner)} liegt mit dem Mittelwert näher.`
+    : "Beide Team-Mittelwerte sind gleich weit entfernt.";
+  const finalText = isFinished
+    ? game.winningTeam
+      ? `<p>🏆 ${getTeamName(game.winningTeam)} gewinnt Schätzfragen!</p>`
+      : "<p>Schätzfragen endet unentschieden.</p>"
+    : "";
+  $("estimation-result").innerHTML = `
+    <strong>Richtige Antwort: ${escapeHtml(result.answerDisplay)}</strong>
+    <span>Team Blau: Ø ${formatEstimate(result.averages.blue)} · Abstand ${formatEstimate(result.distances.blue)}</span><br>
+    <span>Team Rot: Ø ${formatEstimate(result.averages.red)} · Abstand ${formatEstimate(result.distances.red)}</span>
+    <p>${winnerText}</p>
+    ${finalText}
+  `;
 }
 
 function renderHostPersonalNotes(containerId, team, notes = {}) {
@@ -771,6 +897,8 @@ function renderMatchingGame() {
   $("reveal-matching-all").disabled = moderatorActionPending;
   $("next-matching-round").classList.toggle("hidden", game.status !== "round-finished");
   $("next-matching-round").disabled = moderatorActionPending;
+  $("start-estimation-game").classList.toggle("hidden", !isFinished);
+  $("start-estimation-game").disabled = moderatorActionPending;
   $("matching-round-result").classList.toggle("hidden", !result);
 
   if (result) {
@@ -848,6 +976,9 @@ async function broadcastState() {
   }
   if (state.game.id === germanyMapGame.id) {
     publicState.mapSubmissionKey = matchingPublicKey;
+  }
+  if (state.game.id === estimationGame.id) {
+    publicState.estimationSubmissionKey = matchingPublicKey;
   }
   await realtime.send("room_state", publicState);
 }
@@ -1004,6 +1135,73 @@ async function handlePriceKeyRegistration(payload) {
   if (state.game.id === top20Game.id) await sendTop20PrivateState(roomPlayer.id);
   if (state.game.id === germanyMapGame.id) await sendMapPrivateState(roomPlayer.id);
   if (state.game.id === guessThePriceGame.id) await sendPricePrivateState(roomPlayer.id);
+  if (state.game.id === estimationGame.id) await sendEstimationPrivateState(roomPlayer.id);
+}
+
+async function sendEstimationPrivateState(playerId) {
+  if (state.game.id !== estimationGame.id) return false;
+  const participant = state.game.participants?.find((item) => item.id === playerId);
+  const publicKey = pricePlayerKeys.get(playerId);
+  if (!participant || !publicKey) return false;
+  try {
+    const encrypted = await encryptPrivatePayload(publicKey, {
+      roundIndex: state.game.roundIndex,
+      value: estimationDrafts.values[playerId] || "",
+      locked: state.game.lockedPlayerIds.includes(playerId)
+    });
+    await realtime.send("estimation_private_state", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.warn("Private estimation state could not be encrypted:", error);
+    return false;
+  }
+}
+
+async function syncAllEstimationPlayers() {
+  await Promise.all((state.game.participants || []).map((item) =>
+    sendEstimationPrivateState(item.id)
+  ));
+}
+
+async function handleEstimationSubmission(payload) {
+  if (state.game.id !== estimationGame.id || state.game.status !== "guessing" ||
+      !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
+  const participant = state.game.participants.find((item) => item.id === payload.playerId);
+  if (!participant || state.game.lockedPlayerIds.includes(participant.id)) return;
+
+  try {
+    const submission = await decryptPrivatePayload(matchingKeyPair.privateKey, payload.encrypted);
+    const valid = submission?.playerId === participant.id &&
+      submission.roundIndex === state.game.roundIndex &&
+      ["draft", "lock"].includes(submission.type);
+    if (!valid) return;
+    const value = String(submission.value || "").slice(0, 40);
+    estimationDrafts.values[participant.id] = value;
+    saveEstimationDrafts();
+    render();
+
+    if (submission.type === "lock") {
+      if (parseEstimate(value) === null) {
+        await realtime.send("estimation_lock_result", {
+          playerId: participant.id,
+          accepted: false,
+          reason: "Bitte gib eine gültige Zahl ein."
+        });
+        await sendEstimationPrivateState(participant.id);
+        return;
+      }
+      const accepted = estimationGame.lockPlayer(state, participant.id);
+      await realtime.send("estimation_lock_result", {
+        playerId: participant.id,
+        accepted,
+        reason: accepted ? "" : "Die Schätzung konnte nicht eingeloggt werden."
+      });
+      if (accepted) await persistRenderAndBroadcast();
+    }
+    await sendEstimationPrivateState(participant.id);
+  } catch (error) {
+    console.warn("Encrypted estimation submission could not be processed:", error);
+  }
 }
 
 async function sendMapPrivateState(playerId) {
@@ -1145,6 +1343,11 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "estimation_private_submission") {
+    await handleEstimationSubmission(payload);
+    return;
+  }
+
   if (event === "map_pin") {
     const player = state.players.find((item) => item.id === payload.playerId);
     if (!player || !germanyMapGame.placePin(state, player.team, payload.position)) return;
@@ -1201,6 +1404,11 @@ $("force-next-game").addEventListener("click", async () => {
       "Für Da seh ich dich müssen zwei Spieler pro Team im Raum sein.";
     return;
   }
+  if (currentGameId === matchingGame.id && state.players.length !== 4) {
+    $("force-next-game-error").textContent =
+      "Für Schätzfragen müssen alle vier Spieler im Raum sein.";
+    return;
+  }
 
   const accepted = await runModeratorAction(() => {
     if (currentGameId === buzzerGame.id) {
@@ -1227,6 +1435,12 @@ $("force-next-game").addEventListener("click", async () => {
       saveMatchingAssignments();
       return true;
     }
+    if (currentGameId === matchingGame.id) {
+      if (!estimationGame.start(state, state.players)) return false;
+      estimationDrafts = emptyEstimationDrafts(0);
+      saveEstimationDrafts();
+      return true;
+    }
     return false;
   });
 
@@ -1238,6 +1452,7 @@ $("force-next-game").addEventListener("click", async () => {
   if (state.game.id === guessThePriceGame.id) await syncAllPriceTeams();
   if (state.game.id === top20Game.id) await syncAllTop20Teams();
   if (state.game.id === germanyMapGame.id) await syncAllMapTeams();
+  if (state.game.id === estimationGame.id) await syncAllEstimationPlayers();
 });
 
 $("open-buzzer").addEventListener("click", async () => {
@@ -1439,6 +1654,65 @@ $("reveal-matching-all").addEventListener("click", async () => {
 $("next-matching-round").addEventListener("click", async () => {
   $("matching-error").textContent = "";
   await runModeratorAction(() => matchingGame.startNextRound(state));
+});
+
+$("start-estimation-game").addEventListener("click", async () => {
+  $("matching-next-game-error").textContent = "";
+  if (state.players.length !== 4) {
+    $("matching-next-game-error").textContent =
+      "Für Schätzfragen müssen alle vier Spieler im Raum sein.";
+    return;
+  }
+  const accepted = await runModeratorAction(() => {
+    if (state.game.id !== matchingGame.id || state.game.status !== "finished") return false;
+    if (!estimationGame.start(state, state.players)) return false;
+    estimationDrafts = emptyEstimationDrafts(0);
+    saveEstimationDrafts();
+    return true;
+  });
+  if (accepted) await syncAllEstimationPlayers();
+});
+
+$("start-estimation-question").addEventListener("click", async () => {
+  $("estimation-error").textContent = "";
+  const question = getEstimationQuestion(state.game.roundIndex);
+  const accepted = await runModeratorAction(() =>
+    estimationGame.startQuestion(state, question.prompt)
+  );
+  if (accepted) await syncAllEstimationPlayers();
+});
+
+$("reveal-estimation-round").addEventListener("click", async () => {
+  $("estimation-error").textContent = "";
+  const estimates = {};
+  for (const participant of state.game.participants || []) {
+    const value = parseEstimate(estimationDrafts.values[participant.id]);
+    if (value === null) {
+      $("estimation-error").textContent = "Alle vier Spieler benötigen eine gültige Schätzung.";
+      return;
+    }
+    estimates[participant.id] = value;
+  }
+  const question = getEstimationQuestion(state.game.roundIndex);
+  await runModeratorAction(() => estimationGame.revealRound(
+    state,
+    estimates,
+    question.answer,
+    question.answerDisplay
+  ));
+});
+
+$("next-estimation-question").addEventListener("click", async () => {
+  $("estimation-error").textContent = "";
+  const nextRoundIndex = state.game.roundIndex + 1;
+  const question = getEstimationQuestion(nextRoundIndex);
+  const accepted = await runModeratorAction(() => {
+    if (!estimationGame.startNextQuestion(state, question.prompt)) return false;
+    estimationDrafts = emptyEstimationDrafts(nextRoundIndex);
+    saveEstimationDrafts();
+    return true;
+  });
+  if (accepted) await syncAllEstimationPlayers();
 });
 
 $("start-top20-game").addEventListener("click", async () => {

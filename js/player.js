@@ -15,6 +15,7 @@ import {
 } from "./games/matching-game.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
 import { formatEuroAmount, formatSignedEuroDifference, parseEuroAmount } from "./euro.js";
+import { ESTIMATION_ROUND_COUNT, parseEstimate } from "./games/estimation-game.js";
 import {
   createEncryptionKeyPair,
   decryptPrivatePayload,
@@ -28,6 +29,7 @@ const TOP_20_SLOT_COUNT = 20;
 const GERMANY_MAP_GAME_ID = "germany-map";
 const MATCHING_GAME_ID = "matching-game";
 const PRICE_GAME_ID = "guess-the-price";
+const ESTIMATION_GAME_ID = "estimation-game";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -59,6 +61,9 @@ let priceDraft = { roundIndex: -1, amount: "", comments: {}, locked: false };
 let priceAmountTimer = null;
 let priceCommentTimer = null;
 let priceSubmissionPending = false;
+let estimationDraft = { roundIndex: -1, value: "", locked: false };
+let estimationDraftTimer = null;
+let estimationSubmissionPending = false;
 let previousGameId = null;
 let previousBuzzerStatus = null;
 
@@ -303,6 +308,55 @@ $("lock-price-guess").addEventListener("click", async () => {
   }
 });
 
+async function sendEstimationSubmission(type = "draft") {
+  if (!player || roomState?.game?.id !== ESTIMATION_GAME_ID ||
+      roomState.game.status !== "guessing" || estimationDraft.locked ||
+      !roomState.estimationSubmissionKey) return false;
+  try {
+    const encrypted = await encryptPrivatePayload(roomState.estimationSubmissionKey, {
+      type,
+      playerId,
+      roundIndex: roomState.game.roundIndex,
+      value: estimationDraft.value
+    });
+    await realtime.send("estimation_private_submission", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.error("Private estimation could not be encrypted:", error);
+    $("player-estimation-error").textContent = "Die Schätzung konnte nicht synchronisiert werden.";
+    return false;
+  }
+}
+
+$("player-estimation-value").addEventListener("input", (event) => {
+  estimationDraft.value = event.currentTarget.value.slice(0, 40);
+  $("player-estimation-error").textContent = "";
+  clearTimeout(estimationDraftTimer);
+  estimationDraftTimer = setTimeout(() => void sendEstimationSubmission("draft"), 300);
+});
+
+$("player-estimation-value").addEventListener("blur", () => {
+  clearTimeout(estimationDraftTimer);
+  void sendEstimationSubmission("draft");
+});
+
+$("lock-estimation-value").addEventListener("click", async () => {
+  if (estimationSubmissionPending || parseEstimate(estimationDraft.value) === null) {
+    $("player-estimation-error").textContent =
+      "Bitte gib eine gültige Zahl ein, zum Beispiel 12,5 oder -4.";
+    return;
+  }
+  clearTimeout(estimationDraftTimer);
+  estimationSubmissionPending = true;
+  $("player-estimation-error").textContent = "Schätzung wird eingeloggt…";
+  renderEstimationGame();
+  const sent = await sendEstimationSubmission("lock");
+  if (!sent) {
+    estimationSubmissionPending = false;
+    renderEstimationGame();
+  }
+});
+
 async function handleEvent(event, payload) {
   if (event === "buzz_winner") {
     void playBuzzerSound();
@@ -404,11 +458,39 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "estimation_private_state" && payload.playerId === playerId &&
+      payload.encrypted && priceKeyPair?.privateKey) {
+    try {
+      const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
+      if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
+      const valueIsFocused = document.activeElement === $("player-estimation-value");
+      estimationDraft = {
+        roundIndex: privateState.roundIndex,
+        value: valueIsFocused ? estimationDraft.value : String(privateState.value || ""),
+        locked: Boolean(privateState.locked)
+      };
+      estimationSubmissionPending = false;
+      render();
+    } catch (error) {
+      console.warn("Private estimation state could not be decrypted:", error);
+    }
+    return;
+  }
+
   if (event === "price_lock_result" && payload.playerId === playerId) {
     priceSubmissionPending = false;
     $("player-price-error").textContent = payload.accepted
       ? "Euer Team-Preis ist eingeloggt."
       : payload.reason || "Der Preis konnte nicht eingeloggt werden.";
+    render();
+    return;
+  }
+
+  if (event === "estimation_lock_result" && payload.playerId === playerId) {
+    estimationSubmissionPending = false;
+    $("player-estimation-error").textContent = payload.accepted
+      ? "Deine Schätzung ist eingeloggt."
+      : payload.reason || "Die Schätzung konnte nicht eingeloggt werden.";
     render();
     return;
   }
@@ -440,6 +522,15 @@ async function handleEvent(event, payload) {
         };
       }
     }
+    if (roomState.game?.id === ESTIMATION_GAME_ID &&
+        estimationDraft.roundIndex !== roomState.game.roundIndex) {
+      estimationDraft = {
+        roundIndex: roomState.game.roundIndex,
+        value: "",
+        locked: roomState.game.lockedPlayerIds?.includes(playerId) || false
+      };
+      estimationSubmissionPending = false;
+    }
     render();
   }
 }
@@ -467,18 +558,25 @@ function render() {
   const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
   const matchingIsActive = roomState.game?.id === MATCHING_GAME_ID;
   const priceIsActive = roomState.game?.id === PRICE_GAME_ID;
+  const estimationIsActive = roomState.game?.id === ESTIMATION_GAME_ID;
   document.querySelector(".player-shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive
   );
   $("player-buzzer-game").classList.toggle(
     "hidden",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive
+    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive
   );
   $("player-spotify-game").classList.toggle("hidden", !spotifyIsActive);
   $("player-map-game").classList.toggle("hidden", !mapIsActive);
   $("player-matching-game").classList.toggle("hidden", !matchingIsActive);
   $("player-price-game").classList.toggle("hidden", !priceIsActive);
+  $("player-estimation-game").classList.toggle("hidden", !estimationIsActive);
+
+  if (estimationIsActive) {
+    renderEstimationGame();
+    return;
+  }
 
   if (priceIsActive) {
     renderPriceGame();
@@ -824,6 +922,80 @@ function renderPriceGame() {
       ? "Beratet euch und loggt euren gemeinsamen Preis ein."
       : "Die sichere Team-Verbindung wird aufgebaut…";
   }
+}
+
+function formatEstimate(value) {
+  return Number(value).toLocaleString("de-DE", { maximumFractionDigits: 3 });
+}
+
+function renderEstimationGame() {
+  const game = roomState.game;
+  const isPending = game.status === "question-pending";
+  const isGuessing = game.status === "guessing";
+  const isReady = game.status === "ready-to-reveal";
+  const isRevealed = ["revealed", "finished"].includes(game.status);
+  const locked = game.lockedPlayerIds?.includes(playerId) || estimationDraft.locked;
+  const editable = isGuessing && !locked && !estimationSubmissionPending;
+
+  $("player-estimation-round").textContent =
+    `Frage ${game.roundIndex + 1} von ${ESTIMATION_ROUND_COUNT}`;
+  $("player-estimation-blue-score").textContent = game.roundScores.blue;
+  $("player-estimation-red-score").textContent = game.roundScores.red;
+  $("player-estimation-question-card").classList.toggle("hidden", isPending);
+  $("player-estimation-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
+  $("player-estimation-question").textContent = game.questionPrompt || "";
+  $("player-estimation-waiting").classList.toggle("hidden", !isPending);
+  document.querySelector(".estimation-player-form").classList.toggle("hidden", isPending || isRevealed);
+  $("player-estimation-locks").classList.toggle("hidden", isPending || isRevealed);
+
+  const valueInput = $("player-estimation-value");
+  if (document.activeElement !== valueInput && valueInput.value !== estimationDraft.value) {
+    valueInput.value = estimationDraft.value;
+  }
+  valueInput.disabled = !editable;
+  $("lock-estimation-value").disabled = !editable || parseEstimate(estimationDraft.value) === null;
+  $("lock-estimation-value").textContent = estimationSubmissionPending
+    ? "Wird eingeloggt…"
+    : locked ? "Schätzung eingeloggt ✓" : "Schätzung einloggen";
+
+  $("player-estimation-locks").innerHTML = (game.participants || []).map((item) => {
+    const hasLocked = game.lockedPlayerIds?.includes(item.id);
+    return `<span class="${hasLocked ? "ready" : ""}">${escapeHtml(item.name)}: ${hasLocked ? "eingeloggt ✓" : "schätzt…"}</span>`;
+  }).join("");
+
+  if (isPending) {
+    $("player-estimation-result").textContent =
+      "Wartet darauf, dass der Moderator die Frage startet.";
+    return;
+  }
+  if (isRevealed) {
+    const result = game.revealed;
+    const individual = (game.participants || []).map((item) =>
+      `${escapeHtml(item.name)}: ${formatEstimate(result.guesses[item.id])}`
+    ).join(" · ");
+    const winnerText = result.roundWinner
+      ? `${getTeamName(result.roundWinner)} liegt näher.`
+      : "Beide Teams sind gleich weit entfernt.";
+    $("player-estimation-result").innerHTML = `
+      <strong>Richtige Antwort: ${escapeHtml(result.answerDisplay)}</strong><br>
+      ${individual}<br>
+      Team Blau: Ø ${formatEstimate(result.averages.blue)} · Team Rot: Ø ${formatEstimate(result.averages.red)}<br>
+      ${winnerText}
+      ${game.status === "finished"
+        ? game.winningTeam
+          ? `<br>🏆 ${getTeamName(game.winningTeam)} gewinnt Schätzfragen!`
+          : "<br>Schätzfragen endet unentschieden."
+        : ""}
+    `;
+    return;
+  }
+  $("player-estimation-result").textContent = isReady
+    ? "Alle vier Schätzungen sind eingeloggt. Der Moderator deckt gleich auf."
+    : locked
+      ? "Deine Schätzung ist eingeloggt. Warte auf die anderen Spieler."
+      : roomState.estimationSubmissionKey
+        ? "Gib deine persönliche Schätzung ohne Absprache ein."
+        : "Die sichere Verbindung wird aufgebaut…";
 }
 
 function getTeamName(team) {

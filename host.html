@@ -218,6 +218,7 @@
         <button id="complete-matching-turn" class="button secondary hidden">Nächste Spieler</button>
         <button id="reveal-matching-all" class="button primary hidden">Antworten aufdecken</button>
         <button id="next-matching-round" class="button primary hidden">Nächste Runde</button>
+        <button id="start-estimation-game" class="button primary hidden">Schätzfragen starten</button>
       </div>
       <p id="matching-next-game-error" class="error"></p>
     </section>
@@ -272,6 +273,42 @@
         <button id="reveal-price-round" class="button primary">Preis aufdecken &amp; auswerten</button>
         <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
         <button id="start-top20-game" class="button primary hidden">Top 20 starten</button>
+      </div>
+    </section>
+
+    <section id="estimation-game-panel" class="card game-panel hidden">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 6 · BEST OF 9</p>
+          <h2>Schätzfragen</h2>
+          <p id="estimation-round-label" class="muted">Frage 1 von 9</p>
+        </div>
+        <span id="estimation-status" class="status-pill closed">Frage noch nicht gestartet</span>
+      </div>
+
+      <div class="round-score" aria-label="Punktestand bei den Schätzfragen">
+        <span>Blau <strong id="estimation-blue-score">0</strong></span>
+        <span>Rundensiege</span>
+        <span><strong id="estimation-red-score">0</strong> Rot</span>
+      </div>
+
+      <div id="estimation-question-card" class="map-question-card hidden">
+        <span id="estimation-question-number" class="eyebrow">FRAGE 1</span>
+        <h3 id="estimation-question"></h3>
+        <p id="estimation-hint" class="moderator-hint hidden"></p>
+      </div>
+
+      <div id="estimation-waiting" class="player-message">
+        Starte die erste Frage, sobald alle Spieler bereit sind.
+      </div>
+      <div id="estimation-submissions" class="estimation-submissions"></div>
+      <div id="estimation-result" class="map-result hidden"></div>
+      <p id="estimation-error" class="error"></p>
+
+      <div class="controls">
+        <button id="start-estimation-question" class="button primary">Erste Frage starten</button>
+        <button id="reveal-estimation-round" class="button primary hidden">Antwort und Mittelwerte aufdecken</button>
+        <button id="next-estimation-question" class="button primary hidden">Nächste Frage starten</button>
       </div>
     </section>
 
