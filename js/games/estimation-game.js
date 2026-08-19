@@ -40,6 +40,7 @@ export const estimationGame = {
       participants: publicParticipants(participants),
       lockedPlayerIds: [],
       questionPrompt: "",
+      averages: null,
       revealed: null,
       roundResults: [],
       winningTeam: null,
@@ -64,6 +65,10 @@ export const estimationGame = {
       ? state.game.lockedPlayerIds.filter((id) => state.game.participants.some((item) => item.id === id))
       : [];
     state.game.questionPrompt = String(state.game.questionPrompt || "");
+    state.game.averages = state.game.averages &&
+      Number.isFinite(state.game.averages.blue) && Number.isFinite(state.game.averages.red)
+      ? { blue: Number(state.game.averages.blue), red: Number(state.game.averages.red) }
+      : null;
     state.game.roundResults = Array.isArray(state.game.roundResults)
       ? state.game.roundResults.slice(0, ESTIMATION_ROUND_COUNT) : [];
     state.game.revealed ||= null;
@@ -77,6 +82,7 @@ export const estimationGame = {
     state.game.status = "guessing";
     state.game.questionPrompt = String(prompt || "");
     state.game.lockedPlayerIds = [];
+    state.game.averages = null;
     state.game.revealed = null;
     return Boolean(state.game.questionPrompt);
   },
@@ -92,7 +98,7 @@ export const estimationGame = {
     return true;
   },
 
-  revealRound(state, estimates, answer, answerDisplay) {
+  prepareRound(state, estimates) {
     if (state.game.id !== this.id || state.game.status !== "ready-to-reveal") return false;
     const guesses = {};
     for (const participant of state.game.participants) {
@@ -108,6 +114,15 @@ export const estimationGame = {
         .map((item) => guesses[item.id]);
       averages[team] = (teamValues[0] + teamValues[1]) / 2;
     }
+    state.game.averages = averages;
+    return true;
+  },
+
+  revealRound(state, answer, answerDisplay) {
+    if (state.game.id !== this.id || state.game.status !== "ready-to-reveal" ||
+        !Number.isFinite(state.game.averages?.blue) ||
+        !Number.isFinite(state.game.averages?.red) || !Number.isFinite(answer)) return false;
+    const averages = state.game.averages;
     const distances = {
       blue: Math.abs(averages.blue - answer),
       red: Math.abs(averages.red - answer)
@@ -116,7 +131,7 @@ export const estimationGame = {
       ? null : distances.blue < distances.red ? "blue" : "red";
     if (roundWinner) state.game.roundScores[roundWinner] += 1;
 
-    state.game.revealed = { answer, answerDisplay, guesses, averages, distances, roundWinner };
+    state.game.revealed = { answer, answerDisplay, averages, distances, roundWinner };
     state.game.roundResults[state.game.roundIndex] = structuredClone(state.game.revealed);
 
     const reachedWinningScore = roundWinner &&
@@ -140,6 +155,7 @@ export const estimationGame = {
     state.game.status = "question-pending";
     state.game.questionPrompt = "";
     state.game.lockedPlayerIds = [];
+    state.game.averages = null;
     state.game.revealed = null;
     return this.startQuestion(state, prompt);
   }

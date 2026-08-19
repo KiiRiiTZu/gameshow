@@ -42,6 +42,7 @@ import { ESTIMATION_QUESTIONS } from "../js/games/estimation-questions.js";
 import {
   WORD_MATCH_CATEGORIES,
   WORD_MATCH_PHASE_SECONDS,
+  WORD_MATCH_SEED_SECONDS,
   WORD_MATCH_TERM_COUNT,
   getWordMatchRoles,
   wordMatchGame
@@ -72,7 +73,7 @@ test("contains presentation cards for all seven games", () => {
   assert.equal(getGamePresentation("word-match-game").name, "Begriffsmatch");
 });
 
-test("alternates Begriffsmatch roles and starts each phase with 60 seconds", () => {
+test("alternates Begriffsmatch roles with 80 seconds to write and 60 seconds to guess", () => {
   const state = createInitialRoomState("TEST");
   const participants = [
     { id: "b1", name: "B1", team: "blue" },
@@ -85,7 +86,7 @@ test("alternates Begriffsmatch roles and starts each phase with 60 seconds", () 
   assert.equal(roles.seeders.blue.id, "b1");
   assert.equal(roles.guessers.blue.id, "b2");
   assert.equal(wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[0], 1_000), true);
-  assert.equal(state.game.phaseEndsAt, 1_000 + WORD_MATCH_PHASE_SECONDS * 1000);
+  assert.equal(state.game.phaseEndsAt, 1_000 + WORD_MATCH_SEED_SECONDS * 1000);
   wordMatchGame.lockSeeder(state, "b1");
   wordMatchGame.lockSeeder(state, "r1");
   assert.equal(state.game.status, "blue-guess-pending");
@@ -172,9 +173,15 @@ test("scores estimation rounds from both team averages and finishes at five poin
     else estimationGame.startNextQuestion(state, `Frage ${round + 1}`);
     participants.forEach((item) => estimationGame.lockPlayer(state, item.id));
     assert.equal(state.game.status, "ready-to-reveal");
-    estimationGame.revealRound(state, { b1: 90, b2: 110, r1: 0, r2: 40 }, 100, "100");
+    assert.equal(
+      estimationGame.prepareRound(state, { b1: 90, b2: 110, r1: 0, r2: 40 }),
+      true
+    );
+    assert.deepEqual(state.game.averages, { blue: 100, red: 20 });
+    estimationGame.revealRound(state, 100, "100");
     assert.equal(state.game.revealed.averages.blue, 100);
     assert.equal(state.game.revealed.averages.red, 20);
+    assert.equal("guesses" in state.game.revealed, false);
   }
 
   assert.equal(state.game.status, "finished");

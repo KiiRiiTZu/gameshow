@@ -19,6 +19,7 @@ import { ESTIMATION_ROUND_COUNT, parseEstimate } from "./games/estimation-game.j
 import {
   WORD_MATCH_CATEGORIES,
   WORD_MATCH_PHASE_SECONDS,
+  WORD_MATCH_SEED_SECONDS,
   WORD_MATCH_TERM_COUNT,
   getWordMatchRoles
 } from "./games/word-match-game.js";
@@ -1040,6 +1041,7 @@ function renderEstimationGame() {
   const isGuessing = game.status === "guessing";
   const isReady = game.status === "ready-to-reveal";
   const isRevealed = ["revealed", "finished"].includes(game.status);
+  const hasAverages = Number.isFinite(game.averages?.blue) && Number.isFinite(game.averages?.red);
   const locked = game.lockedPlayerIds?.includes(playerId) || estimationDraft.locked;
   const editable = isGuessing && !locked && !estimationSubmissionPending;
 
@@ -1051,8 +1053,8 @@ function renderEstimationGame() {
   $("player-estimation-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
   $("player-estimation-question").textContent = game.questionPrompt || "";
   $("player-estimation-waiting").classList.toggle("hidden", !isPending);
-  document.querySelector(".estimation-player-form").classList.toggle("hidden", isPending || isRevealed);
-  $("player-estimation-locks").classList.toggle("hidden", isPending || isRevealed);
+  document.querySelector(".estimation-player-form").classList.toggle("hidden", isPending || isReady || isRevealed);
+  $("player-estimation-locks").classList.toggle("hidden", isPending || isReady || isRevealed);
 
   const valueInput = $("player-estimation-value");
   if (document.activeElement !== valueInput && valueInput.value !== estimationDraft.value) {
@@ -1076,15 +1078,11 @@ function renderEstimationGame() {
   }
   if (isRevealed) {
     const result = game.revealed;
-    const individual = (game.participants || []).map((item) =>
-      `${escapeHtml(item.name)}: ${formatEstimate(result.guesses[item.id])}`
-    ).join(" · ");
     const winnerText = result.roundWinner
       ? `${getTeamName(result.roundWinner)} liegt näher.`
       : "Beide Teams sind gleich weit entfernt.";
     $("player-estimation-result").innerHTML = `
       <strong>Richtige Antwort: ${escapeHtml(result.answerDisplay)}</strong><br>
-      ${individual}<br>
       Team Blau: Ø ${formatEstimate(result.averages.blue)} · Team Rot: Ø ${formatEstimate(result.averages.red)}<br>
       ${winnerText}
       ${game.status === "finished"
@@ -1095,9 +1093,15 @@ function renderEstimationGame() {
     `;
     return;
   }
-  $("player-estimation-result").textContent = isReady
-    ? "Alle vier Schätzungen sind eingeloggt. Der Moderator deckt gleich auf."
-    : locked
+  if (isReady) {
+    $("player-estimation-result").innerHTML = hasAverages
+      ? `<strong>Alle vier Schätzungen sind eingeloggt.</strong><br>
+        Team Blau: Ø ${formatEstimate(game.averages.blue)} · Team Rot: Ø ${formatEstimate(game.averages.red)}<br>
+        Der Moderator deckt gleich die richtige Antwort auf.`
+      : "Die Team-Mittelwerte werden berechnet…";
+    return;
+  }
+  $("player-estimation-result").textContent = locked
       ? "Deine Schätzung ist eingeloggt. Warte auf die anderen Spieler."
       : roomState.estimationSubmissionKey
         ? "Gib deine persönliche Schätzung ohne Absprache ein."
@@ -1105,7 +1109,11 @@ function renderEstimationGame() {
 }
 
 function wordMatchSecondsRemaining() {
-  if (!roomState?.game?.phaseEndsAt) return WORD_MATCH_PHASE_SECONDS;
+  if (!roomState?.game?.phaseEndsAt) {
+    return ["round-pending", "seed-collecting"].includes(roomState?.game?.status)
+      ? WORD_MATCH_SEED_SECONDS
+      : WORD_MATCH_PHASE_SECONDS;
+  }
   return Math.max(0, Math.ceil((roomState.game.phaseEndsAt - Date.now()) / 1000));
 }
 
@@ -1145,24 +1153,21 @@ function renderWordMatchGame() {
   const isGuesser = roles.guessers[ownTeam]?.id === playerId;
   const activeSeeder = game.status === "seed-collecting" && isSeeder;
   const activeGuesser = game.status === `${ownTeam}-guessing` && isGuesser;
-  const categoryVisible = activeSeeder || activeGuesser;
+  const seederTermsVisible = isSeeder && [
+    "seed-collecting", "blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing"
+  ].includes(game.status);
+  const categoryVisible = seederTermsVisible || activeGuesser;
   const locked = game.lockedSeederIds.includes(playerId) || wordMatchDraft.locked;
   const editable = activeSeeder && !locked && !wordMatchSubmissionPending;
-  const roundInProgress = [
-    "blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing"
-  ].includes(game.status);
-
   $("player-word-match-round").textContent =
     `Runde ${game.roundIndex + 1} von ${WORD_MATCH_CATEGORIES.length}`;
-  $("player-word-match-blue-score").textContent =
-    game.scores.blue + (roundInProgress ? game.currentMatches.blue.length : 0);
-  $("player-word-match-red-score").textContent =
-    game.scores.red + (roundInProgress ? game.currentMatches.red.length : 0);
+  $("player-word-match-blue-score").textContent = game.scores.blue;
+  $("player-word-match-red-score").textContent = game.scores.red;
   $("player-word-match-category-card").classList.toggle("hidden", !categoryVisible);
   $("player-word-match-category").textContent = categoryVisible ? game.category : "";
   updatePlayerWordMatchTimer();
 
-  $("player-word-seed-form").classList.toggle("hidden", !activeSeeder);
+  $("player-word-seed-form").classList.toggle("hidden", !seederTermsVisible);
   renderWordFields(editable);
   $("lock-word-list").disabled = !editable;
   $("lock-word-list").textContent = wordMatchSubmissionPending
@@ -1182,7 +1187,7 @@ function renderWordMatchGame() {
   const messages = {
     "round-pending": "Wartet darauf, dass der Moderator die Listenphase startet.",
     "seed-collecting": activeSeeder
-      ? "Trage bis zu zehn Begriffe ein. Leere Felder sind erlaubt."
+      ? "Trage bis zu zehn Begriffe ein."
       : `${roles.seeders.blue?.name} und ${roles.seeders.red?.name} erstellen ihre Listen.`,
     "blue-guess-pending": `Wartet auf den Start von ${roles.guessers.blue?.name}.`,
     "blue-guessing": activeGuesser

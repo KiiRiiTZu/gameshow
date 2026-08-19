@@ -1,6 +1,7 @@
 export const WORD_MATCH_CATEGORIES = ["Sage", "Frühstück", "Golf", "Ascent"];
 export const WORD_MATCH_TERM_COUNT = 10;
 export const WORD_MATCH_PHASE_SECONDS = 60;
+export const WORD_MATCH_SEED_SECONDS = 80;
 
 function emptyScores() {
   return { blue: 0, red: 0 };
@@ -113,7 +114,7 @@ export const wordMatchGame = {
     state.game.category = String(category || "");
     state.game.lockedSeederIds = [];
     state.game.currentMatches = emptyMatches();
-    state.game.phaseEndsAt = now + WORD_MATCH_PHASE_SECONDS * 1000;
+    state.game.phaseEndsAt = now + WORD_MATCH_SEED_SECONDS * 1000;
     return Boolean(state.game.category);
   },
 

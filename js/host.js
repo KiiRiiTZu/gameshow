@@ -36,6 +36,7 @@ import { ESTIMATION_QUESTIONS, getEstimationQuestion } from "./games/estimation-
 import {
   WORD_MATCH_CATEGORIES,
   WORD_MATCH_PHASE_SECONDS,
+  WORD_MATCH_SEED_SECONDS,
   WORD_MATCH_TERM_COUNT,
   getWordMatchRoles,
   wordMatchGame
@@ -528,6 +529,7 @@ function renderEstimationGame() {
   const isReady = game.status === "ready-to-reveal";
   const isRevealed = ["revealed", "finished"].includes(game.status);
   const isFinished = game.status === "finished";
+  const hasAverages = Number.isFinite(game.averages?.blue) && Number.isFinite(game.averages?.red);
 
   $("estimation-round-label").textContent =
     `Frage ${game.roundIndex + 1} von ${ESTIMATION_QUESTIONS.length}`;
@@ -555,11 +557,8 @@ function renderEstimationGame() {
         <strong>${getTeamName(team)}</strong>
         ${participants.map((item) => {
           const locked = game.lockedPlayerIds.includes(item.id);
-          const revealedValue = game.revealed?.guesses?.[item.id];
           const rawValue = estimationDrafts.values[item.id] || "";
-          const displayValue = revealedValue !== undefined
-            ? formatEstimate(revealedValue)
-            : rawValue || "Noch keine Eingabe";
+          const displayValue = rawValue || "Noch keine Eingabe";
           return `<div class="estimation-player-entry">
             <span>${escapeHtml(item.name)}</span>
             <span class="${locked ? "locked" : ""}">${escapeHtml(displayValue)}${locked ? " · ✓" : ""}</span>
@@ -574,13 +573,21 @@ function renderEstimationGame() {
     ? "Erste Frage starten" : "Frage starten";
   $("start-estimation-question").disabled = moderatorActionPending;
   $("reveal-estimation-round").classList.toggle("hidden", !isGuessing && !isReady);
-  $("reveal-estimation-round").disabled = moderatorActionPending || !isReady;
+  $("reveal-estimation-round").disabled = moderatorActionPending || !isReady || !hasAverages;
   $("next-estimation-question").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-estimation-question").disabled = moderatorActionPending;
   $("start-word-match-game").classList.toggle("hidden", !isFinished);
   $("start-word-match-game").disabled = moderatorActionPending;
-  $("estimation-result").classList.toggle("hidden", !isRevealed);
+  $("estimation-result").classList.toggle("hidden", !isReady && !isRevealed);
 
+  if (isReady) {
+    $("estimation-result").innerHTML = hasAverages
+      ? `<strong>Team-Mittelwerte</strong>
+        <span>Team Blau: Ø ${formatEstimate(game.averages.blue)}</span><br>
+        <span>Team Rot: Ø ${formatEstimate(game.averages.red)}</span>`
+      : "<strong>Mittelwerte werden berechnet…</strong>";
+    return;
+  }
   if (!isRevealed) return;
   const result = game.revealed;
   const winnerText = result.roundWinner
@@ -601,7 +608,11 @@ function renderEstimationGame() {
 }
 
 function wordMatchSecondsRemaining() {
-  if (!state.game.phaseEndsAt) return WORD_MATCH_PHASE_SECONDS;
+  if (!state.game.phaseEndsAt) {
+    return ["round-pending", "seed-collecting"].includes(state.game.status)
+      ? WORD_MATCH_SEED_SECONDS
+      : WORD_MATCH_PHASE_SECONDS;
+  }
   return Math.max(0, Math.ceil((state.game.phaseEndsAt - Date.now()) / 1000));
 }
 
@@ -622,18 +633,10 @@ function renderWordMatchGame() {
   const isSeedCollecting = game.status === "seed-collecting";
   const isRoundFinished = game.status === "round-finished";
   const isFinished = game.status === "finished";
-  const roundInProgress = [
-    "blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing"
-  ].includes(game.status);
-  const visibleScores = {
-    blue: game.scores.blue + (roundInProgress ? game.currentMatches.blue.length : 0),
-    red: game.scores.red + (roundInProgress ? game.currentMatches.red.length : 0)
-  };
-
   $("word-match-round-label").textContent =
     `Runde ${game.roundIndex + 1} von ${WORD_MATCH_CATEGORIES.length}`;
-  $("word-match-blue-score").textContent = visibleScores.blue;
-  $("word-match-red-score").textContent = visibleScores.red;
+  $("word-match-blue-score").textContent = game.scores.blue;
+  $("word-match-red-score").textContent = game.scores.red;
   $("word-match-category").textContent = category;
   $("word-match-roles").textContent =
     `${roles.seeders.blue?.name || "Blau fehlt"} und ${roles.seeders.red?.name || "Rot fehlt"} schreiben · ` +
@@ -1144,6 +1147,10 @@ async function broadcastState() {
   }
   if (state.game.id === wordMatchGame.id) {
     publicState.wordMatchSubmissionKey = matchingPublicKey;
+    if (["blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing"]
+      .includes(state.game.status)) {
+      publicState.game.currentMatches = { blue: [], red: [] };
+    }
   }
   await realtime.send("room_state", publicState);
 }
@@ -1416,6 +1423,25 @@ async function handleEstimationSubmission(payload) {
         return;
       }
       const accepted = estimationGame.lockPlayer(state, participant.id);
+      if (accepted && state.game.status === "ready-to-reveal") {
+        const estimates = {};
+        for (const item of state.game.participants) {
+          const estimate = parseEstimate(estimationDrafts.values[item.id]);
+          if (estimate === null) {
+            state.game.status = "guessing";
+            state.game.lockedPlayerIds = state.game.lockedPlayerIds.filter((id) => id !== participant.id);
+            await realtime.send("estimation_lock_result", {
+              playerId: participant.id,
+              accepted: false,
+              reason: "Die Mittelwerte konnten nicht berechnet werden."
+            });
+            await sendEstimationPrivateState(participant.id);
+            return;
+          }
+          estimates[item.id] = estimate;
+        }
+        estimationGame.prepareRound(state, estimates);
+      }
       await realtime.send("estimation_lock_result", {
         playerId: participant.id,
         accepted,
@@ -1926,19 +1952,9 @@ $("start-estimation-question").addEventListener("click", async () => {
 
 $("reveal-estimation-round").addEventListener("click", async () => {
   $("estimation-error").textContent = "";
-  const estimates = {};
-  for (const participant of state.game.participants || []) {
-    const value = parseEstimate(estimationDrafts.values[participant.id]);
-    if (value === null) {
-      $("estimation-error").textContent = "Alle vier Spieler benötigen eine gültige Schätzung.";
-      return;
-    }
-    estimates[participant.id] = value;
-  }
   const question = getEstimationQuestion(state.game.roundIndex);
   await runModeratorAction(() => estimationGame.revealRound(
     state,
-    estimates,
     question.answer,
     question.answerDisplay
   ));
