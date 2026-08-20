@@ -6,63 +6,64 @@ export const MATCHING_ASSIGNERS = [
 ];
 
 export const MATCHING_TURNS = [
-  { playerIndex: 0, label: "Spieler 1" },
-  { playerIndex: 1, label: "Spieler 2" }
+  { playerIndex: 0, label: "Spieler 1 beider Teams", team: null, assignerIndexes: [0, 1] },
+  { playerIndex: 1, label: "Spieler 2 · Team Blau", team: "blue", assignerIndexes: [2] },
+  { playerIndex: 1, label: "Spieler 2 · Team Rot", team: "red", assignerIndexes: [3] }
 ];
 
-export function getMatchingRoundTeam(roundIndex) {
-  return Number(roundIndex) % 2 === 0 ? "blue" : "red";
-}
-
 export function getMatchingTurn(roundIndex, activeTurnIndex) {
-  const team = getMatchingRoundTeam(roundIndex);
-  const turnIndex = Math.min(Math.max(Number(activeTurnIndex) || 0, 0), 1);
-  const playerIndex = MATCHING_TURNS[turnIndex].playerIndex;
-  const assignerIndex = team === "blue" ? playerIndex * 2 : playerIndex * 2 + 1;
-  return { ...MATCHING_TURNS[turnIndex], team, assignerIndex };
+  const turnIndex = Math.min(
+    Math.max(Number(activeTurnIndex) || 0, 0),
+    MATCHING_TURNS.length - 1
+  );
+  const turn = MATCHING_TURNS[turnIndex];
+  return {
+    ...turn,
+    assignerIndex: turn.assignerIndexes.length === 1 ? turn.assignerIndexes[0] : null
+  };
 }
 
-const IMAGE_ROOT = "./assets/images/matching%20game";
+const IMAGE_ROOT = "./assets/images/da%20seh%20ich%20dich";
 
 export const MATCHING_GAME_ROUNDS = [
   {
-    id: "valowaffen",
-    title: "Valorant-Waffen",
+    id: "autos",
+    title: "Autos",
     images: [
-      { id: "classic", label: "Classic", src: `${IMAGE_ROOT}/valowaffen/Classic.webp` },
-      { id: "frenzy", label: "Frenzy", src: `${IMAGE_ROOT}/valowaffen/Frenzy.webp` },
-      { id: "ghost", label: "Ghost", src: `${IMAGE_ROOT}/valowaffen/Ghost.webp` },
-      { id: "sheriff", label: "Sheriff", src: `${IMAGE_ROOT}/valowaffen/Sheriff.webp` },
+      { id: "audi", label: "Audi", src: `${IMAGE_ROOT}/autos/audi.webp` },
+      { id: "cybertruck", label: "Cybertruck", src: `${IMAGE_ROOT}/autos/cybertruck.webp` },
+      { id: "fiat-panda", label: "Fiat Panda", src: `${IMAGE_ROOT}/autos/Fiat%20Panda.webp` },
+      { id: "lambo", label: "Lamborghini", src: `${IMAGE_ROOT}/autos/lambo.webp` }
     ]
   },
   {
-    id: "essen",
-    title: "Essen",
+    id: "laender",
+    title: "Länder",
     images: [
-      { id: "salat", label: "Salat", src: `${IMAGE_ROOT}/essen/salat.webp` },
-      { id: "steak", label: "Steak", src: `${IMAGE_ROOT}/essen/steak.webp` },
-      { id: "sushi", label: "Sushi", src: `${IMAGE_ROOT}/essen/sushi.webp` },
-      { id: "tacos", label: "Tacos", src: `${IMAGE_ROOT}/essen/tacos.webp` }
+      { id: "amerika", label: "Amerika", src: `${IMAGE_ROOT}/l%C3%A4nder/amerika.webp` },
+      { id: "frankreich", label: "Frankreich", src: `${IMAGE_ROOT}/l%C3%A4nder/frankreich.webp` },
+      { id: "mexiko", label: "Mexiko", src: `${IMAGE_ROOT}/l%C3%A4nder/mexiko.webp` },
+      { id: "tokio", label: "Tokio", src: `${IMAGE_ROOT}/l%C3%A4nder/tokio.webp` }
     ]
   },
   {
-    id: "haustiere",
-    title: "Haustiere",
+    id: "unterkunft",
+    title: "Unterkunft",
     images: [
-      { id: "hund", label: "Hund", src: `${IMAGE_ROOT}/haustiere/hund.webp` },
-      { id: "katze", label: "Katze", src: `${IMAGE_ROOT}/haustiere/katze.webp` },
-      { id: "schildkroete", label: "Schildkröte", src: `${IMAGE_ROOT}/haustiere/schildkroete.webp` },
-      { id: "wiesel", label: "Wiesel", src: `${IMAGE_ROOT}/haustiere/wiesel.webp` }
+      { id: "baumhaus", label: "Baumhaus", src: `${IMAGE_ROOT}/unterkunft/baumhaus.webp` },
+      { id: "bunt", label: "Bunt", src: `${IMAGE_ROOT}/unterkunft/bunt.webp` },
+      { id: "modern", label: "Modern", src: `${IMAGE_ROOT}/unterkunft/modern.webp` },
+      { id: "wohnwagen", label: "Wohnwagen", src: `${IMAGE_ROOT}/unterkunft/wohnwagen.webp` }
     ]
   },
   {
-    id: "setups",
-    title: "Gaming-Setups",
+    id: "valo-maps",
+    title: "Valorant-Maps",
     images: [
-      { id: "cheap", label: "Budget", src: `${IMAGE_ROOT}/setups/cheap.webp` },
-      { id: "rgb", label: "RGB", src: `${IMAGE_ROOT}/setups/rgb.webp` },
-      { id: "pink", label: "Pink", src: `${IMAGE_ROOT}/setups/pink.webp` },
-      { id: "work", label: "Work", src: `${IMAGE_ROOT}/setups/work.webp` }
+      { id: "abyss", label: "Abyss", src: `${IMAGE_ROOT}/valo%20maps/abyss.webp` },
+      { id: "breeze", label: "Breeze", src: `${IMAGE_ROOT}/valo%20maps/breeze.webp` },
+      { id: "fracture", label: "Fracture", src: `${IMAGE_ROOT}/valo%20maps/fracture.webp` },
+      { id: "icebox", label: "Icebox", src: `${IMAGE_ROOT}/valo%20maps/icebox.webp` }
     ]
   }
 ];
@@ -75,16 +76,14 @@ function emptyRevealedAssignments() {
   return { blue: null, red: null };
 }
 
-function remainingMatchingPoints(roundIndex, team) {
-  return MATCHING_GAME_ROUNDS
-    .slice(Number(roundIndex) + 1)
-    .filter((_, offset) => getMatchingRoundTeam(Number(roundIndex) + 1 + offset) === team)
-    .length * 4;
+function remainingMatchingPoints(roundIndex) {
+  return Math.max(MATCHING_GAME_ROUNDS.length - Number(roundIndex) - 1, 0) * 4;
 }
 
 function clinchedMatchingTeam(game) {
-  const blueMaximum = game.scores.blue + remainingMatchingPoints(game.roundIndex, "blue");
-  const redMaximum = game.scores.red + remainingMatchingPoints(game.roundIndex, "red");
+  const remainingPoints = remainingMatchingPoints(game.roundIndex);
+  const blueMaximum = game.scores.blue + remainingPoints;
+  const redMaximum = game.scores.red + remainingPoints;
   if (game.scores.blue > redMaximum) return "blue";
   if (game.scores.red > blueMaximum) return "red";
   return null;
@@ -142,8 +141,8 @@ export const matchingGame = {
       status: "assigning",
       roundIndex: 0,
       activeTurnIndex: 0,
-      activeTeam: "blue",
       turnSubmitted: false,
+      submittedTeams: { blue: false, red: false },
       revealedTeams: { blue: false, red: false },
       revealedAssignments: emptyRevealedAssignments(),
       scores: emptyScores(),
@@ -154,7 +153,7 @@ export const matchingGame = {
         team: player.team
       })),
       winningTeam: null,
-      scoreSystemVersion: 2
+      scoreSystemVersion: 3
     };
     return true;
   },
@@ -171,9 +170,12 @@ export const matchingGame = {
       MATCHING_TURNS.length - 1
     );
     delete state.game.activeAssignerIndex;
-    state.game.activeTeam = getMatchingRoundTeam(state.game.roundIndex);
     state.game.turnSubmitted = Boolean(state.game.turnSubmitted);
-    delete state.game.submittedTeams;
+    state.game.submittedTeams = {
+      blue: Boolean(state.game.submittedTeams?.blue),
+      red: Boolean(state.game.submittedTeams?.red)
+    };
+    delete state.game.activeTeam;
     state.game.revealedTeams = {
       blue: Boolean(state.game.revealedTeams?.blue),
       red: Boolean(state.game.revealedTeams?.red)
@@ -195,13 +197,22 @@ export const matchingGame = {
       ? state.game.assignerOrder.slice(0, MATCHING_ASSIGNERS.length)
       : [];
     state.game.winningTeam ||= null;
-    state.game.scoreSystemVersion = 2;
+    state.game.scoreSystemVersion = 3;
     return true;
   },
 
   submitTeam(state, team) {
     if (state.game.id !== this.id || state.game.status !== "assigning") return false;
-    if (team !== getMatchingRoundTeam(state.game.roundIndex) || state.game.turnSubmitted) return false;
+    if (!["blue", "red"].includes(team)) return false;
+
+    if (state.game.activeTurnIndex === 0) {
+      if (state.game.submittedTeams[team]) return false;
+      state.game.submittedTeams[team] = true;
+      return true;
+    }
+
+    const turn = getMatchingTurn(state.game.roundIndex, state.game.activeTurnIndex);
+    if (team !== turn.team || state.game.turnSubmitted) return false;
 
     state.game.turnSubmitted = true;
     return true;
@@ -209,7 +220,9 @@ export const matchingGame = {
 
   completeTurn(state) {
     if (state.game.id !== this.id || state.game.status !== "assigning") return false;
-    if (!state.game.turnSubmitted) return false;
+    if (state.game.activeTurnIndex === 0) {
+      if (!state.game.submittedTeams.blue || !state.game.submittedTeams.red) return false;
+    } else if (!state.game.turnSubmitted) return false;
 
     if (state.game.activeTurnIndex < MATCHING_TURNS.length - 1) {
       state.game.activeTurnIndex += 1;
@@ -222,22 +235,27 @@ export const matchingGame = {
     return true;
   },
 
-  revealTeam(state, team, teamAssignments) {
+  revealAll(state, assignments) {
     if (state.game.id !== this.id || state.game.status !== "ready-to-reveal") return false;
-    if (team !== getMatchingRoundTeam(state.game.roundIndex) || state.game.revealedTeams[team]) return false;
-    if (!Array.isArray(teamAssignments) || teamAssignments.length !== 4 ||
-        teamAssignments.some((pair) => !Array.isArray(pair) || pair.length !== 2 ||
-          pair.some((value) => !String(value || "").trim()))) return false;
+    for (const team of ["blue", "red"]) {
+      const teamAssignments = assignments?.[team];
+      if (!Array.isArray(teamAssignments) || teamAssignments.length !== 4 ||
+          teamAssignments.some((pair) => !Array.isArray(pair) || pair.length !== 2 ||
+            pair.some((value) => !String(value || "").trim()))) return false;
+      state.game.revealedAssignments[team] = teamAssignments.map((pair) =>
+        pair.map((value) => String(value).trim())
+      );
+      state.game.revealedTeams[team] = true;
+    }
 
-    state.game.revealedAssignments[team] = teamAssignments.map((pair) =>
-      pair.map((value) => String(value).trim())
+    const roundScores = scoreMatchingAssignments(
+      state.game.revealedAssignments.blue.map((bluePair, imageIndex) => [
+        bluePair[0],
+        state.game.revealedAssignments.red[imageIndex][0],
+        bluePair[1],
+        state.game.revealedAssignments.red[imageIndex][1]
+      ])
     );
-    state.game.revealedTeams[team] = true;
-    const matches = state.game.revealedAssignments[team].filter(([first, second]) =>
-      normalizeName(first) === normalizeName(second)
-    ).length;
-    const roundScores = { blue: 0, red: 0 };
-    roundScores[team] = matches;
 
     state.game.scores.blue += roundScores.blue;
     state.game.scores.red += roundScores.red;
@@ -261,19 +279,14 @@ export const matchingGame = {
     return true;
   },
 
-  revealAll(state, assignments) {
-    const team = getMatchingRoundTeam(state.game.roundIndex);
-    return this.revealTeam(state, team, assignments?.[team]);
-  },
-
   startNextRound(state) {
     if (state.game.id !== this.id || state.game.status !== "round-finished") return false;
     if (state.game.roundIndex >= MATCHING_GAME_ROUNDS.length - 1) return false;
 
     state.game.roundIndex += 1;
     state.game.activeTurnIndex = 0;
-    state.game.activeTeam = getMatchingRoundTeam(state.game.roundIndex);
     state.game.turnSubmitted = false;
+    state.game.submittedTeams = { blue: false, red: false };
     state.game.revealedTeams = { blue: false, red: false };
     state.game.revealedAssignments = emptyRevealedAssignments();
     state.game.status = "assigning";

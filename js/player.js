@@ -65,6 +65,9 @@ let pricePublicKey = null;
 let priceDraft = { roundIndex: -1, amount: "", locked: false };
 let priceAmountTimer = null;
 let priceSubmissionPending = false;
+let matchingDraft = { roundIndex: -1, values: Array(4).fill(""), locked: false };
+let matchingDraftTimer = null;
+let matchingSubmissionPending = false;
 let teamChatState = { gameId: null, team: null, messages: [], typing: [] };
 let teamChatDraft = "";
 let teamChatTypingTimer = null;
@@ -200,6 +203,55 @@ async function registerPriceKey() {
   if (!realtime || !player || !pricePublicKey) return;
   await realtime.send("price_key_registration", { playerId, publicKey: pricePublicKey });
 }
+
+async function sendMatchingSubmission(type = "draft") {
+  if (!player || roomState?.game?.id !== MATCHING_GAME_ID ||
+      roomState.game.status !== "assigning" || roomState.game.activeTurnIndex !== 0 ||
+      matchingDraft.locked || !roomState.matchingSubmissionKey) return false;
+  const assignerIndex = roomState.game.assignerOrder?.findIndex((item) => item.id === playerId) ?? -1;
+  if (assignerIndex < 0 || assignerIndex > 1) return false;
+
+  try {
+    const encrypted = await encryptPrivatePayload(roomState.matchingSubmissionKey, {
+      type,
+      playerId,
+      roundIndex: roomState.game.roundIndex,
+      values: matchingDraft.values
+    });
+    await realtime.send("matching_private_submission", { playerId, encrypted });
+    return true;
+  } catch (error) {
+    console.error("Private matching assignment could not be encrypted:", error);
+    $("player-matching-error").textContent = "Die Zuordnungen konnten nicht synchronisiert werden.";
+    return false;
+  }
+}
+
+$("player-matching-board").addEventListener("change", (event) => {
+  const select = event.target.closest("[data-player-matching-index]");
+  if (!select || matchingDraft.locked) return;
+  matchingDraft.values[Number(select.dataset.playerMatchingIndex)] = select.value;
+  $("player-matching-error").textContent = "";
+  clearTimeout(matchingDraftTimer);
+  matchingDraftTimer = setTimeout(() => void sendMatchingSubmission("draft"), 200);
+});
+
+$("lock-player-matching").addEventListener("click", async () => {
+  if (matchingSubmissionPending || matchingDraft.locked) return;
+  if (matchingDraft.values.length !== 4 || matchingDraft.values.some((value) => !value)) {
+    $("player-matching-error").textContent = "Bitte ordne allen vier Bildern eine Person zu.";
+    return;
+  }
+  clearTimeout(matchingDraftTimer);
+  matchingSubmissionPending = true;
+  $("player-matching-error").textContent = "Zuordnungen werden eingeloggt…";
+  renderMatchingGame();
+  const sent = await sendMatchingSubmission("lock");
+  if (!sent) {
+    matchingSubmissionPending = false;
+    renderMatchingGame();
+  }
+});
 
 function teamChatIsWritable() {
   if (!player || !roomState || teamChatState.gameId !== roomState.game.id) return false;
@@ -501,6 +553,26 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "matching_private_state" && payload.playerId === playerId &&
+      payload.encrypted && priceKeyPair?.privateKey) {
+    try {
+      const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
+      if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
+      matchingDraft = {
+        roundIndex: privateState.roundIndex,
+        values: Array.from({ length: 4 }, (_, index) =>
+          String(privateState.values?.[index] || "")
+        ),
+        locked: Boolean(privateState.locked)
+      };
+      matchingSubmissionPending = false;
+      render();
+    } catch (error) {
+      console.warn("Private matching state could not be decrypted:", error);
+    }
+    return;
+  }
+
   if (event === "estimation_private_state" && payload.playerId === playerId &&
       payload.encrypted && priceKeyPair?.privateKey) {
     try {
@@ -572,6 +644,15 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "matching_lock_result" && payload.playerId === playerId) {
+    matchingSubmissionPending = false;
+    $("player-matching-error").textContent = payload.accepted
+      ? "Deine Zuordnungen sind eingeloggt."
+      : payload.reason || "Die Zuordnungen konnten nicht eingeloggt werden.";
+    render();
+    return;
+  }
+
   if (event === "word_match_lock_result" && payload.playerId === playerId) {
     wordMatchSubmissionPending = false;
     $("player-word-match-error").textContent = payload.accepted
@@ -608,6 +689,16 @@ async function handleEvent(event, payload) {
           locked: Boolean(roomState.game.lockedTeams?.[player?.team])
         };
       }
+    }
+    if (roomState.game?.id === MATCHING_GAME_ID &&
+        matchingDraft.roundIndex !== roomState.game.roundIndex) {
+      matchingDraft = {
+        roundIndex: roomState.game.roundIndex,
+        values: Array(4).fill(""),
+        locked: false
+      };
+      matchingSubmissionPending = false;
+      $("player-matching-error").textContent = "";
     }
     if (roomState.game?.id === ESTIMATION_GAME_ID &&
         estimationDraft.roundIndex !== roomState.game.roundIndex) {
@@ -950,7 +1041,31 @@ function renderPlayerMatchingBox(value, assignerIndex) {
   `;
 }
 
-function renderPlayerMatchingOverlays(game, imageIndex) {
+function renderPlayerMatchingOptions(selectedValue = "") {
+  return [
+    '<option value="">Spieler wählen</option>',
+    ...(roomState.players || []).map((item) =>
+      `<option value="${escapeHtml(item.name)}"${item.name === selectedValue ? " selected" : ""}>` +
+      `${escapeHtml(item.name)}</option>`
+    )
+  ].join("");
+}
+
+function renderPlayerMatchingOwnBox(imageIndex, assignerIndex, editable) {
+  const assigner = MATCHING_ASSIGNERS[assignerIndex];
+  const positions = ["top-left", "top-right"];
+  const disabled = editable ? "" : " disabled";
+  return `
+    <label class="matching-assignment ${positions[assignerIndex]} ${assigner.team} active"
+           aria-label="${escapeHtml(assigner.label)}">
+      <select data-player-matching-index="${imageIndex}"${disabled}>
+        ${renderPlayerMatchingOptions(matchingDraft.values[imageIndex] || "")}
+      </select>
+    </label>
+  `;
+}
+
+function renderPlayerMatchingOverlays(game, imageIndex, ownAssignerIndex, editable) {
   const overlays = [];
 
   if (game.revealedTeams?.blue) {
@@ -963,6 +1078,9 @@ function renderPlayerMatchingOverlays(game, imageIndex) {
     overlays.push(renderPlayerMatchingBox(values[0], 1));
     overlays.push(renderPlayerMatchingBox(values[1], 3));
   }
+  if (!game.revealedTeams?.blue && !game.revealedTeams?.red && ownAssignerIndex >= 0) {
+    overlays.push(renderPlayerMatchingOwnBox(imageIndex, ownAssignerIndex, editable));
+  }
   return overlays.join("");
 }
 
@@ -970,7 +1088,11 @@ function renderMatchingGame() {
   const game = roomState.game;
   const round = MATCHING_GAME_ROUNDS[game.roundIndex];
   const turn = getMatchingTurn(game.roundIndex, game.activeTurnIndex);
-  const activePlayer = game.assignerOrder?.[turn.assignerIndex];
+  const activePlayer = turn.assignerIndex === null ? null : game.assignerOrder?.[turn.assignerIndex];
+  const ownAssignerIndex = game.assignerOrder?.findIndex((item) => item.id === playerId) ?? -1;
+  const isFirstAssigner = ownAssignerIndex >= 0 && ownAssignerIndex < 2;
+  const canSelfAssign = game.status === "assigning" && game.activeTurnIndex === 0 &&
+    isFirstAssigner && !game.submittedTeams?.[player.team] && !matchingDraft.locked;
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
   const isRevealing = ["ready-to-reveal", "revealing"].includes(game.status);
@@ -984,7 +1106,12 @@ function renderMatchingGame() {
     <article class="matching-card">
       <div class="matching-image-frame">
         <img src="${image.src}" alt="${escapeHtml(image.label)}">
-        ${renderPlayerMatchingOverlays(game, imageIndex)}
+        ${renderPlayerMatchingOverlays(
+          game,
+          imageIndex,
+          isFirstAssigner ? ownAssignerIndex : -1,
+          canSelfAssign && !matchingSubmissionPending
+        )}
       </div>
     </article>
   `).join("");
@@ -998,10 +1125,26 @@ function renderMatchingGame() {
         ? `Runde ${game.roundIndex + 1} ist beendet.`
         : "Der Moderator deckt gleich alle Antworten auf.";
   } else {
-    $("player-matching-turn").className = "matching-turn split";
-    $("player-matching-turn").textContent =
-      `${getTeamName(turn.team)} spielt · ${turn.label} (${activePlayer?.name || "Spieler fehlt"}) ordnet zu.`;
+    if (game.activeTurnIndex === 0) {
+      $("player-matching-turn").className = "matching-turn split";
+      $("player-matching-turn").textContent = isFirstAssigner
+        ? `${matchingDraft.locked || game.submittedTeams?.[player.team]
+          ? "Deine Zuordnungen sind eingeloggt."
+          : "Ordne den vier Bildern jeweils eine Person zu."}`
+        : "Die beiden Spieler 1 ordnen die Bilder zu.";
+    } else {
+      $("player-matching-turn").className = `matching-turn ${turn.team}`;
+      $("player-matching-turn").textContent =
+        `${getTeamName(turn.team)} matcht · ${activePlayer?.name || "Spieler fehlt"} nennt die Zuordnungen.`;
+    }
   }
+
+  $("lock-player-matching").classList.toggle("hidden", !canSelfAssign);
+  $("lock-player-matching").disabled = matchingSubmissionPending ||
+    matchingDraft.values.some((value) => !value);
+  $("lock-player-matching").textContent = matchingSubmissionPending
+    ? "Zuordnungen werden eingeloggt…"
+    : "Zuordnungen einloggen";
 
   if (isFinished) {
     $("player-matching-result").textContent = game.winningTeam
@@ -1009,14 +1152,13 @@ function renderMatchingGame() {
       : "Da seh ich dich endet unentschieden.";
   } else if (isRoundFinished) {
     $("player-matching-result").textContent =
-      `${result[game.activeTeam]} Punkte für ${getTeamName(game.activeTeam)}. Wartet auf die nächste Runde.`;
+      `Team Blau: ${result.blue} Punkte · Team Rot: ${result.red} Punkte. Wartet auf die nächste Runde.`;
   } else if (isRevealing) {
-    const revealed = game.revealedTeams.blue ? "Team Blau" :
-      game.revealedTeams.red ? "Team Rot" : "Noch kein Team";
-    $("player-matching-result").textContent = `${revealed} ist aufgedeckt.`;
+    $("player-matching-result").textContent = "Der Moderator deckt gleich alle Antworten auf.";
   } else {
-    $("player-matching-result").textContent =
-      `${getTeamName(turn.team)} nennt die Zuordnungen. Der Moderator trägt sie ein.`;
+    $("player-matching-result").textContent = game.activeTurnIndex === 0
+      ? "Beide Teams spielen mit denselben vier Bildern."
+      : `${getTeamName(turn.team)} nennt die Zuordnungen. Der Moderator trägt sie ein.`;
   }
 }
 

@@ -517,7 +517,7 @@ test("contains four complete matching rounds", () => {
   ));
 });
 
-test("collects one active team in two moderator-controlled turns", () => {
+test("collects both first players before the blue and red matching turns", () => {
   const state = createInitialRoomState("TEST");
   const players = [
     { id: "b1", name: "Max", team: "blue" },
@@ -527,15 +527,20 @@ test("collects one active team in two moderator-controlled turns", () => {
   ];
   assert.equal(matchingGame.start(state, players), true);
   assert.equal("assignments" in state.game, false);
-  assert.equal(state.game.activeTeam, "blue");
-  assert.equal(MATCHING_TURNS.length, 2);
-  assert.equal(matchingGame.submitTeam(state, "red"), false);
+  assert.equal(MATCHING_TURNS.length, 3);
   assert.equal(matchingGame.submitTeam(state, "blue"), true);
+  assert.equal(matchingGame.completeTurn(state), false);
+  assert.equal(matchingGame.submitTeam(state, "red"), true);
   assert.equal(matchingGame.completeTurn(state), true);
   assert.equal(state.game.activeTurnIndex, 1);
   assert.equal(state.game.turnSubmitted, false);
 
+  assert.equal(matchingGame.submitTeam(state, "red"), false);
   assert.equal(matchingGame.submitTeam(state, "blue"), true);
+  assert.equal(matchingGame.completeTurn(state), true);
+  assert.equal(state.game.activeTurnIndex, 2);
+  assert.equal(matchingGame.submitTeam(state, "blue"), false);
+  assert.equal(matchingGame.submitTeam(state, "red"), true);
   assert.equal(matchingGame.completeTurn(state), true);
   assert.equal(state.game.status, "ready-to-reveal");
   assert.equal("assignments" in state.game, false);
@@ -546,21 +551,21 @@ test("contains all prepared buzzer questions", () => {
   assert.ok(BUZZER_QUESTIONS.every((entry) => entry.question && entry.answer));
 });
 
-test("reveals and scores only the active team", () => {
+test("reveals and scores both teams on the same four images", () => {
   const state = createInitialRoomState("TEST");
   const players = MATCHING_ASSIGNERS.map((assigner, index) => ({
     id: String(index), name: `Spieler ${index + 1}`, team: assigner.team
   }));
   const blueAssignments = [["Max", "Max"], ["Tom", "Max"], ["Lisa", "Lisa"], ["Mia", "Mia"]];
+  const redAssignments = [["Max", "Max"], ["Tom", "Lisa"], ["Lisa", "Lisa"], ["Mia", "Tom"]];
   matchingGame.start(state, players);
   state.game.status = "ready-to-reveal";
 
-  assert.equal(matchingGame.revealAll(state, {
-    blue: blueAssignments
-  }), true);
+  assert.equal(matchingGame.revealAll(state, { blue: blueAssignments }), false);
+  assert.equal(matchingGame.revealAll(state, { blue: blueAssignments, red: redAssignments }), true);
   assert.equal(state.game.status, "round-finished");
-  assert.deepEqual(state.game.revealedTeams, { blue: true, red: false });
-  assert.deepEqual(state.game.scores, { blue: 3, red: 0 });
+  assert.deepEqual(state.game.revealedTeams, { blue: true, red: true });
+  assert.deepEqual(state.game.scores, { blue: 3, red: 2 });
 });
 
 test("ends matching early when the trailing team cannot catch up", () => {
@@ -573,15 +578,17 @@ test("ends matching early when the trailing team cannot catch up", () => {
   matchingGame.start(state, players);
 
   const perfect = Array.from({ length: 4 }, () => ["Max", "Max"]);
-  const twoMatches = [["Max", "Max"], ["Max", "Tom"], ["Lisa", "Lisa"], ["Mia", "Tom"]];
+  const noMatches = Array.from({ length: 4 }, () => ["Max", "Tom"]);
 
   for (let roundIndex = 0; roundIndex < MATCHING_GAME_ROUNDS.length; roundIndex += 1) {
-    const team = roundIndex % 2 === 0 ? "blue" : "red";
-    matchingGame.submitTeam(state, team);
+    matchingGame.submitTeam(state, "blue");
+    matchingGame.submitTeam(state, "red");
     matchingGame.completeTurn(state);
-    matchingGame.submitTeam(state, team);
+    matchingGame.submitTeam(state, "blue");
     matchingGame.completeTurn(state);
-    matchingGame.revealAll(state, { [team]: team === "blue" ? perfect : twoMatches });
+    matchingGame.submitTeam(state, "red");
+    matchingGame.completeTurn(state);
+    matchingGame.revealAll(state, { blue: perfect, red: noMatches });
     if (state.game.status === "finished") break;
     matchingGame.startNextRound(state);
   }
@@ -589,9 +596,9 @@ test("ends matching early when the trailing team cannot catch up", () => {
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "blue");
   assert.equal(state.game.roundIndex, 2);
-  assert.deepEqual(state.game.scores, { blue: 8, red: 2 });
+  assert.deepEqual(state.game.scores, { blue: 12, red: 0 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(matchingGame.revealAll(state, { red: perfect }), false);
+  assert.equal(matchingGame.revealAll(state, { blue: perfect, red: perfect }), false);
 });
 
 test("allows a draw in the matching game without awarding a match point", () => {
@@ -603,12 +610,12 @@ test("allows a draw in the matching game without awarding a match point", () => 
   }));
   matchingGame.start(state, players);
   state.game.roundIndex = MATCHING_GAME_ROUNDS.length - 1;
-  state.game.activeTeam = "red";
   state.game.status = "ready-to-reveal";
-  state.game.scores = { blue: 4, red: 0 };
+  state.game.scores = { blue: 4, red: 4 };
   const equalAssignments = Array.from({ length: 4 }, () => ["Max", "Max"]);
 
   assert.equal(matchingGame.revealAll(state, {
+    blue: equalAssignments,
     red: equalAssignments
   }), true);
   assert.equal(state.game.winningTeam, null);
@@ -630,15 +637,16 @@ test("encrypts player assignments so only the moderator key can read them", asyn
   assert.deepEqual(await decryptMatchingSubmission(keyPair.privateKey, encrypted), payload);
 });
 
-test("uses player one then player two and alternates the active team per round", () => {
+test("uses both first players, then blue player two, then red player two", () => {
   assert.equal(getMatchingTurn(0, 0).playerIndex, 0);
   assert.equal(getMatchingTurn(0, 1).playerIndex, 1);
-  assert.equal(getMatchingTurn(0, 0).team, "blue");
-  assert.equal(getMatchingTurn(1, 0).playerIndex, 0);
-  assert.equal(getMatchingTurn(1, 1).playerIndex, 1);
-  assert.equal(getMatchingTurn(1, 0).team, "red");
-  assert.equal(getMatchingTurn(2, 0).playerIndex, 0);
-  assert.equal(getMatchingTurn(3, 0).team, "red");
+  assert.equal(getMatchingTurn(0, 0).team, null);
+  assert.deepEqual(getMatchingTurn(0, 0).assignerIndexes, [0, 1]);
+  assert.equal(getMatchingTurn(0, 1).team, "blue");
+  assert.equal(getMatchingTurn(0, 1).assignerIndex, 2);
+  assert.equal(getMatchingTurn(0, 2).team, "red");
+  assert.equal(getMatchingTurn(0, 2).assignerIndex, 3);
+  assert.deepEqual(getMatchingTurn(3, 0).assignerIndexes, [0, 1]);
 });
 
 test("contains seven complete price products without public prices", () => {
