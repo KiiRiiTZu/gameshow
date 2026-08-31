@@ -1271,7 +1271,10 @@ function renderEstimationGame() {
   const resultElement = $("player-estimation-result");
   resultElement.classList.remove("hidden");
 
+  $("player-estimation-eyebrow").classList.toggle("hidden", isGameNotStarted);
   $("player-estimation-title").classList.toggle("hidden", isGameNotStarted);
+  $("player-estimation-round").classList.toggle("hidden", isGameNotStarted);
+  $("player-estimation-score").classList.toggle("hidden", isGameNotStarted);
   $("player-estimation-round").textContent =
     `Frage ${game.roundIndex + 1} von ${ESTIMATION_ROUND_COUNT}`;
   $("player-estimation-blue-score").textContent = game.roundScores.blue;
@@ -1279,7 +1282,6 @@ function renderEstimationGame() {
   $("player-estimation-question-card").classList.toggle("hidden", isPending || isGameNotStarted);
   $("player-estimation-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
   $("player-estimation-question").textContent = game.questionPrompt || "";
-  $("player-estimation-waiting").classList.toggle("hidden", !isPending && !isGameNotStarted);
   document.querySelector(".estimation-player-form").classList.toggle(
     "hidden", isPending || isGameNotStarted || isReady || isRevealed
   );
@@ -1303,8 +1305,8 @@ function renderEstimationGame() {
   if (isGameNotStarted || isPending) {
     resultElement.textContent =
       isGameNotStarted
-        ? "Wartet darauf, dass der Moderator Spiel 1 startet."
-        : "Wartet darauf, dass der Moderator die Frage startet.";
+        ? "Wartet darauf, dass der Moderator Spiel 1 startet"
+        : "Wartet darauf, dass der Moderator die erste Frage startet.";
     return;
   }
   if (isRevealed) {

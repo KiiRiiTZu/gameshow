@@ -41,40 +41,40 @@ export const MATCHING_GAME_ROUNDS = [
     id: "autos",
     title: "Autos",
     images: [
-      { id: "audi", label: "Audi", src: `${IMAGE_ROOT}/autos/audi.webp` },
-      { id: "cybertruck", label: "Cybertruck", src: `${IMAGE_ROOT}/autos/cybertruck.webp` },
-      { id: "fiat-panda", label: "Fiat Panda", src: `${IMAGE_ROOT}/autos/Fiat%20Panda.webp` },
-      { id: "lambo", label: "Lamborghini", src: `${IMAGE_ROOT}/autos/lambo.webp` }
+      { id: "audi", label: "Audi", src: `${IMAGE_ROOT}/autos/Audi_A3_8V_1.4_TFSI_Ambiente_Misanorot.webp` },
+      { id: "cybertruck", label: "Cybertruck", src: `${IMAGE_ROOT}/autos/tesla-cybertruck_02-scaled.webp` },
+      { id: "peel-p50", label: "Peel P50", src: `${IMAGE_ROOT}/autos/size-matters-the-peel-p50-is-still-the-ultimate-microcar-1476934523527.webp` },
+      { id: "lambo", label: "Lamborghini", src: `${IMAGE_ROOT}/autos/images.webp` }
     ]
   },
   {
     id: "laender",
     title: "Länder",
     images: [
-      { id: "amerika", label: "Amerika", src: `${IMAGE_ROOT}/l%C3%A4nder/amerika.webp` },
-      { id: "frankreich", label: "Frankreich", src: `${IMAGE_ROOT}/l%C3%A4nder/frankreich.webp` },
-      { id: "mexiko", label: "Mexiko", src: `${IMAGE_ROOT}/l%C3%A4nder/mexiko.webp` },
-      { id: "tokio", label: "Tokio", src: `${IMAGE_ROOT}/l%C3%A4nder/tokio.webp` }
+      { id: "amerika", label: "Amerika", src: `${IMAGE_ROOT}/l%C3%A4nder/NYC_GettyImages-755656809.webp` },
+      { id: "frankreich", label: "Frankreich", src: `${IMAGE_ROOT}/l%C3%A4nder/33583-Eiffelturm_copyright_Ekaterina_Belova__AdobeStock.jpeg.webp` },
+      { id: "mexiko", label: "Mexiko", src: `${IMAGE_ROOT}/l%C3%A4nder/top-10-sehenswuerdigkeiten-in-mexiko-stadt_zocalo-platz-kathedrale%20(1).webp` },
+      { id: "tokio", label: "Tokio", src: `${IMAGE_ROOT}/l%C3%A4nder/tokyo_tokyo_japan_ss_1_9e77fab1aa%20(1).webp` }
     ]
   },
   {
     id: "unterkunft",
     title: "Unterkunft",
     images: [
-      { id: "baumhaus", label: "Baumhaus", src: `${IMAGE_ROOT}/unterkunft/baumhaus.webp` },
-      { id: "bunt", label: "Bunt", src: `${IMAGE_ROOT}/unterkunft/bunt.webp` },
-      { id: "modern", label: "Modern", src: `${IMAGE_ROOT}/unterkunft/modern.webp` },
-      { id: "wohnwagen", label: "Wohnwagen", src: `${IMAGE_ROOT}/unterkunft/wohnwagen.webp` }
+      { id: "baumhaus", label: "Baumhaus", src: `${IMAGE_ROOT}/unterkunft/wooden-walkway-to-illuminated-tree-house-2022-03-04-02-32-20-utc1-scaled.webp` },
+      { id: "bunt", label: "Bunt", src: `${IMAGE_ROOT}/unterkunft/08-little-india-singapur-g-470648561-jpg--74808-.webp` },
+      { id: "modern", label: "Modern", src: `${IMAGE_ROOT}/unterkunft/kern-haus-futura-bauhaus-eingangsseite-abend.webp` },
+      { id: "wohnwagen", label: "Wohnwagen", src: `${IMAGE_ROOT}/unterkunft/csm_DSC_1617_c8fe9e3891.webp` }
     ]
   },
   {
     id: "valo-maps",
     title: "Valorant-Maps",
     images: [
-      { id: "abyss", label: "Abyss", src: `${IMAGE_ROOT}/valo%20maps/abyss.webp` },
-      { id: "breeze", label: "Breeze", src: `${IMAGE_ROOT}/valo%20maps/breeze.webp` },
-      { id: "fracture", label: "Fracture", src: `${IMAGE_ROOT}/valo%20maps/fracture.webp` },
-      { id: "icebox", label: "Icebox", src: `${IMAGE_ROOT}/valo%20maps/icebox.webp` }
+      { id: "abyss", label: "Abyss", src: `${IMAGE_ROOT}/valo%20maps/Loading_Screen_Abyss.webp` },
+      { id: "breeze", label: "Breeze", src: `${IMAGE_ROOT}/valo%20maps/181545_Valorant%20breeze.webp` },
+      { id: "fracture", label: "Fracture", src: `${IMAGE_ROOT}/valo%20maps/Loading_Screen_Fracture.webp` },
+      { id: "icebox", label: "Icebox", src: `${IMAGE_ROOT}/valo%20maps/Loading_Screen_Icebox.webp` }
     ]
   }
 ];

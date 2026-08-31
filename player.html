@@ -149,10 +149,10 @@
       </div>
 
       <div id="player-estimation-game" class="hidden">
-        <p class="eyebrow">SPIEL 1 · FIRST TO 5</p>
+        <p id="player-estimation-eyebrow" class="eyebrow hidden">SPIEL 1 · FIRST TO 5</p>
         <h2 id="player-estimation-title" class="hidden">Mittelwert</h2>
-        <p id="player-estimation-round" class="muted">Frage 1 von 15</p>
-        <div class="round-score" aria-label="Punktestand bei Mittelwert">
+        <p id="player-estimation-round" class="muted hidden">Frage 1 von 15</p>
+        <div id="player-estimation-score" class="round-score hidden" aria-label="Punktestand bei Mittelwert">
           <span>Blau <strong id="player-estimation-blue-score">0</strong></span>
           <span>Rundensiege</span>
           <span><strong id="player-estimation-red-score">0</strong> Rot</span>
@@ -163,9 +163,6 @@
           <h3 id="player-estimation-question"></h3>
         </div>
 
-        <div id="player-estimation-waiting" class="player-message">
-          Wartet darauf, dass der Moderator die erste Frage startet.
-        </div>
         <div class="estimation-player-form">
           <label for="player-estimation-value">Deine persönliche Schätzung</label>
           <input id="player-estimation-value" type="text" inputmode="decimal"
