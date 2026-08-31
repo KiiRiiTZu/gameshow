@@ -96,14 +96,16 @@ function isInsideEurope(position, features) {
   });
 }
 
-function marker(position, type, label, compact = false) {
+function marker(position, type, label, compact = false, scale = 1) {
   if (!position) return "";
   const point = project(position);
   const radius = compact ? 3 : 6;
   const centerRadius = compact ? 1 : 2;
   const labelOffset = compact ? -6 : -10;
   return `
-    <g class="map-marker ${type}${compact ? " compact" : ""}" transform="translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})">
+    <g class="map-marker ${type}${compact ? " compact" : ""}"
+      data-map-x="${point.x.toFixed(1)}" data-map-y="${point.y.toFixed(1)}"
+      transform="translate(${point.x.toFixed(1)} ${point.y.toFixed(1)}) scale(${scale.toFixed(4)})">
       <circle r="${radius}"></circle>
       <circle r="${centerRadius}" class="marker-center"></circle>
       <text y="${labelOffset}" text-anchor="middle">${label}</text>
@@ -147,6 +149,11 @@ export function createEuropeMap(container, options = {}) {
     if (!svg) return;
     svg.setAttribute("viewBox", viewBoxValue());
     svg.classList.toggle("zoomed", zoom > 1);
+    svg.querySelectorAll(".map-marker").forEach((mapMarker) => {
+      const x = mapMarker.dataset.mapX;
+      const y = mapMarker.dataset.mapY;
+      mapMarker.setAttribute("transform", `translate(${x} ${y}) scale(${(1 / zoom).toFixed(4)})`);
+    });
     const zoomIn = container.querySelector('[data-map-zoom="in"]');
     const zoomOut = container.querySelector('[data-map-zoom="out"]');
     if (zoomIn) zoomIn.disabled = zoom >= 4;
@@ -159,6 +166,7 @@ export function createEuropeMap(container, options = {}) {
     const interactiveClass = options.onPlacePin && !nextState.locked && features.length
       ? " interactive" : "";
     const zoomClass = options.enableZoom ? ` zoomable${zoom > 1 ? " zoomed" : ""}` : "";
+    const markerScale = options.enableZoom ? 1 / zoom : 1;
 
     container.innerHTML = `
       <svg class="europe-map-svg${interactiveClass}${zoomClass}" viewBox="${viewBoxValue()}"
@@ -174,9 +182,9 @@ export function createEuropeMap(container, options = {}) {
         </g>
         ${connectingLine(nextState.pins?.blue, target, "blue")}
         ${connectingLine(nextState.pins?.red, target, "red")}
-        ${marker(nextState.pins?.blue, "blue", "B", options.compactMarkers)}
-        ${marker(nextState.pins?.red, "red", "R", options.compactMarkers)}
-        ${marker(target, "target", "Ziel", options.compactMarkers)}
+        ${marker(nextState.pins?.blue, "blue", "B", options.compactMarkers, markerScale)}
+        ${marker(nextState.pins?.red, "red", "R", options.compactMarkers, markerScale)}
+        ${marker(target, "target", "Ziel", options.compactMarkers, markerScale)}
         ${!features.length
           ? `<text class="map-loading" x="${VIEWBOX.width / 2}" y="${VIEWBOX.height / 2}" text-anchor="middle">` +
             `${loadError ? "Europakarte konnte nicht geladen werden" : "Europakarte wird geladen…"}</text>`
