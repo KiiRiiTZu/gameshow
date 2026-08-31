@@ -157,6 +157,29 @@ test("alternates Begriffsmatch roles with 80 seconds to write and 60 seconds to 
   assert.equal(state.game.status, "blue-guess-pending");
 });
 
+test("lets every Begriffsmatch player begin one guessing phase", () => {
+  const state = createInitialRoomState("TEST");
+  const participants = [
+    { id: "b1", name: "Kii", team: "blue" },
+    { id: "b2", name: "Luu", team: "blue" },
+    { id: "r1", name: "Jo", team: "red" },
+    { id: "r2", name: "Ramsi", team: "red" }
+  ];
+  wordMatchGame.start(state, participants);
+
+  const firstGuessers = [];
+  for (let roundIndex = 0; roundIndex < 4; roundIndex += 1) {
+    const firstTeam = getWordMatchGuessOrder(state.game)[0];
+    firstGuessers.push(getWordMatchRoles(state.game).guessers[firstTeam].name);
+    if (roundIndex < 3) {
+      state.game.status = "round-finished";
+      wordMatchGame.startNextRound(state);
+    }
+  }
+
+  assert.deepEqual(firstGuessers, ["Luu", "Jo", "Ramsi", "Kii"]);
+});
+
 test("ends Begriffsmatch early when the trailing team cannot catch up", () => {
   const state = createInitialRoomState("TEST");
   const participants = [

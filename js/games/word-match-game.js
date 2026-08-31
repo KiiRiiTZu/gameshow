@@ -58,9 +58,9 @@ export function getWordMatchRoles(game) {
 }
 
 export function getWordMatchGuessOrder(game) {
-  return Number(game?.roundIndex) % 2 === 0
-    ? ["blue", "red"]
-    : ["red", "blue"];
+  const roundIndex = Number(game?.roundIndex) % 4;
+  const firstTeam = roundIndex === 0 || roundIndex === 3 ? "blue" : "red";
+  return firstTeam === "blue" ? ["blue", "red"] : ["red", "blue"];
 }
 
 export const wordMatchGame = {
