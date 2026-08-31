@@ -152,6 +152,7 @@ async function initializePlayer() {
   }
 
   playerMap = createEuropeMap($("player-germany-map"), {
+    enableZoom: true,
     async onPlacePin(position) {
       if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
           roomState.game.status !== "placing" || roomState.game.lockedTeams?.[player.team]) return;
@@ -1021,9 +1022,11 @@ function renderMapGame() {
   if (isRevealed) {
     const blueDistance = Math.round(game.distances.blue);
     const redDistance = Math.round(game.distances.red);
+    const roundResult = `${question.location} · Blau: ${blueDistance} km · Rot: ${redDistance} km · ` +
+      `${getTeamName(game.roundWinner)} ist näher`;
     $("player-map-result").textContent = isFinished
-      ? `🏆 ${getTeamName(game.winningTeam)} gewinnt das Kartenspiel! Blau: ${blueDistance} km · Rot: ${redDistance} km`
-      : `${question.answer} · ${getTeamName(game.roundWinner)} ist näher! Blau: ${blueDistance} km · Rot: ${redDistance} km`;
+      ? `${roundResult} · 🏆 ${getTeamName(game.winningTeam)} gewinnt das Kartenspiel!`
+      : roundResult;
   } else {
     $("player-map-result").textContent = bothTeamsLocked
       ? "Beide Team-Pins sind sichtbar. Das Ziel bleibt noch verborgen."

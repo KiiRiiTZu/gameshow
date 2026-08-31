@@ -119,15 +119,46 @@ export function createEuropeMap(container, options = {}) {
   let currentState = {};
   let features = [];
   let loadError = false;
+  let zoom = 1;
+  let center = { x: VIEWBOX.width / 2, y: VIEWBOX.height / 2 };
+  let drag = null;
+  let suppressNextClick = false;
+
+  function viewport() {
+    const width = VIEWBOX.width / zoom;
+    const height = VIEWBOX.height / zoom;
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+    center.x = Math.min(VIEWBOX.width - halfWidth, Math.max(halfWidth, center.x));
+    center.y = Math.min(VIEWBOX.height - halfHeight, Math.max(halfHeight, center.y));
+    return { x: center.x - halfWidth, y: center.y - halfHeight, width, height };
+  }
+
+  function viewBoxValue() {
+    const view = viewport();
+    return `${view.x.toFixed(2)} ${view.y.toFixed(2)} ${view.width.toFixed(2)} ${view.height.toFixed(2)}`;
+  }
+
+  function updateViewport() {
+    const svg = container.querySelector(".europe-map-svg");
+    if (!svg) return;
+    svg.setAttribute("viewBox", viewBoxValue());
+    svg.classList.toggle("zoomed", zoom > 1);
+    const zoomIn = container.querySelector('[data-map-zoom="in"]');
+    const zoomOut = container.querySelector('[data-map-zoom="out"]');
+    if (zoomIn) zoomIn.disabled = zoom >= 4;
+    if (zoomOut) zoomOut.disabled = zoom <= 1;
+  }
 
   function render(nextState = currentState) {
     currentState = nextState;
     const target = nextState.revealed ? nextState.target : null;
     const interactiveClass = options.onPlacePin && !nextState.locked && features.length
       ? " interactive" : "";
+    const zoomClass = options.enableZoom ? ` zoomable${zoom > 1 ? " zoomed" : ""}` : "";
 
     container.innerHTML = `
-      <svg class="europe-map-svg${interactiveClass}" viewBox="0 0 ${VIEWBOX.width} ${VIEWBOX.height}"
+      <svg class="europe-map-svg${interactiveClass}${zoomClass}" viewBox="${viewBoxValue()}"
         role="img" aria-label="Europakarte mit Ländergrenzen">
         <defs>
           <filter id="europe-map-shadow" x="-20%" y="-20%" width="140%" height="140%">
@@ -148,6 +179,12 @@ export function createEuropeMap(container, options = {}) {
             `${loadError ? "Europakarte konnte nicht geladen werden" : "Europakarte wird geladen…"}</text>`
           : ""}
       </svg>
+      ${options.enableZoom ? `
+        <div class="map-zoom-controls" aria-label="Kartenzoom">
+          <button type="button" data-map-zoom="in" aria-label="Karte vergrößern"${zoom >= 4 ? " disabled" : ""}>+</button>
+          <button type="button" data-map-zoom="out" aria-label="Karte verkleinern"${zoom <= 1 ? " disabled" : ""}>−</button>
+        </div>
+      ` : ""}
     `;
   }
 
@@ -163,18 +200,69 @@ export function createEuropeMap(container, options = {}) {
     });
 
   container.addEventListener("click", (event) => {
+    const zoomAction = event.target.closest("[data-map-zoom]")?.dataset.mapZoom;
+    if (zoomAction) {
+      zoom = zoomAction === "in" ? Math.min(4, zoom * 1.5) : Math.max(1, zoom / 1.5);
+      if (zoom < 1.01) zoom = 1;
+      updateViewport();
+      return;
+    }
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      return;
+    }
     if (!options.onPlacePin || currentState.locked || !features.length) return;
     const svg = event.target.closest("svg");
     if (!svg) return;
     const bounds = svg.getBoundingClientRect();
+    const view = viewport();
     const point = {
-      x: (event.clientX - bounds.left) / bounds.width * VIEWBOX.width,
-      y: (event.clientY - bounds.top) / bounds.height * VIEWBOX.height
+      x: view.x + (event.clientX - bounds.left) / bounds.width * view.width,
+      y: view.y + (event.clientY - bounds.top) / bounds.height * view.height
     };
     const position = unproject(point);
     if (!isInsideEurope(position, features)) return;
     options.onPlacePin(position);
   });
+
+  container.addEventListener("pointerdown", (event) => {
+    const svg = event.target.closest(".europe-map-svg.zoomable");
+    if (!svg || zoom <= 1 || event.button !== 0) return;
+    drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      centerX: center.x,
+      centerY: center.y,
+      moved: false
+    };
+    svg.setPointerCapture(event.pointerId);
+    svg.classList.add("dragging");
+  });
+
+  container.addEventListener("pointermove", (event) => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const svg = event.target.closest(".europe-map-svg") || container.querySelector(".europe-map-svg");
+    if (!svg) return;
+    const bounds = svg.getBoundingClientRect();
+    const view = viewport();
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (Math.hypot(deltaX, deltaY) > 4) drag.moved = true;
+    center.x = drag.centerX - deltaX / bounds.width * view.width;
+    center.y = drag.centerY - deltaY / bounds.height * view.height;
+    updateViewport();
+  });
+
+  function finishDrag(event) {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    suppressNextClick = drag.moved;
+    container.querySelector(".europe-map-svg")?.classList.remove("dragging");
+    drag = null;
+  }
+
+  container.addEventListener("pointerup", finishDrag);
+  container.addEventListener("pointercancel", finishDrag);
 
   render();
   return { render };

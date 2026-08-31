@@ -655,7 +655,7 @@ function updateHostWordMatchTimer() {
 function renderWordMatchGame() {
   const game = state.game;
   const roles = getWordMatchRoles(game);
-  const category = WORD_MATCH_CATEGORIES[game.roundIndex];
+  const category = game.category;
   const isSeedCollecting = game.status === "seed-collecting";
   const isRoundFinished = game.status === "round-finished";
   const isFinished = game.status === "finished";
@@ -664,6 +664,7 @@ function renderWordMatchGame() {
   $("word-match-blue-score").textContent = game.scores.blue;
   $("word-match-red-score").textContent = game.scores.red;
   $("word-match-category").textContent = category;
+  $("word-match-category-card").classList.toggle("hidden", game.status === "round-pending");
   $("word-match-roles").textContent =
     `${roles.seeders.blue?.name || "Blau fehlt"} und ${roles.seeders.red?.name || "Rot fehlt"} schreiben · ` +
     `${roles.guessers.blue?.name || "Blau fehlt"} und ${roles.guessers.red?.name || "Rot fehlt"} raten`;

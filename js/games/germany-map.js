@@ -4,36 +4,43 @@ export const GERMANY_MAP_QUESTIONS = [
   {
     prompt: "Wo befindet sich die Sagrada Família?",
     answer: "Sagrada Família · Barcelona, Spanien",
+    location: "Barcelona, Spanien",
     target: { lat: 41.4036, lng: 2.1744 }
   },
   {
     prompt: "Wo steht das Kolosseum?",
     answer: "Kolosseum · Rom, Italien",
+    location: "Rom, Italien",
     target: { lat: 41.8902, lng: 12.4922 }
   },
   {
     prompt: "Wo befindet sich die Hauptstadt Polens?",
     answer: "Warschau · Polen",
+    location: "Warschau, Polen",
     target: { lat: 52.2297, lng: 21.0122 }
   },
   {
     prompt: "Wo liegt die historische Altstadt von Dubrovnik, die auch als Kulisse für Game of Thrones diente?",
     answer: "Altstadt von Dubrovnik · Kroatien",
+    location: "Dubrovnik, Kroatien",
     target: { lat: 42.6407, lng: 18.1083 }
   },
   {
-    prompt: "Wo steht die Hagia Sophia?",
+    prompt: "Wo steht die Hagia Sophia, eine der historisch bedeutendsten Moscheen der Welt?",
     answer: "Hagia Sophia · Istanbul, Türkei",
+    location: "Istanbul, Türkei",
     target: { lat: 41.0086, lng: 28.9802 }
   },
   {
     prompt: "Wo befindet sich Stonehenge?",
     answer: "Stonehenge · nahe Amesbury/Salisbury, England",
+    location: "Amesbury/Salisbury, England",
     target: { lat: 51.1789, lng: -1.8262 }
   },
   {
     prompt: "Wo liegt das Atomium?",
     answer: "Atomium · Brüssel, Belgien",
+    location: "Brüssel, Belgien",
     target: { lat: 50.8949, lng: 4.3416 }
   }
 ];

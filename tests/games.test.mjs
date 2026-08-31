@@ -468,6 +468,19 @@ test("uses the seven requested European destinations", () => {
     "Stonehenge · nahe Amesbury/Salisbury, England",
     "Atomium · Brüssel, Belgien"
   ]);
+  assert.deepEqual(GERMANY_MAP_QUESTIONS.map((question) => question.location), [
+    "Barcelona, Spanien",
+    "Rom, Italien",
+    "Warschau, Polen",
+    "Dubrovnik, Kroatien",
+    "Istanbul, Türkei",
+    "Amesbury/Salisbury, England",
+    "Brüssel, Belgien"
+  ]);
+  assert.equal(
+    GERMANY_MAP_QUESTIONS[4].prompt,
+    "Wo steht die Hagia Sophia, eine der historisch bedeutendsten Moscheen der Welt?"
+  );
 });
 
 test("ships detailed European country geometry", () => {
