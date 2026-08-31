@@ -6,6 +6,7 @@ const MAP_BOUNDS = {
 };
 
 const VIEWBOX = { width: 760, height: 650, padding: 24 };
+const MAX_ZOOM = 6;
 const CENTER_LATITUDE_RADIANS =
   (MAP_BOUNDS.minLat + MAP_BOUNDS.maxLat) / 2 * Math.PI / 180;
 const LONGITUDE_SCALE = Math.cos(CENTER_LATITUDE_RADIANS);
@@ -99,9 +100,9 @@ function isInsideEurope(position, features) {
 function marker(position, type, label, compact = false, scale = 1) {
   if (!position) return "";
   const point = project(position);
-  const radius = compact ? 3 : 6;
-  const centerRadius = compact ? 1 : 2;
-  const labelOffset = compact ? -6 : -10;
+  const radius = compact ? 4.5 : 6;
+  const centerRadius = compact ? 1.5 : 2;
+  const labelOffset = compact ? -8 : -10;
   return `
     <g class="map-marker ${type}${compact ? " compact" : ""}"
       data-map-x="${point.x.toFixed(1)}" data-map-y="${point.y.toFixed(1)}"
@@ -156,7 +157,7 @@ export function createEuropeMap(container, options = {}) {
     });
     const zoomIn = container.querySelector('[data-map-zoom="in"]');
     const zoomOut = container.querySelector('[data-map-zoom="out"]');
-    if (zoomIn) zoomIn.disabled = zoom >= 4;
+    if (zoomIn) zoomIn.disabled = zoom >= MAX_ZOOM;
     if (zoomOut) zoomOut.disabled = zoom <= 1;
   }
 
@@ -192,7 +193,7 @@ export function createEuropeMap(container, options = {}) {
       </svg>
       ${options.enableZoom ? `
         <div class="map-zoom-controls" aria-label="Kartenzoom">
-          <button type="button" data-map-zoom="in" aria-label="Karte vergrößern"${zoom >= 4 ? " disabled" : ""}>+</button>
+          <button type="button" data-map-zoom="in" aria-label="Karte vergrößern"${zoom >= MAX_ZOOM ? " disabled" : ""}>+</button>
           <button type="button" data-map-zoom="out" aria-label="Karte verkleinern"${zoom <= 1 ? " disabled" : ""}>−</button>
         </div>
       ` : ""}
@@ -213,7 +214,7 @@ export function createEuropeMap(container, options = {}) {
   container.addEventListener("click", (event) => {
     const zoomAction = event.target.closest("[data-map-zoom]")?.dataset.mapZoom;
     if (zoomAction) {
-      zoom = zoomAction === "in" ? Math.min(4, zoom * 1.5) : Math.max(1, zoom / 1.5);
+      zoom = zoomAction === "in" ? Math.min(MAX_ZOOM, zoom * 1.5) : Math.max(1, zoom / 1.5);
       if (zoom < 1.01) zoom = 1;
       updateViewport();
       return;
@@ -248,7 +249,7 @@ export function createEuropeMap(container, options = {}) {
     const focusX = previousView.x + ratioX * previousView.width;
     const focusY = previousView.y + ratioY * previousView.height;
     const zoomFactor = Math.exp(-event.deltaY * 0.0015);
-    const nextZoom = Math.min(4, Math.max(1, zoom * zoomFactor));
+    const nextZoom = Math.min(MAX_ZOOM, Math.max(1, zoom * zoomFactor));
     if (Math.abs(nextZoom - zoom) < 0.001) return;
 
     zoom = nextZoom < 1.01 ? 1 : nextZoom;
