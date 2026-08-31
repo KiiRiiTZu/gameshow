@@ -22,6 +22,7 @@ import {
   WORD_MATCH_PHASE_SECONDS,
   WORD_MATCH_SEED_SECONDS,
   WORD_MATCH_TERM_COUNT,
+  getWordMatchGuessOrder,
   getWordMatchRoles
 } from "./games/word-match-game.js";
 import {
@@ -1424,6 +1425,7 @@ function renderWordMatchLists(lists, matches = { blue: [], red: [] }) {
 function renderWordMatchGame() {
   const game = roomState.game;
   const roles = getWordMatchRoles(game);
+  const [firstGuessTeam] = getWordMatchGuessOrder(game);
   const participant = game.participants.find((item) => item.id === playerId);
   const ownTeam = participant?.team;
   const isSeeder = roles.seeders[ownTeam]?.id === playerId;
@@ -1457,7 +1459,7 @@ function renderWordMatchGame() {
   }).join("");
   $("player-word-match-locks").classList.toggle(
     "hidden",
-    !["seed-collecting", "blue-guess-pending"].includes(game.status)
+    !["seed-collecting", `${firstGuessTeam}-guess-pending`].includes(game.status)
   );
 
   const activeName = game.status.startsWith("blue-")

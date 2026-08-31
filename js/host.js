@@ -39,6 +39,7 @@ import {
   WORD_MATCH_PHASE_SECONDS,
   WORD_MATCH_SEED_SECONDS,
   WORD_MATCH_TERM_COUNT,
+  getWordMatchGuessOrder,
   getWordMatchRoles,
   wordMatchGame
 } from "./games/word-match-game.js";
@@ -655,6 +656,7 @@ function updateHostWordMatchTimer() {
 function renderWordMatchGame() {
   const game = state.game;
   const roles = getWordMatchRoles(game);
+  const [firstGuessTeam] = getWordMatchGuessOrder(game);
   const category = game.category;
   const isSeedCollecting = game.status === "seed-collecting";
   const isRoundFinished = game.status === "round-finished";
@@ -694,7 +696,7 @@ function renderWordMatchGame() {
     const seeder = roles.seeders[team];
     const terms = wordMatchDrafts.terms[seeder?.id] || emptyWordTerms();
     const clickable = game.status === `${team}-guessing`;
-    const editable = game.status === "blue-guess-pending";
+    const editable = game.status === `${firstGuessTeam}-guess-pending`;
     return `<article class="word-match-list ${team}">
       <strong>${getTeamName(team)} · Liste von ${escapeHtml(seeder?.name || "")}</strong>
       ${terms.map((term, index) => {
@@ -1623,7 +1625,7 @@ async function handleWordMatchSubmission(payload) {
         reason: accepted ? "" : "Die Liste konnte nicht eingeloggt werden."
       });
       if (accepted) await persistRenderAndBroadcast();
-      if (accepted && state.game.status === "blue-guess-pending") {
+      if (accepted && state.game.status === `${getWordMatchGuessOrder(state.game)[0]}-guess-pending`) {
         await syncWordMatchSeeders();
         return;
       }
@@ -2312,7 +2314,9 @@ $("finish-blue-guess-phase").addEventListener("click", async () => {
 });
 
 $("start-red-guess-phase").addEventListener("click", async () => {
-  await runModeratorAction(() => wordMatchGame.startGuessPhase(state, "red"));
+  clearTimeout(wordMatchEditTimer);
+  const accepted = await runModeratorAction(() => wordMatchGame.startGuessPhase(state, "red"));
+  if (accepted) await syncWordMatchSeeders();
 });
 
 $("finish-red-guess-phase").addEventListener("click", async () => {
@@ -2325,7 +2329,8 @@ $("reveal-word-match-round").addEventListener("click", async () => {
 
 $("word-match-lists").addEventListener("input", (event) => {
   const input = event.target.closest("[data-word-edit-player][data-word-index]");
-  if (!input || state.game.status !== "blue-guess-pending") return;
+  const firstGuessTeam = getWordMatchGuessOrder(state.game)[0];
+  if (!input || state.game.status !== `${firstGuessTeam}-guess-pending`) return;
   const playerId = input.dataset.wordEditPlayer;
   const index = Number(input.dataset.wordIndex);
   if (!wordMatchDrafts.terms[playerId] || !Number.isInteger(index) ||

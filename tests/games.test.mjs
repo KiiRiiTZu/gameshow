@@ -45,6 +45,7 @@ import {
   WORD_MATCH_PHASE_SECONDS,
   WORD_MATCH_SEED_SECONDS,
   WORD_MATCH_TERM_COUNT,
+  getWordMatchGuessOrder,
   getWordMatchRoles,
   wordMatchGame
 } from "../js/games/word-match-game.js";
@@ -146,6 +147,14 @@ test("alternates Begriffsmatch roles with 80 seconds to write and 60 seconds to 
   roles = getWordMatchRoles(state.game);
   assert.equal(roles.seeders.blue.id, "b2");
   assert.equal(roles.guessers.blue.id, "b1");
+  assert.deepEqual(getWordMatchGuessOrder(state.game), ["red", "blue"]);
+  wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[1]);
+  wordMatchGame.finishSeedPhase(state);
+  assert.equal(state.game.status, "red-guess-pending");
+  assert.equal(wordMatchGame.startGuessPhase(state, "blue"), false);
+  assert.equal(wordMatchGame.startGuessPhase(state, "red"), true);
+  assert.equal(wordMatchGame.finishGuessPhase(state, "red"), true);
+  assert.equal(state.game.status, "blue-guess-pending");
 });
 
 test("ends Begriffsmatch early when the trailing team cannot catch up", () => {
@@ -161,13 +170,21 @@ test("ends Begriffsmatch early when the trailing team cannot catch up", () => {
   for (let round = 0; round < 3; round += 1) {
     wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[round]);
     wordMatchGame.finishSeedPhase(state);
-    wordMatchGame.startGuessPhase(state, "blue");
-    for (let index = 0; index < WORD_MATCH_TERM_COUNT; index += 1) {
-      wordMatchGame.toggleMatch(state, "blue", index);
+    const [firstTeam, secondTeam] = getWordMatchGuessOrder(state.game);
+    wordMatchGame.startGuessPhase(state, firstTeam);
+    if (firstTeam === "blue") {
+      for (let index = 0; index < WORD_MATCH_TERM_COUNT; index += 1) {
+        wordMatchGame.toggleMatch(state, "blue", index);
+      }
     }
-    wordMatchGame.finishGuessPhase(state, "blue");
-    wordMatchGame.startGuessPhase(state, "red");
-    wordMatchGame.finishGuessPhase(state, "red");
+    wordMatchGame.finishGuessPhase(state, firstTeam);
+    wordMatchGame.startGuessPhase(state, secondTeam);
+    if (secondTeam === "blue") {
+      for (let index = 0; index < WORD_MATCH_TERM_COUNT; index += 1) {
+        wordMatchGame.toggleMatch(state, "blue", index);
+      }
+    }
+    wordMatchGame.finishGuessPhase(state, secondTeam);
     assert.equal(state.game.status, "results-pending");
     wordMatchGame.revealRound(state, {
       blue: Array(WORD_MATCH_TERM_COUNT).fill("Blau"),

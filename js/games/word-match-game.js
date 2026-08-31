@@ -57,6 +57,12 @@ export function getWordMatchRoles(game) {
   };
 }
 
+export function getWordMatchGuessOrder(game) {
+  return Number(game?.roundIndex) % 2 === 0
+    ? ["blue", "red"]
+    : ["red", "blue"];
+}
+
 export const wordMatchGame = {
   id: "word-match-game",
   name: "Begriffsmatch",
@@ -141,7 +147,7 @@ export const wordMatchGame = {
     if (state.game.id !== this.id || state.game.status !== "seed-collecting") return false;
     const roles = getWordMatchRoles(state.game);
     state.game.lockedSeederIds = Object.values(roles.seeders).map((item) => item.id);
-    state.game.status = "blue-guess-pending";
+    state.game.status = `${getWordMatchGuessOrder(state.game)[0]}-guess-pending`;
     state.game.phaseEndsAt = null;
     return true;
   },
@@ -169,8 +175,9 @@ export const wordMatchGame = {
   finishGuessPhase(state, team) {
     if (state.game.id !== this.id || state.game.status !== `${team}-guessing`) return false;
     state.game.phaseEndsAt = null;
-    if (team === "blue") {
-      state.game.status = "red-guess-pending";
+    const [firstTeam, secondTeam] = getWordMatchGuessOrder(state.game);
+    if (team === firstTeam) {
+      state.game.status = `${secondTeam}-guess-pending`;
       return true;
     }
 
