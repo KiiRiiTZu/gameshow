@@ -7,7 +7,7 @@ import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode } from "./
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
-import { createGermanyMap } from "./germany-map-view.js";
+import { createEuropeMap } from "./europe-map-view.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
@@ -151,7 +151,7 @@ async function initializePlayer() {
     showPlayerGame();
   }
 
-  playerMap = createGermanyMap($("player-germany-map"), {
+  playerMap = createEuropeMap($("player-germany-map"), {
     async onPlacePin(position) {
       if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
           roomState.game.status !== "placing" || roomState.game.lockedTeams?.[player.team]) return;
@@ -1001,7 +1001,7 @@ function renderMapGame() {
       ? "Eure Antwort ist eingeloggt. Wartet auf das andere Team."
     : ownPin
       ? "Euer Team-Pin ist gesetzt. Ihr könnt ihn noch verschieben oder einloggen."
-      : "Tippt auf die Karte, um euren gemeinsamen Team-Pin zu setzen.";
+      : "Tippt auf die Europakarte, um euren gemeinsamen Team-Pin zu setzen.";
 
   $("lock-map-pin").disabled = isRevealed || ownTeamLocked || !ownPin;
   $("lock-map-pin").textContent = ownTeamLocked

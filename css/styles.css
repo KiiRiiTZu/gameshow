@@ -566,8 +566,8 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .map-question-card h3 { margin-bottom: 0; line-height: 1.4; }
 
-.germany-map {
-  width: min(690px, 100%);
+.europe-map {
+  width: min(760px, 100%);
   margin: 0 auto;
   border: 1px solid rgba(255,255,255,.08);
   border-radius: 20px;
@@ -577,17 +577,21 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
     #0f131d;
 }
 
-.germany-map-svg { display: block; width: 100%; height: auto; }
-.germany-map-svg.interactive { cursor: crosshair; touch-action: manipulation; }
+.europe-map-svg { display: block; width: 100%; height: auto; }
+.europe-map-svg.interactive { cursor: crosshair; touch-action: manipulation; }
 
-.germany-outline {
+.europe-sea { fill: #111a28; }
+
+.europe-country {
   fill: #28303d;
-  stroke: #657086;
-  stroke-width: 3;
+  stroke: #77839a;
+  stroke-width: 1.25;
   stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
-.germany-map-svg.interactive .germany-outline:hover { fill: #303a49; }
+.europe-map-svg.interactive .europe-country:hover { fill: #303a49; }
+.map-loading { fill: #c8ccda; font-size: 16px; font-weight: 700; }
 
 .map-marker circle { stroke: white; stroke-width: 1.5; }
 .map-marker.blue circle { fill: #5a72f6; }

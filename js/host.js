@@ -16,7 +16,7 @@ import { BUZZER_QUESTIONS, getBuzzerQuestion } from "./games/buzzer-questions.js
 import { top20Game } from "./games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
 import { GERMANY_MAP_QUESTIONS, GERMANY_MAP_ROUNDS_TO_WIN, germanyMapGame } from "./games/germany-map.js";
-import { createGermanyMap } from "./germany-map-view.js";
+import { createEuropeMap } from "./europe-map-view.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
@@ -433,7 +433,7 @@ async function initializeHost() {
   }
 
   $("room-code").textContent = roomCode;
-  hostMap = createGermanyMap($("host-germany-map"));
+  hostMap = createEuropeMap($("host-germany-map"));
   matchingKeyPair = await createMatchingKeyPair();
   matchingPublicKey = await exportMatchingPublicKey(matchingKeyPair.publicKey);
   previousGameId = state.game.id;

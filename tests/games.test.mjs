@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { BUZZER_WINNING_SCORE, buzzerGame } from "../js/games/buzzer.js";
 import { BUZZER_QUESTIONS } from "../js/games/buzzer-questions.js";
@@ -450,16 +450,33 @@ test("normalizes a persisted single-round Spotify state", () => {
   assert.equal("slots" in state.game, false);
 });
 
-test("contains seven prepared Germany map questions", () => {
+test("contains seven prepared Europe map questions", () => {
   assert.equal(GERMANY_MAP_QUESTIONS.length, 7);
   assert.ok(GERMANY_MAP_QUESTIONS.every((question) =>
     question.prompt && question.answer && Number.isFinite(question.target.lat) && Number.isFinite(question.target.lng)
   ));
 });
 
-test("mixes full map questions with city-only rounds", () => {
-  assert.equal(GERMANY_MAP_QUESTIONS[1].prompt, "Hannover");
-  assert.ok(GERMANY_MAP_QUESTIONS.filter((question) => question.prompt === question.answer).length === 1);
+test("uses the seven requested European destinations", () => {
+  const answers = GERMANY_MAP_QUESTIONS.map((question) => question.answer);
+  assert.deepEqual(answers, [
+    "Sagrada Família · Barcelona, Spanien",
+    "Kolosseum · Rom, Italien",
+    "Warschau · Polen",
+    "Altstadt von Dubrovnik · Kroatien",
+    "Hagia Sophia · Istanbul, Türkei",
+    "Stonehenge · nahe Amesbury/Salisbury, England",
+    "Atomium · Brüssel, Belgien"
+  ]);
+});
+
+test("ships detailed European country geometry", () => {
+  const mapPath = new URL("../assets/maps/europe-countries-50m.geojson", import.meta.url);
+  const mapData = JSON.parse(readFileSync(mapPath, "utf8"));
+  assert.ok(mapData.features.length >= 40);
+  assert.ok(mapData.features.every((feature) =>
+    ["Polygon", "MultiPolygon"].includes(feature.geometry?.type)
+  ));
 });
 
 test("calculates geographic distances in kilometers", () => {

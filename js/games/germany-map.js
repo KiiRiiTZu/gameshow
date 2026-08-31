@@ -2,39 +2,39 @@ export const GERMANY_MAP_ROUNDS_TO_WIN = 4;
 
 export const GERMANY_MAP_QUESTIONS = [
   {
-    prompt: "Wo findet jährlich das nach Besucherzahlen größte Volksfest Deutschlands statt?",
-    answer: "Oktoberfest · München",
-    target: { lat: 48.1315, lng: 11.5497 }
+    prompt: "Wo befindet sich die Sagrada Família?",
+    answer: "Sagrada Família · Barcelona, Spanien",
+    target: { lat: 41.4036, lng: 2.1744 }
   },
   {
-    prompt: "Hannover",
-    answer: "Hannover",
-    target: { lat: 52.3759, lng: 9.7320 }
+    prompt: "Wo steht das Kolosseum?",
+    answer: "Kolosseum · Rom, Italien",
+    target: { lat: 41.8902, lng: 12.4922 }
   },
   {
-    prompt: "Wo wurde Ludwig van Beethoven geboren?",
-    answer: "Bonn",
-    target: { lat: 50.7374, lng: 7.0982 }
+    prompt: "Wo befindet sich die Hauptstadt Polens?",
+    answer: "Warschau · Polen",
+    target: { lat: 52.2297, lng: 21.0122 }
   },
   {
-    prompt: "Wo befindet sich Schloss Neuschwanstein?",
-    answer: "Schloss Neuschwanstein · Schwangau",
-    target: { lat: 47.5576, lng: 10.7498 }
+    prompt: "Wo liegt die historische Altstadt von Dubrovnik, die auch als Kulisse für Game of Thrones diente?",
+    answer: "Altstadt von Dubrovnik · Kroatien",
+    target: { lat: 42.6407, lng: 18.1083 }
   },
   {
-    prompt: "Wo befindet sich Deutschlands älteste Universität, gegründet 1386?",
-    answer: "Heidelberg",
-    target: { lat: 49.4094, lng: 8.6947 }
+    prompt: "Wo steht die Hagia Sophia?",
+    answer: "Hagia Sophia · Istanbul, Türkei",
+    target: { lat: 41.0086, lng: 28.9802 }
   },
   {
-    prompt: "Wo steht das Brandenburger Tor?",
-    answer: "Berlin",
-    target: { lat: 52.5163, lng: 13.3777 }
+    prompt: "Wo befindet sich Stonehenge?",
+    answer: "Stonehenge · nahe Amesbury/Salisbury, England",
+    target: { lat: 51.1789, lng: -1.8262 }
   },
   {
-    prompt: "Wo liegt laut der Deutschen Zentrale für Tourismus die beliebteste deutsche Sehenswürdigkeit?",
-    answer: "Miniatur Wunderland · Hamburg",
-    target: { lat: 53.5439, lng: 9.9890 }
+    prompt: "Wo liegt das Atomium?",
+    answer: "Atomium · Brüssel, Belgien",
+    target: { lat: 50.8949, lng: 4.3416 }
   }
 ];
 
@@ -112,7 +112,7 @@ export const germanyMapGame = {
     const lat = Number(position?.lat);
     const lng = Number(position?.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
-    if (lat < 47 || lat > 55.2 || lng < 5.5 || lng > 15.6) return false;
+    if (lat < 33 || lat > 72.5 || lng < -26 || lng > 46) return false;
 
     state.game.pins[team] = { lat, lng };
     return true;
