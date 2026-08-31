@@ -225,6 +225,29 @@ export function createEuropeMap(container, options = {}) {
     options.onPlacePin(position);
   });
 
+  container.addEventListener("wheel", (event) => {
+    const svg = event.target.closest(".europe-map-svg.zoomable");
+    if (!svg) return;
+    event.preventDefault();
+
+    const bounds = svg.getBoundingClientRect();
+    const previousView = viewport();
+    const ratioX = (event.clientX - bounds.left) / bounds.width;
+    const ratioY = (event.clientY - bounds.top) / bounds.height;
+    const focusX = previousView.x + ratioX * previousView.width;
+    const focusY = previousView.y + ratioY * previousView.height;
+    const zoomFactor = Math.exp(-event.deltaY * 0.0015);
+    const nextZoom = Math.min(4, Math.max(1, zoom * zoomFactor));
+    if (Math.abs(nextZoom - zoom) < 0.001) return;
+
+    zoom = nextZoom < 1.01 ? 1 : nextZoom;
+    const nextWidth = VIEWBOX.width / zoom;
+    const nextHeight = VIEWBOX.height / zoom;
+    center.x = focusX + (0.5 - ratioX) * nextWidth;
+    center.y = focusY + (0.5 - ratioY) * nextHeight;
+    updateViewport();
+  }, { passive: false });
+
   container.addEventListener("pointerdown", (event) => {
     const svg = event.target.closest(".europe-map-svg.zoomable");
     if (!svg || zoom <= 1 || event.button !== 0) return;
