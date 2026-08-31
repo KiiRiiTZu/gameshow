@@ -647,6 +647,8 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .map-marker.target circle { fill: #f5b83d; }
 .map-marker .marker-center { fill: white; stroke: none; }
 .map-marker text { fill: white; font-size: 10px; font-weight: 900; paint-order: stroke; stroke: #0d0f17; stroke-width: 3px; }
+.map-marker.compact circle { stroke-width: .8; }
+.map-marker.compact text { font-size: 6px; stroke-width: 1.8px; }
 
 .distance-line { stroke-width: 3; stroke-dasharray: 8 7; opacity: .8; }
 .distance-line.blue { stroke: #7f94ff; }

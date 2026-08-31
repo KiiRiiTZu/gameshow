@@ -153,6 +153,7 @@ async function initializePlayer() {
 
   playerMap = createEuropeMap($("player-germany-map"), {
     enableZoom: true,
+    compactMarkers: true,
     async onPlacePin(position) {
       if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
           roomState.game.status !== "placing" || roomState.game.lockedTeams?.[player.team]) return;

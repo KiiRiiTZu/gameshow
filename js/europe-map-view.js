@@ -96,14 +96,17 @@ function isInsideEurope(position, features) {
   });
 }
 
-function marker(position, type, label) {
+function marker(position, type, label, compact = false) {
   if (!position) return "";
   const point = project(position);
+  const radius = compact ? 3 : 6;
+  const centerRadius = compact ? 1 : 2;
+  const labelOffset = compact ? -6 : -10;
   return `
-    <g class="map-marker ${type}" transform="translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})">
-      <circle r="6"></circle>
-      <circle r="2" class="marker-center"></circle>
-      <text y="-10" text-anchor="middle">${label}</text>
+    <g class="map-marker ${type}${compact ? " compact" : ""}" transform="translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})">
+      <circle r="${radius}"></circle>
+      <circle r="${centerRadius}" class="marker-center"></circle>
+      <text y="${labelOffset}" text-anchor="middle">${label}</text>
     </g>
   `;
 }
@@ -171,9 +174,9 @@ export function createEuropeMap(container, options = {}) {
         </g>
         ${connectingLine(nextState.pins?.blue, target, "blue")}
         ${connectingLine(nextState.pins?.red, target, "red")}
-        ${marker(nextState.pins?.blue, "blue", "B")}
-        ${marker(nextState.pins?.red, "red", "R")}
-        ${marker(target, "target", "Ziel")}
+        ${marker(nextState.pins?.blue, "blue", "B", options.compactMarkers)}
+        ${marker(nextState.pins?.red, "red", "R", options.compactMarkers)}
+        ${marker(target, "target", "Ziel", options.compactMarkers)}
         ${!features.length
           ? `<text class="map-loading" x="${VIEWBOX.width / 2}" y="${VIEWBOX.height / 2}" text-anchor="middle">` +
             `${loadError ? "Europakarte konnte nicht geladen werden" : "Europakarte wird geladen…"}</text>`
