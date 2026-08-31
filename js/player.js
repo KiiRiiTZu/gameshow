@@ -11,6 +11,7 @@ import { createGermanyMap } from "./germany-map-view.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
+  areMatchingValuesUnique,
   getMatchingTurn
 } from "./games/matching-game.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
@@ -209,7 +210,7 @@ async function sendMatchingSubmission(type = "draft") {
       roomState.game.status !== "assigning" || roomState.game.activeTurnIndex !== 0 ||
       matchingDraft.locked || !roomState.matchingSubmissionKey) return false;
   const assignerIndex = roomState.game.assignerOrder?.findIndex((item) => item.id === playerId) ?? -1;
-  if (assignerIndex < 0 || assignerIndex > 1) return false;
+  if (!getMatchingTurn(roomState.game.roundIndex, 0).assignerIndexes.includes(assignerIndex)) return false;
 
   try {
     const encrypted = await encryptPrivatePayload(roomState.matchingSubmissionKey, {
@@ -232,6 +233,7 @@ $("player-matching-board").addEventListener("change", (event) => {
   if (!select || matchingDraft.locked) return;
   matchingDraft.values[Number(select.dataset.playerMatchingIndex)] = select.value;
   $("player-matching-error").textContent = "";
+  renderMatchingGame();
   clearTimeout(matchingDraftTimer);
   matchingDraftTimer = setTimeout(() => void sendMatchingSubmission("draft"), 200);
 });
@@ -240,6 +242,10 @@ $("lock-player-matching").addEventListener("click", async () => {
   if (matchingSubmissionPending || matchingDraft.locked) return;
   if (matchingDraft.values.length !== 4 || matchingDraft.values.some((value) => !value)) {
     $("player-matching-error").textContent = "Bitte ordne allen vier Bildern eine Person zu.";
+    return;
+  }
+  if (!areMatchingValuesUnique(matchingDraft.values)) {
+    $("player-matching-error").textContent = "Jeder Spielername darf nur einmal verwendet werden.";
     return;
   }
   clearTimeout(matchingDraftTimer);
@@ -1041,11 +1047,15 @@ function renderPlayerMatchingBox(value, assignerIndex) {
   `;
 }
 
-function renderPlayerMatchingOptions(selectedValue = "") {
+function renderPlayerMatchingOptions(selectedValue = "", imageIndex = -1) {
+  const usedElsewhere = new Set(
+    matchingDraft.values.filter((_, index) => index !== imageIndex)
+  );
   return [
     '<option value="">Spieler wählen</option>',
     ...(roomState.players || []).map((item) =>
-      `<option value="${escapeHtml(item.name)}"${item.name === selectedValue ? " selected" : ""}>` +
+      `<option value="${escapeHtml(item.name)}"${item.name === selectedValue ? " selected" : ""}` +
+      `${usedElsewhere.has(item.name) ? " disabled" : ""}>` +
       `${escapeHtml(item.name)}</option>`
     )
   ].join("");
@@ -1053,13 +1063,13 @@ function renderPlayerMatchingOptions(selectedValue = "") {
 
 function renderPlayerMatchingOwnBox(imageIndex, assignerIndex, editable) {
   const assigner = MATCHING_ASSIGNERS[assignerIndex];
-  const positions = ["top-left", "top-right"];
+  const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
   const disabled = editable ? "" : " disabled";
   return `
     <label class="matching-assignment ${positions[assignerIndex]} ${assigner.team} active"
            aria-label="${escapeHtml(assigner.label)}">
       <select data-player-matching-index="${imageIndex}"${disabled}>
-        ${renderPlayerMatchingOptions(matchingDraft.values[imageIndex] || "")}
+        ${renderPlayerMatchingOptions(matchingDraft.values[imageIndex] || "", imageIndex)}
       </select>
     </label>
   `;
@@ -1090,9 +1100,10 @@ function renderMatchingGame() {
   const turn = getMatchingTurn(game.roundIndex, game.activeTurnIndex);
   const activePlayer = turn.assignerIndex === null ? null : game.assignerOrder?.[turn.assignerIndex];
   const ownAssignerIndex = game.assignerOrder?.findIndex((item) => item.id === playerId) ?? -1;
-  const isFirstAssigner = ownAssignerIndex >= 0 && ownAssignerIndex < 2;
+  const isSeeder = getMatchingTurn(game.roundIndex, 0).assignerIndexes.includes(ownAssignerIndex);
+  const isPending = game.status === "round-pending";
   const canSelfAssign = game.status === "assigning" && game.activeTurnIndex === 0 &&
-    isFirstAssigner && !game.submittedTeams?.[player.team] && !matchingDraft.locked;
+    isSeeder && !game.submittedTeams?.[player.team] && !matchingDraft.locked;
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
   const isRevealing = ["ready-to-reveal", "revealing"].includes(game.status);
@@ -1102,20 +1113,24 @@ function renderMatchingGame() {
     `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
   $("player-matching-blue-score").textContent = game.scores.blue;
   $("player-matching-red-score").textContent = game.scores.red;
-  $("player-matching-board").innerHTML = round.images.map((image, imageIndex) => `
+  $("player-matching-board").classList.toggle("hidden", isPending);
+  $("player-matching-board").innerHTML = isPending ? "" : round.images.map((image, imageIndex) => `
     <article class="matching-card">
       <div class="matching-image-frame">
         <img src="${image.src}" alt="${escapeHtml(image.label)}">
         ${renderPlayerMatchingOverlays(
           game,
           imageIndex,
-          isFirstAssigner ? ownAssignerIndex : -1,
+          isSeeder ? ownAssignerIndex : -1,
           canSelfAssign && !matchingSubmissionPending
         )}
       </div>
     </article>
   `).join("");
-  if (isFinished || isRoundFinished || isRevealing) {
+  if (isPending) {
+    $("player-matching-turn").className = "matching-turn finished";
+    $("player-matching-turn").textContent = "Warte darauf, dass der Moderator die erste Runde startet.";
+  } else if (isFinished || isRoundFinished || isRevealing) {
     $("player-matching-turn").className = "matching-turn finished";
     $("player-matching-turn").textContent = isFinished
       ? game.roundIndex < MATCHING_GAME_ROUNDS.length - 1
@@ -1127,11 +1142,11 @@ function renderMatchingGame() {
   } else {
     if (game.activeTurnIndex === 0) {
       $("player-matching-turn").className = "matching-turn split";
-      $("player-matching-turn").textContent = isFirstAssigner
+      $("player-matching-turn").textContent = isSeeder
         ? `${matchingDraft.locked || game.submittedTeams?.[player.team]
           ? "Deine Zuordnungen sind eingeloggt."
           : "Ordne den vier Bildern jeweils eine Person zu."}`
-        : "Die beiden Spieler 1 ordnen die Bilder zu.";
+        : `Die beiden Spieler ${turn.playerIndex + 1} ordnen die Bilder zu.`;
     } else {
       $("player-matching-turn").className = `matching-turn ${turn.team}`;
       $("player-matching-turn").textContent =
@@ -1139,9 +1154,10 @@ function renderMatchingGame() {
     }
   }
 
-  $("lock-player-matching").classList.toggle("hidden", !canSelfAssign);
+  $("lock-player-matching").classList.toggle("hidden", !canSelfAssign || isPending);
   $("lock-player-matching").disabled = matchingSubmissionPending ||
-    matchingDraft.values.some((value) => !value);
+    matchingDraft.values.some((value) => !value) ||
+    !areMatchingValuesUnique(matchingDraft.values);
   $("lock-player-matching").textContent = matchingSubmissionPending
     ? "Zuordnungen werden eingeloggt…"
     : "Zuordnungen einloggen";
@@ -1155,6 +1171,8 @@ function renderMatchingGame() {
       `Team Blau: ${result.blue} Punkte · Team Rot: ${result.red} Punkte. Wartet auf die nächste Runde.`;
   } else if (isRevealing) {
     $("player-matching-result").textContent = "Der Moderator deckt gleich alle Antworten auf.";
+  } else if (isPending) {
+    $("player-matching-result").textContent = "Die Bilder bleiben bis zum Rundenstart verborgen.";
   } else {
     $("player-matching-result").textContent = game.activeTurnIndex === 0
       ? "Beide Teams spielen mit denselben vier Bildern."
@@ -1253,6 +1271,7 @@ function renderEstimationGame() {
   const resultElement = $("player-estimation-result");
   resultElement.classList.remove("hidden");
 
+  $("player-estimation-title").classList.toggle("hidden", isGameNotStarted);
   $("player-estimation-round").textContent =
     `Frage ${game.roundIndex + 1} von ${ESTIMATION_ROUND_COUNT}`;
   $("player-estimation-blue-score").textContent = game.roundScores.blue;

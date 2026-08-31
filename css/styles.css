@@ -673,7 +673,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   position: relative;
   display: grid;
   place-items: center;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   background: #090b11;
 }

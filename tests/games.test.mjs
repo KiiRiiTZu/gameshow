@@ -16,6 +16,7 @@ import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
   MATCHING_TURNS,
+  areMatchingValuesUnique,
   getMatchingTurn,
   matchingGame
 } from "../js/games/matching-game.js";
@@ -526,6 +527,9 @@ test("collects both first players before the blue and red matching turns", () =>
     { id: "r2", name: "Mia", team: "red" }
   ];
   assert.equal(matchingGame.start(state, players), true);
+  assert.equal(state.game.status, "round-pending");
+  assert.equal(matchingGame.submitTeam(state, "blue"), false);
+  assert.equal(matchingGame.startFirstRound(state), true);
   assert.equal("assignments" in state.game, false);
   assert.equal(MATCHING_TURNS.length, 3);
   assert.equal(matchingGame.submitTeam(state, "blue"), true);
@@ -556,8 +560,8 @@ test("reveals and scores both teams on the same four images", () => {
   const players = MATCHING_ASSIGNERS.map((assigner, index) => ({
     id: String(index), name: `Spieler ${index + 1}`, team: assigner.team
   }));
-  const blueAssignments = [["Max", "Max"], ["Tom", "Max"], ["Lisa", "Lisa"], ["Mia", "Mia"]];
-  const redAssignments = [["Max", "Max"], ["Tom", "Lisa"], ["Lisa", "Lisa"], ["Mia", "Tom"]];
+  const blueAssignments = [["Max", "Max"], ["Tom", "Lisa"], ["Lisa", "Tom"], ["Mia", "Mia"]];
+  const redAssignments = [["Max", "Max"], ["Tom", "Lisa"], ["Lisa", "Tom"], ["Mia", "Mia"]];
   matchingGame.start(state, players);
   state.game.status = "ready-to-reveal";
 
@@ -565,7 +569,7 @@ test("reveals and scores both teams on the same four images", () => {
   assert.equal(matchingGame.revealAll(state, { blue: blueAssignments, red: redAssignments }), true);
   assert.equal(state.game.status, "round-finished");
   assert.deepEqual(state.game.revealedTeams, { blue: true, red: true });
-  assert.deepEqual(state.game.scores, { blue: 3, red: 2 });
+  assert.deepEqual(state.game.scores, { blue: 2, red: 2 });
 });
 
 test("ends matching early when the trailing team cannot catch up", () => {
@@ -576,9 +580,10 @@ test("ends matching early when the trailing team cannot catch up", () => {
     team: assigner.team
   }));
   matchingGame.start(state, players);
+  matchingGame.startFirstRound(state);
 
-  const perfect = Array.from({ length: 4 }, () => ["Max", "Max"]);
-  const noMatches = Array.from({ length: 4 }, () => ["Max", "Tom"]);
+  const perfect = [["Max", "Max"], ["Tom", "Tom"], ["Lisa", "Lisa"], ["Mia", "Mia"]];
+  const noMatches = [["Max", "Tom"], ["Tom", "Lisa"], ["Lisa", "Mia"], ["Mia", "Max"]];
 
   for (let roundIndex = 0; roundIndex < MATCHING_GAME_ROUNDS.length; roundIndex += 1) {
     matchingGame.submitTeam(state, "blue");
@@ -612,7 +617,7 @@ test("allows a draw in the matching game without awarding a match point", () => 
   state.game.roundIndex = MATCHING_GAME_ROUNDS.length - 1;
   state.game.status = "ready-to-reveal";
   state.game.scores = { blue: 4, red: 4 };
-  const equalAssignments = Array.from({ length: 4 }, () => ["Max", "Max"]);
+  const equalAssignments = [["Max", "Max"], ["Tom", "Tom"], ["Lisa", "Lisa"], ["Mia", "Mia"]];
 
   assert.equal(matchingGame.revealAll(state, {
     blue: equalAssignments,
@@ -637,7 +642,7 @@ test("encrypts player assignments so only the moderator key can read them", asyn
   assert.deepEqual(await decryptMatchingSubmission(keyPair.privateKey, encrypted), payload);
 });
 
-test("uses both first players, then blue player two, then red player two", () => {
+test("alternates assigning and matching players between rounds", () => {
   assert.equal(getMatchingTurn(0, 0).playerIndex, 0);
   assert.equal(getMatchingTurn(0, 1).playerIndex, 1);
   assert.equal(getMatchingTurn(0, 0).team, null);
@@ -646,7 +651,15 @@ test("uses both first players, then blue player two, then red player two", () =>
   assert.equal(getMatchingTurn(0, 1).assignerIndex, 2);
   assert.equal(getMatchingTurn(0, 2).team, "red");
   assert.equal(getMatchingTurn(0, 2).assignerIndex, 3);
-  assert.deepEqual(getMatchingTurn(3, 0).assignerIndexes, [0, 1]);
+  assert.deepEqual(getMatchingTurn(1, 0).assignerIndexes, [2, 3]);
+  assert.equal(getMatchingTurn(1, 1).assignerIndex, 0);
+  assert.equal(getMatchingTurn(1, 2).assignerIndex, 1);
+  assert.deepEqual(getMatchingTurn(3, 0).assignerIndexes, [2, 3]);
+});
+
+test("requires every player name to be unique within one assignment", () => {
+  assert.equal(areMatchingValuesUnique(["Max", "Lisa", "Tom", "Mia"]), true);
+  assert.equal(areMatchingValuesUnique(["Max", "Lisa", "Max", "Mia"]), false);
 });
 
 test("contains seven complete price products without public prices", () => {

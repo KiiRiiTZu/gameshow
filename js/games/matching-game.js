@@ -16,10 +16,21 @@ export function getMatchingTurn(roundIndex, activeTurnIndex) {
     Math.max(Number(activeTurnIndex) || 0, 0),
     MATCHING_TURNS.length - 1
   );
-  const turn = MATCHING_TURNS[turnIndex];
+  const assigningPlayerIndex = Math.abs(Number(roundIndex) || 0) % 2;
+  const matchingPlayerIndex = assigningPlayerIndex === 0 ? 1 : 0;
+  const playerIndex = turnIndex === 0 ? assigningPlayerIndex : matchingPlayerIndex;
+  const team = turnIndex === 0 ? null : turnIndex === 1 ? "blue" : "red";
+  const assignerIndexes = turnIndex === 0
+    ? [playerIndex * 2, playerIndex * 2 + 1]
+    : [playerIndex * 2 + (team === "red" ? 1 : 0)];
   return {
-    ...turn,
-    assignerIndex: turn.assignerIndexes.length === 1 ? turn.assignerIndexes[0] : null
+    playerIndex,
+    label: turnIndex === 0
+      ? `Spieler ${playerIndex + 1} beider Teams`
+      : `Spieler ${playerIndex + 1} · Team ${team === "blue" ? "Blau" : "Rot"}`,
+    team,
+    assignerIndexes,
+    assignerIndex: assignerIndexes.length === 1 ? assignerIndexes[0] : null
   };
 }
 
@@ -138,7 +149,7 @@ export const matchingGame = {
 
     state.game = {
       id: this.id,
-      status: "assigning",
+      status: "round-pending",
       roundIndex: 0,
       activeTurnIndex: 0,
       turnSubmitted: false,
@@ -155,6 +166,12 @@ export const matchingGame = {
       winningTeam: null,
       scoreSystemVersion: 3
     };
+    return true;
+  },
+
+  startFirstRound(state) {
+    if (state.game.id !== this.id || state.game.status !== "round-pending") return false;
+    state.game.status = "assigning";
     return true;
   },
 
@@ -241,7 +258,9 @@ export const matchingGame = {
       const teamAssignments = assignments?.[team];
       if (!Array.isArray(teamAssignments) || teamAssignments.length !== 4 ||
           teamAssignments.some((pair) => !Array.isArray(pair) || pair.length !== 2 ||
-            pair.some((value) => !String(value || "").trim()))) return false;
+            pair.some((value) => !String(value || "").trim())) ||
+          !areMatchingValuesUnique(teamAssignments.map((pair) => pair[0])) ||
+          !areMatchingValuesUnique(teamAssignments.map((pair) => pair[1]))) return false;
       state.game.revealedAssignments[team] = teamAssignments.map((pair) =>
         pair.map((value) => String(value).trim())
       );
