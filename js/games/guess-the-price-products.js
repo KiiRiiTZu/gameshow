@@ -2,39 +2,39 @@ const IMAGE_ROOT = "./assets/images/guess%20the%20price";
 
 export const PRICE_PRODUCTS = [
   {
-    id: "ck-one",
-    name: "Calvin Klein CK One",
-    src: `${IMAGE_ROOT}/Calcin%20Klein%20ck%20one%20(29,99%E2%82%AC).webp`
+    id: "heated-gloves",
+    name: "Beheizbare Handschuhe",
+    src: `${IMAGE_ROOT}/01-beheizbare-handschuhe.webp`
   },
   {
-    id: "ferrero-box",
-    name: "Ferrero Geschenkbox",
-    src: `${IMAGE_ROOT}/Ferrero%20Box%20(59,99%E2%82%AC).webp`
+    id: "bmw-m2",
+    name: "BMW M2",
+    src: `${IMAGE_ROOT}/02-bmw-m2.webp`
   },
   {
-    id: "weber-grill",
-    name: "Weber Grill",
-    src: `${IMAGE_ROOT}/Weber%20Grill%20(548,00%E2%82%AC).webp`
+    id: "phone-tripod",
+    name: "Handystativ",
+    src: `${IMAGE_ROOT}/03-handystativ.webp`
   },
   {
-    id: "der-nachbar",
-    name: "Sebastian Fitzek – Der Nachbar",
-    src: `${IMAGE_ROOT}/Fitzek%20der%20Nachbar%20(25,00%E2%82%AC).webp`
+    id: "thriller-vinyl",
+    name: "Michael Jackson – Thriller Vinyl",
+    src: `${IMAGE_ROOT}/04-thriller-vinyl.webp`
   },
   {
-    id: "iphone-17-pro-max",
-    name: "iPhone 17 Pro Max 2 TB",
-    src: `${IMAGE_ROOT}/iPhone%2017%20pro%20max%202TB%20(2.269,00%E2%82%AC).webp`
+    id: "oxford-master",
+    name: "Master in Mathematical Sciences · Oxford (1 Jahr, Overseas)",
+    src: `${IMAGE_ROOT}/05-oxford-master.webp`
   },
   {
-    id: "hyperx-cloud-3",
-    name: "HyperX Cloud III",
-    src: `${IMAGE_ROOT}/Hyperx%20Cloud%203%20(94,36%E2%82%AC).webp`
+    id: "oono",
+    name: "OOONO",
+    src: `${IMAGE_ROOT}/06-oono.webp`
   },
   {
-    id: "cat-toy",
-    name: "Katzenspielzeug",
-    src: `${IMAGE_ROOT}/Katzenspielzeug%20(22,94%E2%82%AC).webp`
+    id: "zwilling-knife-block",
+    name: "Zwilling Messerblock",
+    src: `${IMAGE_ROOT}/07-zwilling-messerblock.webp`
   }
 ];
 

@@ -3,7 +3,7 @@ export { formatEuroAmount, formatSignedEuroDifference, parseEuroAmount } from ".
 
 export const PRICE_GAME_WINNING_SCORE = 4;
 
-const PRODUCT_PRICES = [29.99, 59.99, 548, 25, 2269, 94.36, 22.94];
+const PRODUCT_PRICES = [79.99, 82_220, 11.54, 25.95, 51_800, 49.95, 149.90];
 
 function emptyTeams(value) {
   return { blue: structuredClone(value), red: structuredClone(value) };

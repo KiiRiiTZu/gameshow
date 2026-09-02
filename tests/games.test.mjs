@@ -740,13 +740,13 @@ test("contains seven complete price products without public prices", () => {
     existsSync(new URL(`../${product.src.replace("./", "")}`, import.meta.url))
   ));
   assert.deepEqual(PRICE_PRODUCTS.map((product) => product.id), [
-    "ck-one",
-    "ferrero-box",
-    "weber-grill",
-    "der-nachbar",
-    "iphone-17-pro-max",
-    "hyperx-cloud-3",
-    "cat-toy"
+    "heated-gloves",
+    "bmw-m2",
+    "phone-tripod",
+    "thriller-vinyl",
+    "oxford-master",
+    "oono",
+    "zwilling-knife-block"
   ]);
 });
 
@@ -771,8 +771,8 @@ test("locks both teams and awards the closer price guess", () => {
   assert.equal(guessThePriceGame.lockTeam(state, "red"), true);
   assert.equal(state.game.status, "ready-to-reveal");
   assert.equal(guessThePriceGame.revealRound(state, { blue: null, red: 40 }), false);
-  assert.equal(guessThePriceGame.revealRound(state, { blue: 30, red: 40 }), true);
-  assert.equal(state.game.revealed.actualPrice, 29.99);
+  assert.equal(guessThePriceGame.revealRound(state, { blue: 80, red: 40 }), true);
+  assert.equal(state.game.revealed.actualPrice, 79.99);
   assert.equal(state.game.revealed.roundWinner, "blue");
   assert.deepEqual(state.game.roundScores, { blue: 1, red: 0 });
   assert.equal(state.game.status, "revealed");
@@ -798,7 +798,7 @@ test("finishes the best of seven price game at four wins", () => {
 
 test("uses the requested product order with matching prices", () => {
   const state = createInitialRoomState("TEST");
-  const expectedPrices = [29.99, 59.99, 548, 25, 2269, 94.36, 22.94];
+  const expectedPrices = [79.99, 82_220, 11.54, 25.95, 51_800, 49.95, 149.90];
   guessThePriceGame.start(state);
 
   expectedPrices.forEach((expectedPrice, index) => {
