@@ -15,6 +15,8 @@ import { BUZZER_WINNING_SCORE, buzzerGame } from "./games/buzzer.js";
 import { BUZZER_QUESTIONS, getBuzzerQuestion } from "./games/buzzer-questions.js";
 import { top20Game } from "./games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
+import { rankingGame } from "./games/ranking-game.js";
+import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
 import { GERMANY_MAP_QUESTIONS, GERMANY_MAP_ROUNDS_TO_WIN, germanyMapGame } from "./games/germany-map.js";
 import { createEuropeMap } from "./europe-map-view.js";
 import {
@@ -60,6 +62,7 @@ import {
 
 registerGame(buzzerGame);
 registerGame(top20Game);
+registerGame(rankingGame);
 registerGame(germanyMapGame);
 registerGame(matchingGame);
 registerGame(guessThePriceGame);
@@ -87,6 +90,7 @@ let wordTimerActionPending = false;
 let wordMatchEditTimer = null;
 let previousGameId = null;
 let previousGameStatus = null;
+let rankingSelection = { itemId: null, position: null };
 
 const $ = (id) => document.getElementById(id);
 
@@ -412,6 +416,7 @@ async function initializeHost() {
     germanyMapGame.normalize(state);
     restoreMapNotes();
   }
+  if (state.game.id === rankingGame.id) rankingGame.normalize(state);
   if (state.game.id === matchingGame.id) {
     matchingGame.normalize(state);
     const assignmentsRestored = restoreMatchingAssignments();
@@ -479,6 +484,7 @@ function render() {
   $("force-next-game").disabled = moderatorActionPending;
 
   const spotifyIsActive = state.game.id === top20Game.id;
+  const rankingIsActive = state.game.id === rankingGame.id;
   const mapIsActive = state.game.id === germanyMapGame.id;
   const matchingIsActive = state.game.id === matchingGame.id;
   const priceIsActive = state.game.id === guessThePriceGame.id;
@@ -491,13 +497,14 @@ function render() {
   if (chatIsActive) renderHostTeamChats();
   document.querySelector(".shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("buzzer-game-panel").classList.toggle(
     "hidden",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
+  $("ranking-game-panel").classList.toggle("hidden", !rankingIsActive);
   $("map-game-panel").classList.toggle("hidden", !mapIsActive);
   $("matching-game-panel").classList.toggle("hidden", !matchingIsActive);
   $("price-game-panel").classList.toggle("hidden", !priceIsActive);
@@ -509,6 +516,7 @@ function render() {
   else if (priceIsActive) renderPriceGame();
   else if (matchingIsActive) renderMatchingGame();
   else if (mapIsActive) renderMapGame();
+  else if (rankingIsActive) renderRankingGame();
   else if (spotifyIsActive) renderSpotifyGame();
   else renderBuzzerGame();
 }
@@ -531,7 +539,7 @@ function getNextGameDefinition(gameId) {
     { id: germanyMapGame.id, name: germanyMapGame.name },
     { id: wordMatchGame.id, name: wordMatchGame.name },
     { id: guessThePriceGame.id, name: guessThePriceGame.name },
-    { id: top20Game.id, name: top20Game.name },
+    { id: rankingGame.id, name: rankingGame.name },
     { id: buzzerGame.id, name: buzzerGame.name }
   ];
   const currentIndex = games.findIndex((game) => game.id === gameId);
@@ -785,8 +793,8 @@ function renderPriceGame() {
   $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
   $("next-price-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-price-round").disabled = moderatorActionPending;
-  $("start-top20-game").classList.toggle("hidden", !isFinished || showIsFinished);
-  $("start-top20-game").disabled = moderatorActionPending;
+  $("start-ranking-game").classList.toggle("hidden", !isFinished || showIsFinished);
+  $("start-ranking-game").disabled = moderatorActionPending;
   $("price-round-result").classList.toggle("hidden", !isRevealed);
 
   if (!isRevealed) return;
@@ -807,6 +815,98 @@ function renderPriceGame() {
     <p>${roundMessage}</p>
     ${finalMessage}
   `;
+}
+
+function renderRankingBoard(game, list, interactive = false) {
+  const rows = [];
+  const proposalIndex = game.proposal ? Number(game.proposal.position) - 1 : -1;
+  for (let index = 0; index <= game.placedIds.length; index += 1) {
+    if (interactive && game.status === "playing") {
+      rows.push(`<button type="button" class="ranking-insert${rankingSelection.position === index + 1 ? " selected" : ""}"
+        data-ranking-position="${index + 1}">Position ${index + 1}</button>`);
+    }
+    if (proposalIndex === index) {
+      const proposed = getRankingEntry(list, game.proposal.itemId);
+      rows.push(`<div class="ranking-row proposed ${game.proposal.team}">
+        <span>${index + 1}</span><strong>${escapeHtml(proposed?.label || "")}</strong><small>vorgemerkt</small>
+      </div>`);
+    }
+    if (index < game.placedIds.length) {
+      const entry = getRankingEntry(list, game.placedIds[index]);
+      const isAnchor = entry?.id === list.anchorId;
+      const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
+      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}">
+        <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
+        <small>${isAnchor ? "Vorgabe" : "korrekt"}</small>
+      </div>`);
+    }
+  }
+  return `<div class="ranking-scale-label high">${escapeHtml(list.highLabel)}</div>
+    ${rows.join("")}
+    <div class="ranking-scale-label low">${escapeHtml(list.lowLabel)}</div>`;
+}
+
+function renderRankingGame() {
+  const game = state.game;
+  const list = getRankingList(game.roundIndex);
+  const isFinished = game.status === "finished";
+  const isRoundFinished = game.status === "round-finished";
+  const displayTeam = game.roundWinner || game.winningTeam || game.currentTeam;
+  const interactionLocked = game.status !== "playing";
+
+  $("ranking-round-label").textContent = `Liste ${game.roundIndex + 1} von ${RANKING_LISTS.length}`;
+  $("ranking-round-wins").textContent =
+    `Listensiege · Blau ${game.roundWins.blue} : ${game.roundWins.red} Rot`;
+  $("ranking-title").textContent = list.title;
+  $("ranking-turn").textContent = isFinished
+    ? game.winningTeam ? `${getTeamName(game.winningTeam)} gewinnt Einordnen!` : "Einordnen endet unentschieden"
+    : isRoundFinished
+      ? game.roundWinner ? `${getTeamName(game.roundWinner)} gewinnt die Liste!` : "Liste endet unentschieden"
+      : `${getTeamName(game.currentTeam)} ist dran`;
+  $("ranking-turn").className = `turn-card ${displayTeam || "blue"}`;
+  $("ranking-strikes").innerHTML =
+    `<span>Blau: <strong>${renderStrikes(game.strikes.blue)}</strong></span>` +
+    `<span>Rot: <strong>${renderStrikes(game.strikes.red)}</strong></span>`;
+  $("ranking-status").textContent = isFinished
+    ? "Spiel beendet" : isRoundFinished ? "Liste beendet"
+      : game.status === "ready-to-reveal" ? "Bereit zum Aufdecken"
+        : game.status === "revealed" ? "Aufgedeckt" : "Einordnung wählen";
+  $("ranking-status").className = `status-pill ${interactionLocked ? "closed" : "open"}`;
+
+  $("ranking-board").innerHTML = renderRankingBoard(game, list, true);
+  $("ranking-pool").innerHTML = game.remainingIds.filter((id) => id !== game.proposal?.itemId).map((id) => {
+    const entry = getRankingEntry(list, id);
+    return `<button type="button" class="ranking-candidate${rankingSelection.itemId === id ? " selected" : ""}"
+      data-ranking-item="${escapeHtml(id)}"${game.status !== "playing" ? " disabled" : ""}>${escapeHtml(entry?.label || "")}</button>`;
+  }).join("");
+
+  const result = game.lastResult;
+  $("ranking-result").classList.toggle("hidden", !result && !isFinished);
+  if (result) {
+    const entry = getRankingEntry(list, result.itemId);
+    const resultText = result.correct
+      ? `${entry.label} wurde richtig eingeordnet.`
+      : `${entry.label} war falsch eingeordnet und gehört an Position ${result.correctPosition}.`;
+    const conclusion = isFinished
+      ? game.winningTeam ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Einordnen!` : "Einordnen endet unentschieden."
+      : isRoundFinished && game.roundWinner ? `${getTeamName(game.roundWinner)} gewinnt diese Liste.` : "";
+    $("ranking-result").innerHTML = `<strong>${result.correct ? "✓ Richtig" : "✕ Falsch"}</strong>
+      <span>${escapeHtml(resultText)} Wert: ${escapeHtml(entry.value)}</span>
+      ${conclusion ? `<p>${escapeHtml(conclusion)}</p>` : ""}`;
+  } else if (isFinished) {
+    $("ranking-result").innerHTML = "<strong>Spiel beendet</strong><span>Einordnen endet unentschieden.</span>";
+  }
+
+  $("confirm-ranking-placement").classList.toggle("hidden", game.status !== "playing");
+  $("confirm-ranking-placement").disabled = moderatorActionPending ||
+    !rankingSelection.itemId || !rankingSelection.position;
+  $("reveal-ranking-placement").classList.toggle("hidden", game.status !== "ready-to-reveal");
+  $("next-ranking-turn").classList.toggle("hidden", game.status !== "revealed");
+  $("next-ranking-round").classList.toggle("hidden", !isRoundFinished);
+  $("start-buzzer-after-ranking").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
+  for (const id of ["reveal-ranking-placement", "next-ranking-turn", "next-ranking-round", "start-buzzer-after-ranking"]) {
+    $(id).disabled = moderatorActionPending;
+  }
 }
 
 function renderBuzzerGame() {
@@ -1967,12 +2067,11 @@ $("force-next-game").addEventListener("click", async () => {
       return true;
     }
     if (currentGameId === guessThePriceGame.id) {
-      top20Game.start(state);
-      top20Notes = emptyTop20Notes(0);
-      saveTop20Notes();
+      rankingGame.start(state);
+      rankingSelection = { itemId: null, position: null };
       return true;
     }
-    if (currentGameId === top20Game.id) {
+    if ([rankingGame.id, top20Game.id].includes(currentGameId)) {
       buzzerGame.start(state);
       return true;
     }
@@ -2052,6 +2151,53 @@ $("next-top20-round").addEventListener("click", async () => {
     return true;
   });
   if (accepted) await syncAllTop20Teams();
+});
+
+$("ranking-pool").addEventListener("click", (event) => {
+  const item = event.target.closest("[data-ranking-item]");
+  if (!item || item.disabled || state.game.id !== rankingGame.id || state.game.status !== "playing") return;
+  rankingSelection.itemId = item.dataset.rankingItem;
+  renderRankingGame();
+});
+
+$("ranking-board").addEventListener("click", (event) => {
+  const position = event.target.closest("[data-ranking-position]");
+  if (!position || state.game.id !== rankingGame.id || state.game.status !== "playing") return;
+  rankingSelection.position = Number(position.dataset.rankingPosition);
+  renderRankingGame();
+});
+
+$("confirm-ranking-placement").addEventListener("click", async () => {
+  $("ranking-error").textContent = "";
+  const accepted = await runModeratorAction(() => rankingGame.proposePlacement(
+    state,
+    rankingSelection.itemId,
+    rankingSelection.position
+  ));
+  if (accepted) rankingSelection = { itemId: null, position: null };
+  else $("ranking-error").textContent = "Diese Einordnung konnte nicht übernommen werden.";
+});
+
+$("reveal-ranking-placement").addEventListener("click", async () => {
+  $("ranking-error").textContent = "";
+  await runModeratorAction(() => rankingGame.revealPlacement(state));
+});
+
+$("next-ranking-turn").addEventListener("click", async () => {
+  rankingSelection = { itemId: null, position: null };
+  await runModeratorAction(() => rankingGame.startNextTurn(state));
+});
+
+$("next-ranking-round").addEventListener("click", async () => {
+  rankingSelection = { itemId: null, position: null };
+  await runModeratorAction(() => rankingGame.startNextRound(state));
+});
+
+$("start-buzzer-after-ranking").addEventListener("click", async () => {
+  await runModeratorAction(() => {
+    if (getShowWinner(state) || state.game.id !== rankingGame.id || state.game.status !== "finished") return false;
+    return buzzerGame.start(state);
+  });
 });
 
 $("start-buzzer-game-after-top20").addEventListener("click", async () => {
@@ -2419,15 +2565,12 @@ $("start-price-game").addEventListener("click", async () => {
   if (accepted) await syncAllPriceTeams();
 });
 
-$("start-top20-game").addEventListener("click", async () => {
-  const accepted = await runModeratorAction(() => {
+$("start-ranking-game").addEventListener("click", async () => {
+  await runModeratorAction(() => {
     if (getShowWinner(state) || state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
-    top20Game.start(state);
-    top20Notes = emptyTop20Notes(0);
-    saveTop20Notes();
-    return true;
+    rankingSelection = { itemId: null, position: null };
+    return rankingGame.start(state);
   });
-  if (accepted) await syncAllTop20Teams();
 });
 
 $("reveal-price-round").addEventListener("click", async () => {

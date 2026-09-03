@@ -7,6 +7,7 @@ import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode } from "./
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
+import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
 import { createEuropeMap } from "./europe-map-view.js";
 import {
   MATCHING_ASSIGNERS,
@@ -35,6 +36,7 @@ import { showGameTransition } from "./game-effects.js";
 import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
+const RANKING_GAME_ID = "ranking-game";
 const TOP_20_SLOT_COUNT = 20;
 const GERMANY_MAP_GAME_ID = "germany-map";
 const MATCHING_GAME_ID = "matching-game";
@@ -757,6 +759,7 @@ function render() {
     : "";
 
   const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
+  const rankingIsActive = roomState.game?.id === RANKING_GAME_ID;
   const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
   const matchingIsActive = roomState.game?.id === MATCHING_GAME_ID;
   const priceIsActive = roomState.game?.id === PRICE_GAME_ID;
@@ -764,13 +767,14 @@ function render() {
   const wordMatchIsActive = roomState.game?.id === WORD_MATCH_GAME_ID;
   document.querySelector(".player-shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("player-buzzer-game").classList.toggle(
     "hidden",
-    spotifyIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("player-spotify-game").classList.toggle("hidden", !spotifyIsActive);
+  $("player-ranking-game").classList.toggle("hidden", !rankingIsActive);
   $("player-map-game").classList.toggle("hidden", !mapIsActive);
   $("player-matching-game").classList.toggle("hidden", !matchingIsActive);
   $("player-price-game").classList.toggle("hidden", !priceIsActive);
@@ -799,6 +803,11 @@ function render() {
 
   if (mapIsActive) {
     renderMapGame();
+    return;
+  }
+
+  if (rankingIsActive) {
+    renderRankingGame();
     return;
   }
 
@@ -922,6 +931,73 @@ function renderSpotifyGame() {
     : isRoundFinished
       ? `Liste ${roundNumber} ist beendet. Wartet auf die nächste Liste.`
       : "";
+}
+
+function renderPlayerRankingBoard(game, list) {
+  const rows = [];
+  const proposalIndex = game.proposal ? Number(game.proposal.position) - 1 : -1;
+  for (let index = 0; index <= game.placedIds.length; index += 1) {
+    if (proposalIndex === index) {
+      const proposed = getRankingEntry(list, game.proposal.itemId);
+      rows.push(`<div class="ranking-row proposed ${game.proposal.team}">
+        <span>${index + 1}</span><strong>${escapeHtml(proposed?.label || "")}</strong><small>vorgemerkt</small>
+      </div>`);
+    }
+    if (index < game.placedIds.length) {
+      const entry = getRankingEntry(list, game.placedIds[index]);
+      const isAnchor = entry?.id === list.anchorId;
+      const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
+      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}">
+        <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
+        <small>${isAnchor ? "Vorgabe" : "korrekt"}</small>
+      </div>`);
+    }
+  }
+  return `<div class="ranking-scale-label high">${escapeHtml(list.highLabel)}</div>
+    ${rows.join("")}
+    <div class="ranking-scale-label low">${escapeHtml(list.lowLabel)}</div>`;
+}
+
+function renderRankingGame() {
+  const game = roomState.game;
+  const list = getRankingList(game.roundIndex);
+  const isFinished = game.status === "finished";
+  const isRoundFinished = game.status === "round-finished";
+  const displayTeam = game.roundWinner || game.winningTeam || game.currentTeam;
+  $("player-ranking-round").textContent = `Liste ${game.roundIndex + 1} von ${RANKING_LISTS.length}`;
+  $("player-ranking-round-wins").textContent =
+    `Listensiege · Blau ${game.roundWins.blue} : ${game.roundWins.red} Rot`;
+  $("player-ranking-title").textContent = list.title;
+  $("player-ranking-turn").textContent = isFinished
+    ? game.winningTeam ? `${getTeamName(game.winningTeam)} gewinnt Einordnen!` : "Einordnen endet unentschieden"
+    : isRoundFinished
+      ? game.roundWinner ? `${getTeamName(game.roundWinner)} gewinnt die Liste!` : "Liste endet unentschieden"
+      : `${getTeamName(game.currentTeam)} ist dran`;
+  $("player-ranking-turn").className = `turn-card ${displayTeam || "blue"}`;
+  $("player-ranking-strikes").innerHTML =
+    `<span>Blau: <strong>${renderStrikes(game.strikes.blue)}</strong></span>` +
+    `<span>Rot: <strong>${renderStrikes(game.strikes.red)}</strong></span>`;
+  $("player-ranking-board").innerHTML = renderPlayerRankingBoard(game, list);
+  $("player-ranking-pool").innerHTML = game.remainingIds.filter((id) => id !== game.proposal?.itemId).map((id) => {
+    const entry = getRankingEntry(list, id);
+    return `<span class="ranking-candidate">${escapeHtml(entry?.label || "")}</span>`;
+  }).join("");
+
+  const result = game.lastResult;
+  if (result) {
+    const entry = getRankingEntry(list, result.itemId);
+    const resultText = result.correct
+      ? `✓ ${entry.label} wurde richtig eingeordnet.`
+      : `✕ ${entry.label} war falsch eingeordnet und gehört an Position ${result.correctPosition}.`;
+    const conclusion = isFinished
+      ? game.winningTeam ? ` 🏆 ${getTeamName(game.winningTeam)} gewinnt Einordnen!` : " Einordnen endet unentschieden."
+      : isRoundFinished && game.roundWinner ? ` ${getTeamName(game.roundWinner)} gewinnt diese Liste.` : "";
+    $("player-ranking-result").textContent = `${resultText} Wert: ${entry.value}.${conclusion}`;
+  } else {
+    $("player-ranking-result").textContent = game.status === "ready-to-reveal"
+      ? "Die Einordnung ist vorgemerkt. Der Moderator deckt gleich auf."
+      : "";
+  }
 }
 
 function renderPersonalNoteFields(containerId, notes = {}, ownEditable = true) {

@@ -7,6 +7,12 @@ import { BUZZER_QUESTIONS } from "../js/games/buzzer-questions.js";
 import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT } from "../js/games/top-20-lists.js";
 import {
+  RANKING_MAX_STRIKES,
+  RANKING_ROUNDS_TO_WIN,
+  rankingGame
+} from "../js/games/ranking-game.js";
+import { RANKING_LISTS } from "../js/games/ranking-lists.js";
+import {
   GERMANY_MAP_QUESTIONS,
   GERMANY_MAP_ROUNDS_TO_WIN,
   distanceInKilometers,
@@ -100,7 +106,7 @@ test("contains presentation cards for all seven games", () => {
     "germany-map",
     "word-match-game",
     "guess-the-price",
-    "spotify-top-artists",
+    "ranking-game",
     "buzzer"
   ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6, 7]);
   assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");
@@ -108,6 +114,60 @@ test("contains presentation cards for all seven games", () => {
   assert.equal(getGamePresentation("matching-game").name, "Da seh ich dich");
   assert.equal(getGamePresentation("estimation-game").name, "Mittelwert");
   assert.equal(getGamePresentation("word-match-game").name, "Begriffsmatch");
+  assert.equal(getGamePresentation("ranking-game").name, "Einordnen");
+  assert.equal(getGamePresentation("spotify-top-artists").name, "Top 20");
+});
+
+test("contains the three prepared Einordnen lists and their anchors", () => {
+  assert.equal(RANKING_LISTS.length, 3);
+  assert.deepEqual(RANKING_LISTS.map((list) => list.anchorId), ["iso", "banana", "man-germany"]);
+  assert.equal(RANKING_LISTS[0].entries.find((entry) => entry.id === "miks")?.label, "Miks");
+  for (const list of RANKING_LISTS) {
+    assert.ok(list.entries.length > 1);
+    assert.ok(list.entries.some((entry) => entry.id === list.anchorId));
+  }
+});
+
+test("Einordnen validates relative placements and alternates turns", () => {
+  const state = createInitialRoomState("TEST");
+  rankingGame.start(state, "blue");
+
+  assert.deepEqual(state.game.placedIds, ["iso"]);
+  assert.equal(rankingGame.proposePlacement(state, "sova", 1), true);
+  assert.equal(rankingGame.revealPlacement(state), true);
+  assert.equal(state.game.lastResult.correct, true);
+  assert.deepEqual(state.game.placedIds, ["sova", "iso"]);
+  assert.equal(rankingGame.startNextTurn(state), true);
+  assert.equal(state.game.currentTeam, "red");
+
+  assert.equal(rankingGame.proposePlacement(state, "harbor", 1), true);
+  assert.equal(rankingGame.revealPlacement(state), true);
+  assert.equal(state.game.lastResult.correct, false);
+  assert.equal(state.game.strikes.red, 1);
+  assert.equal(state.game.remainingIds.includes("harbor"), false);
+});
+
+test("Einordnen ends a list on the second error and alternates its starting team", () => {
+  const state = createInitialRoomState("TEST");
+  rankingGame.start(state, "blue");
+  assert.equal(RANKING_MAX_STRIKES, 2);
+  assert.equal(RANKING_ROUNDS_TO_WIN, 2);
+
+  rankingGame.proposePlacement(state, "jett", 2);
+  rankingGame.revealPlacement(state);
+  rankingGame.startNextTurn(state);
+  rankingGame.proposePlacement(state, "harbor", 2);
+  rankingGame.revealPlacement(state);
+  rankingGame.startNextTurn(state);
+  rankingGame.proposePlacement(state, "reyna", 2);
+  rankingGame.revealPlacement(state);
+
+  assert.equal(state.game.status, "round-finished");
+  assert.equal(state.game.roundWinner, "red");
+  assert.equal(state.game.roundWins.red, 1);
+  assert.equal(rankingGame.startNextRound(state), true);
+  assert.equal(state.game.currentTeam, "red");
+  assert.deepEqual(state.game.placedIds, ["banana"]);
 });
 
 test("starts a new show with Mittelwert waiting for the moderator", () => {

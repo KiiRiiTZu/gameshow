@@ -129,6 +129,40 @@
       </div>
     </section>
 
+    <section id="ranking-game-panel" class="card game-panel hidden">
+      <div class="game-heading">
+        <div>
+          <p class="eyebrow">SPIEL 6 · BEST OF 3</p>
+          <h2>Einordnen</h2>
+          <p id="ranking-round-label" class="muted">Liste 1 von 3</p>
+        </div>
+        <span id="ranking-status" class="status-pill open">Läuft</span>
+      </div>
+      <div id="ranking-round-wins" class="round-wins">Listensiege · Blau 0 : 0 Rot</div>
+      <div class="ranking-meta">
+        <div id="ranking-turn" class="turn-card blue">Team Blau ist dran</div>
+        <div id="ranking-strikes" class="strike-board">Blau: — · Rot: —</div>
+      </div>
+      <div class="ranking-title-card">
+        <span class="eyebrow">EINORDNEN</span>
+        <h3 id="ranking-title"></h3>
+      </div>
+      <div id="ranking-board" class="ranking-board"></div>
+      <div class="ranking-pool-wrap">
+        <strong>Noch verfügbare Begriffe</strong>
+        <div id="ranking-pool" class="ranking-pool"></div>
+      </div>
+      <div id="ranking-result" class="map-result hidden"></div>
+      <p id="ranking-error" class="error"></p>
+      <div class="controls">
+        <button id="confirm-ranking-placement" class="button primary">Einordnung vormerken</button>
+        <button id="reveal-ranking-placement" class="button primary hidden">Einordnung aufdecken</button>
+        <button id="next-ranking-turn" class="button primary hidden">Nächster Begriff</button>
+        <button id="next-ranking-round" class="button primary hidden">Nächste Liste starten</button>
+        <button id="start-buzzer-after-ranking" class="button primary hidden">Buzzer Quiz starten</button>
+      </div>
+    </section>
+
     <section id="map-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
@@ -249,7 +283,7 @@
       <div class="controls">
         <button id="reveal-price-round" class="button primary">Preis aufdecken &amp; auswerten</button>
         <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
-        <button id="start-top20-game" class="button primary hidden">Top 20 starten</button>
+        <button id="start-ranking-game" class="button primary hidden">Einordnen starten</button>
       </div>
 
     </section>
