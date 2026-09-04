@@ -593,6 +593,7 @@ async function handleEvent(event, payload) {
         opponentValues: Array.isArray(privateState.opponentValues)
           ? Array.from({ length: 4 }, (_, index) =>
             String(privateState.opponentValues[index] || "")
+          )
           : null
       };
       matchingSubmissionPending = false;
