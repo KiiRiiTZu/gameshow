@@ -26,8 +26,7 @@ import {
   WORD_MATCH_TERM_COUNT,
   WORD_MATCH_TIEBREAK_SECONDS,
   getWordMatchGuessOrder,
-  getWordMatchRoles,
-  getWordMatchTiebreakTurn
+  getWordMatchRoles
 } from "./games/word-match-game.js";
 import {
   createEncryptionKeyPair,
@@ -980,7 +979,7 @@ function renderPlayerRankingBoard(game, list) {
       const entry = getRankingEntry(list, game.placedIds[index]);
       const isAnchor = entry?.id === list.anchorId;
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
-      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}">
+      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
         <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
       </div>`);
@@ -1558,7 +1557,6 @@ function renderWordMatchGame() {
   const isTiebreak = Boolean(game.tiebreak) &&
     ["tiebreak-pending", "tiebreak-playing", "finished"].includes(game.status);
   if (isTiebreak) {
-    const turn = getWordMatchTiebreakTurn(game);
     const finished = game.status === "finished";
     const tiebreakVisible = game.status !== "tiebreak-pending";
     $("player-word-match-round").textContent = "Finale bei Gleichstand";
@@ -1569,15 +1567,27 @@ function renderWordMatchGame() {
     updatePlayerWordMatchTimer();
     $("player-word-seed-form").classList.add("hidden");
     $("player-word-match-locks").classList.add("hidden");
-    $("player-word-match-lists").classList.add("hidden");
-    $("player-word-match-lists").innerHTML = "";
+    $("player-word-match-lists").classList.toggle("hidden", !tiebreakVisible);
+    $("player-word-match-lists").innerHTML = tiebreakVisible
+      ? `<article class="word-match-list word-match-tiebreak-list">
+          <strong>Finalbegriffe · Kino</strong>
+          ${game.tiebreak.terms.map((term, index) => {
+            const claimedBy = game.tiebreak.claimedBy[index];
+            const revealed = game.tiebreak.revealed[index];
+            return `<div class="word-match-tiebreak-term${claimedBy ? ` claimed ${claimedBy}` : revealed ? " revealed" : ""}">
+              <span>${index + 1}. ${revealed ? escapeHtml(term) : "Noch verdeckt"}</span>
+              ${claimedBy ? `<strong>${getTeamName(claimedBy)}</strong>` : ""}
+            </div>`;
+          }).join("")}
+        </article>`
+      : "";
     $("player-word-match-role").textContent = finished
       ? game.winningTeam
         ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Begriffsmatch!`
         : "Das Finale endet unentschieden."
       : game.status === "tiebreak-pending"
         ? "Wartet darauf, dass der Moderator das 90-Sekunden-Finale startet."
-        : `${turn.player?.name || getTeamName(turn.team)} ist dran · Spieler ${turn.playerIndex + 1}`;
+        : "Das Finale läuft. Der Moderator deckt Treffer einzeln auf.";
     $("player-word-match-result").textContent = finished
       ? `Finale: Blau ${game.tiebreak.scores.blue} Treffer · Rot ${game.tiebreak.scores.red} Treffer`
       : "";

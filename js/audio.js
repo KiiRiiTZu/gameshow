@@ -1,5 +1,6 @@
 const buzzerSound = new Audio("./assets/audio/buzzer.mp3");
 buzzerSound.preload = "auto";
+buzzerSound.volume = 0.5;
 
 export async function playBuzzerSound() {
   try {

@@ -45,7 +45,6 @@ import {
   WORD_MATCH_TIEBREAK_SECONDS,
   getWordMatchGuessOrder,
   getWordMatchRoles,
-  getWordMatchTiebreakTurn,
   wordMatchGame
 } from "./games/word-match-game.js";
 import {
@@ -666,7 +665,6 @@ function renderWordMatchGame() {
   const isTiebreak = Boolean(game.tiebreak) &&
     ["tiebreak-pending", "tiebreak-playing", "finished"].includes(game.status);
   if (isTiebreak) {
-    const turn = getWordMatchTiebreakTurn(game);
     const playing = game.status === "tiebreak-playing";
     const finished = game.status === "finished";
     $("word-match-round-label").textContent = "Finale bei Gleichstand";
@@ -676,7 +674,7 @@ function renderWordMatchGame() {
     $("word-match-category-card").classList.remove("hidden");
     $("word-match-roles").textContent = finished
       ? "Das Finale ist beendet."
-      : `${turn.player?.name || getTeamName(turn.team)} ist dran · Spieler ${turn.playerIndex + 1}`;
+      : playing ? "Der Moderator ordnet Treffer Team Blau oder Team Rot zu." : "Das Finale ist bereit.";
     updateHostWordMatchTimer();
     $("word-match-status").textContent = finished
       ? "Spiel beendet" : playing ? "Finale läuft" : "Finale bereit";
@@ -686,13 +684,16 @@ function renderWordMatchGame() {
       <strong>Moderator-Liste · Kino</strong>
       ${game.tiebreak.terms.map((term, index) => {
         const claimedBy = game.tiebreak.claimedBy[index];
-        return `<div class="word-match-tiebreak-term${claimedBy ? ` claimed ${claimedBy}` : ""}">
+        const revealed = game.tiebreak.revealed[index];
+        return `<div class="word-match-tiebreak-term${claimedBy ? ` claimed ${claimedBy}` : revealed ? " revealed" : ""}">
           <span>${index + 1}. ${escapeHtml(term)}</span>
           <div>
             <button type="button" class="button tiny blue" data-word-tiebreak-index="${index}" data-word-tiebreak-team="blue"
-              ${!playing || claimedBy || turn.team !== "blue" ? " disabled" : ""}>Blau</button>
+              ${!playing || claimedBy ? " disabled" : ""}>Blau</button>
             <button type="button" class="button tiny danger" data-word-tiebreak-index="${index}" data-word-tiebreak-team="red"
-              ${!playing || claimedBy || turn.team !== "red" ? " disabled" : ""}>Rot</button>
+              ${!playing || claimedBy ? " disabled" : ""}>Rot</button>
+            <button type="button" class="button tiny secondary" data-word-tiebreak-reveal="${index}"
+              ${revealed ? " disabled" : ""}>Aufdecken</button>
           </div>
         </div>`;
       }).join("")}
@@ -703,10 +704,9 @@ function renderWordMatchGame() {
       "reveal-word-match-round", "next-word-match-round"
     ]) $(id).classList.add("hidden");
     $("start-word-tiebreak").classList.toggle("hidden", game.status !== "tiebreak-pending");
-    $("skip-word-tiebreak-turn").classList.toggle("hidden", !playing);
     $("finish-word-tiebreak").classList.toggle("hidden", !playing);
     $("start-ranking-after-word").classList.toggle("hidden", !finished || Boolean(getShowWinner(state)));
-    for (const id of ["start-word-tiebreak", "skip-word-tiebreak-turn", "finish-word-tiebreak", "start-ranking-after-word"]) {
+    for (const id of ["start-word-tiebreak", "finish-word-tiebreak", "start-ranking-after-word"]) {
       $(id).disabled = moderatorActionPending || wordTimerActionPending;
     }
     $("word-match-result").classList.toggle("hidden", !finished);
@@ -785,7 +785,6 @@ function renderWordMatchGame() {
   $("next-word-match-round").classList.toggle("hidden", !isRoundFinished);
   $("start-ranking-after-word").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
   $("start-word-tiebreak").classList.add("hidden");
-  $("skip-word-tiebreak-turn").classList.add("hidden");
   $("finish-word-tiebreak").classList.add("hidden");
   $("start-ranking-after-word").disabled = moderatorActionPending;
   for (const id of [
@@ -894,7 +893,7 @@ function renderRankingBoard(game, list, interactive = false) {
       const entry = getRankingEntry(list, game.placedIds[index]);
       const isAnchor = entry?.id === list.anchorId;
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
-      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}">
+      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
         <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
       </div>`);
@@ -1425,7 +1424,11 @@ async function broadcastState() {
   }
   if (state.game.id === wordMatchGame.id) {
     publicState.wordMatchSubmissionKey = matchingPublicKey;
-    if (publicState.game.tiebreak) publicState.game.tiebreak.terms = [];
+    if (publicState.game.tiebreak) {
+      publicState.game.tiebreak.terms = publicState.game.tiebreak.terms.map((term, index) =>
+        publicState.game.tiebreak.revealed[index] ? term : ""
+      );
+    }
     if (["blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing", "results-pending"]
       .includes(state.game.status)) {
       publicState.game.currentMatches = { blue: [], red: [] };
@@ -2605,6 +2608,14 @@ $("word-match-lists").addEventListener("input", (event) => {
 });
 
 $("word-match-lists").addEventListener("click", async (event) => {
+  const revealButton = event.target.closest("[data-word-tiebreak-reveal]");
+  if (revealButton) {
+    await runModeratorAction(() => wordMatchGame.revealTiebreakTerm(
+      state,
+      Number(revealButton.dataset.wordTiebreakReveal)
+    ));
+    return;
+  }
   const tiebreakButton = event.target.closest("[data-word-tiebreak-index][data-word-tiebreak-team]");
   if (tiebreakButton) {
     await runModeratorAction(() => wordMatchGame.claimTiebreakTerm(
@@ -2625,10 +2636,6 @@ $("word-match-lists").addEventListener("click", async (event) => {
 
 $("start-word-tiebreak").addEventListener("click", async () => {
   await runModeratorAction(() => wordMatchGame.startTiebreaker(state));
-});
-
-$("skip-word-tiebreak-turn").addEventListener("click", async () => {
-  await runModeratorAction(() => wordMatchGame.skipTiebreakTurn(state));
 });
 
 $("finish-word-tiebreak").addEventListener("click", async () => {

@@ -60,7 +60,6 @@ import {
   WORD_MATCH_TIEBREAK_TERMS,
   getWordMatchGuessOrder,
   getWordMatchRoles,
-  getWordMatchTiebreakTurn,
   wordMatchGame
 } from "../js/games/word-match-game.js";
 import {
@@ -267,18 +266,18 @@ test("starts the Begriffsmatch Kino tiebreak after four tied rounds", () => {
   assert.deepEqual(state.game.tiebreak.terms, WORD_MATCH_TIEBREAK_TERMS);
   assert.equal(wordMatchGame.startTiebreaker(state, 4_000), true);
   assert.equal(state.game.phaseEndsAt, 4_000 + WORD_MATCH_TIEBREAK_SECONDS * 1000);
-  assert.equal(getWordMatchTiebreakTurn(state.game).player.id, "r1");
-  assert.equal(wordMatchGame.claimTiebreakTerm(state, 0, "blue"), false);
   assert.equal(wordMatchGame.claimTiebreakTerm(state, 0, "red"), true);
-  assert.equal(getWordMatchTiebreakTurn(state.game).player.id, "b1");
-  assert.equal(wordMatchGame.skipTiebreakTurn(state), true);
-  assert.equal(getWordMatchTiebreakTurn(state.game).player.id, "r2");
-  assert.equal(wordMatchGame.claimTiebreakTerm(state, 1, "red"), true);
-  assert.equal(getWordMatchTiebreakTurn(state.game).player.id, "b2");
+  assert.equal(state.game.tiebreak.revealed[0], true);
+  assert.equal(wordMatchGame.claimTiebreakTerm(state, 1, "blue"), true);
+  assert.equal(wordMatchGame.revealTiebreakTerm(state, 2), true);
+  assert.equal(state.game.tiebreak.revealed[2], true);
+  assert.equal(state.game.tiebreak.claimedBy[2], null);
+  assert.equal(wordMatchGame.claimTiebreakTerm(state, 3, "red"), true);
   assert.equal(wordMatchGame.finishTiebreaker(state), true);
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "red");
-  assert.deepEqual(state.game.tiebreak.scores, { blue: 0, red: 2 });
+  assert.deepEqual(state.game.tiebreak.scores, { blue: 1, red: 2 });
+  assert.equal(wordMatchGame.revealTiebreakTerm(state, 4), true);
   assert.equal(state.scores.red, 1);
 });
 

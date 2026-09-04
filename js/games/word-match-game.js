@@ -34,19 +34,12 @@ function publicParticipants(participants) {
   );
 }
 
-const WORD_MATCH_TIEBREAK_ORDER = [
-  { team: "red", playerIndex: 0 },
-  { team: "blue", playerIndex: 0 },
-  { team: "red", playerIndex: 1 },
-  { team: "blue", playerIndex: 1 }
-];
-
 function emptyTiebreak() {
   return {
     category: "Kino",
     terms: [...WORD_MATCH_TIEBREAK_TERMS],
     claimedBy: Array(WORD_MATCH_TIEBREAK_TERMS.length).fill(null),
-    turnIndex: 0,
+    revealed: Array(WORD_MATCH_TIEBREAK_TERMS.length).fill(false),
     scores: emptyScores()
   };
 }
@@ -57,16 +50,6 @@ function finishGame(state, winningTeam = null) {
   state.game.winningTeam = winningTeam || (state.game.scores.blue === state.game.scores.red
     ? null : state.game.scores.blue > state.game.scores.red ? "blue" : "red");
   if (state.game.winningTeam) state.scores[state.game.winningTeam] += 1;
-}
-
-export function getWordMatchTiebreakTurn(game) {
-  const turn = WORD_MATCH_TIEBREAK_ORDER[
-    (Number(game?.tiebreak?.turnIndex) || 0) % WORD_MATCH_TIEBREAK_ORDER.length
-  ];
-  const player = game?.participants?.find((item) =>
-    item.team === turn.team && item.playerIndex === turn.playerIndex
-  ) || null;
-  return { ...turn, player };
 }
 
 export function getWordMatchRoles(game) {
@@ -160,7 +143,9 @@ export const wordMatchGame = {
             ? state.game.tiebreak.claimedBy[index]
             : null
         ),
-        turnIndex: Math.max(0, Number(state.game.tiebreak.turnIndex) || 0),
+        revealed: Array.from({ length: WORD_MATCH_TIEBREAK_TERMS.length }, (_, index) =>
+          Boolean(state.game.tiebreak.revealed?.[index] || state.game.tiebreak.claimedBy?.[index])
+        ),
         scores: {
           blue: Number(state.game.tiebreak.scores?.blue) || defaults.scores.blue,
           red: Number(state.game.tiebreak.scores?.red) || defaults.scores.red
@@ -282,21 +267,23 @@ export const wordMatchGame = {
     if (state.game.id !== this.id || state.game.status !== "tiebreak-playing" ||
         !state.game.tiebreak) return false;
     const termIndex = Number(index);
-    const turn = getWordMatchTiebreakTurn(state.game);
     if (!Number.isInteger(termIndex) || termIndex < 0 ||
         termIndex >= WORD_MATCH_TIEBREAK_TERMS.length ||
-        state.game.tiebreak.claimedBy[termIndex] || team !== turn.team) return false;
+        state.game.tiebreak.claimedBy[termIndex] || !["blue", "red"].includes(team)) return false;
     state.game.tiebreak.claimedBy[termIndex] = team;
+    state.game.tiebreak.revealed[termIndex] = true;
     state.game.tiebreak.scores[team] += 1;
-    state.game.tiebreak.turnIndex += 1;
-    if (state.game.tiebreak.claimedBy.every(Boolean)) this.finishTiebreaker(state);
     return true;
   },
 
-  skipTiebreakTurn(state) {
-    if (state.game.id !== this.id || state.game.status !== "tiebreak-playing" ||
+  revealTiebreakTerm(state, index) {
+    if (state.game.id !== this.id || !["tiebreak-playing", "finished"].includes(state.game.status) ||
         !state.game.tiebreak) return false;
-    state.game.tiebreak.turnIndex += 1;
+    const termIndex = Number(index);
+    if (!Number.isInteger(termIndex) || termIndex < 0 ||
+        termIndex >= WORD_MATCH_TIEBREAK_TERMS.length ||
+        state.game.tiebreak.revealed[termIndex]) return false;
+    state.game.tiebreak.revealed[termIndex] = true;
     return true;
   },
 
