@@ -871,6 +871,11 @@ button.ranking-candidate:disabled { opacity: .72; }
   margin: 20px 0;
 }
 
+.matching-board.tiebreak {
+  grid-template-columns: minmax(320px, 760px);
+  justify-content: center;
+}
+
 .matching-card {
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.09);

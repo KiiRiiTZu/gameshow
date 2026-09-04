@@ -13,7 +13,9 @@ import { createEuropeMap } from "./europe-map-view.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
+  MATCHING_TIEBREAK_IMAGES,
   areMatchingValuesUnique,
+  getMatchingRoleRoundIndex,
   getMatchingTurn
 } from "./games/matching-game.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
@@ -106,6 +108,14 @@ let wordMatchDraftTimer = null;
 let wordMatchSubmissionPending = false;
 let previousGameId = null;
 let previousGameStatus = null;
+
+function matchingDraftRoundIndex(game = roomState?.game) {
+  return getMatchingRoleRoundIndex(game);
+}
+
+function matchingDraftValueCount(game = roomState?.game) {
+  return game?.tiebreak ? 1 : 4;
+}
 
 function showPlayerGame() {
   if (!player) return;
@@ -222,16 +232,17 @@ async function registerPriceKey() {
 
 async function sendMatchingSubmission(type = "draft") {
   if (!player || roomState?.game?.id !== MATCHING_GAME_ID ||
-      roomState.game.status !== "assigning" || roomState.game.activeTurnIndex !== 0 ||
+      !["assigning", "tiebreak-assigning"].includes(roomState.game.status) ||
+      roomState.game.activeTurnIndex !== 0 ||
       matchingDraft.locked || !roomState.matchingSubmissionKey) return false;
   const assignerIndex = roomState.game.assignerOrder?.findIndex((item) => item.id === playerId) ?? -1;
-  if (!getMatchingTurn(roomState.game.roundIndex, 0).assignerIndexes.includes(assignerIndex)) return false;
+  if (!getMatchingTurn(getMatchingRoleRoundIndex(roomState.game), 0).assignerIndexes.includes(assignerIndex)) return false;
 
   try {
     const encrypted = await encryptPrivatePayload(roomState.matchingSubmissionKey, {
       type,
       playerId,
-      roundIndex: roomState.game.roundIndex,
+      roundIndex: matchingDraftRoundIndex(),
       values: matchingDraft.values
     });
     await realtime.send("matching_private_submission", { playerId, encrypted });
@@ -255,11 +266,13 @@ $("player-matching-board").addEventListener("change", (event) => {
 
 $("lock-player-matching").addEventListener("click", async () => {
   if (matchingSubmissionPending || matchingDraft.locked) return;
-  if (matchingDraft.values.length !== 4 || matchingDraft.values.some((value) => !value)) {
-    $("player-matching-error").textContent = "Bitte ordne allen vier Bildern eine Person zu.";
+  if (matchingDraft.values.length !== matchingDraftValueCount() || matchingDraft.values.some((value) => !value)) {
+    $("player-matching-error").textContent = roomState.game.tiebreak
+      ? "Bitte ordne dem Bild eine Person zu."
+      : "Bitte ordne allen vier Bildern eine Person zu.";
     return;
   }
-  if (!areMatchingValuesUnique(matchingDraft.values)) {
+  if (!roomState.game.tiebreak && !areMatchingValuesUnique(matchingDraft.values)) {
     $("player-matching-error").textContent = "Jeder Spielername darf nur einmal verwendet werden.";
     return;
   }
@@ -581,10 +594,10 @@ async function handleEvent(event, payload) {
       payload.encrypted && priceKeyPair?.privateKey) {
     try {
       const privateState = await decryptPrivatePayload(priceKeyPair.privateKey, payload.encrypted);
-      if (privateState.roundIndex !== roomState?.game?.roundIndex) return;
+      if (privateState.roundIndex !== matchingDraftRoundIndex()) return;
       matchingDraft = {
         roundIndex: privateState.roundIndex,
-        values: Array.from({ length: 4 }, (_, index) =>
+        values: Array.from({ length: matchingDraftValueCount() }, (_, index) =>
           String(privateState.values?.[index] || "")
         ),
         locked: Boolean(privateState.locked),
@@ -592,7 +605,7 @@ async function handleEvent(event, payload) {
           ? privateState.opponentAssignerIndex
           : null,
         opponentValues: Array.isArray(privateState.opponentValues)
-          ? Array.from({ length: 4 }, (_, index) =>
+          ? Array.from({ length: matchingDraftValueCount() }, (_, index) =>
             String(privateState.opponentValues[index] || "")
           )
           : null
@@ -730,10 +743,10 @@ async function handleEvent(event, payload) {
       }
     }
     if (roomState.game?.id === MATCHING_GAME_ID &&
-        matchingDraft.roundIndex !== roomState.game.roundIndex) {
+        matchingDraft.roundIndex !== matchingDraftRoundIndex()) {
       matchingDraft = {
-        roundIndex: roomState.game.roundIndex,
-        values: Array(4).fill(""),
+        roundIndex: matchingDraftRoundIndex(),
+        values: Array(matchingDraftValueCount()).fill(""),
         locked: false,
         opponentAssignerIndex: null,
         opponentValues: null
@@ -1233,24 +1246,32 @@ function renderPlayerMatchingOverlays(game, imageIndex, ownAssignerIndex, editab
 
 function renderMatchingGame() {
   const game = roomState.game;
-  const round = MATCHING_GAME_ROUNDS[game.roundIndex];
-  const turn = getMatchingTurn(game.roundIndex, game.activeTurnIndex);
+  const isTiebreak = Boolean(game.tiebreak);
+  const round = isTiebreak
+    ? { title: "Golden Image", images: [MATCHING_TIEBREAK_IMAGES[game.tiebreak.imageIndex]] }
+    : MATCHING_GAME_ROUNDS[game.roundIndex];
+  const turn = getMatchingTurn(getMatchingRoleRoundIndex(game), game.activeTurnIndex);
   const activePlayer = turn.assignerIndex === null ? null : game.assignerOrder?.[turn.assignerIndex];
   const ownAssignerIndex = game.assignerOrder?.findIndex((item) => item.id === playerId) ?? -1;
-  const isSeeder = getMatchingTurn(game.roundIndex, 0).assignerIndexes.includes(ownAssignerIndex);
-  const isPending = game.status === "round-pending";
-  const canSelfAssign = game.status === "assigning" && game.activeTurnIndex === 0 &&
+  const isSeeder = getMatchingTurn(getMatchingRoleRoundIndex(game), 0).assignerIndexes.includes(ownAssignerIndex);
+  const isPending = ["round-pending", "tiebreak-pending"].includes(game.status);
+  const canSelfAssign = ["assigning", "tiebreak-assigning"].includes(game.status) && game.activeTurnIndex === 0 &&
     isSeeder && !game.submittedTeams?.[player.team] && !matchingDraft.locked;
   const isFinished = game.status === "finished";
-  const isRoundFinished = game.status === "round-finished";
-  const isRevealing = ["ready-to-reveal", "revealing"].includes(game.status);
-  const result = game.roundResults?.[game.roundIndex];
+  const isRoundFinished = ["round-finished", "tiebreak-round-finished"].includes(game.status);
+  const isRevealing = ["ready-to-reveal", "revealing", "tiebreak-ready-to-reveal"].includes(game.status);
+  const result = isTiebreak
+    ? game.tiebreak.roundResults?.[game.tiebreak.imageIndex]
+    : game.roundResults?.[game.roundIndex];
 
   $("player-matching-round").textContent =
-    `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
+    isTiebreak
+      ? `Stechen · Golden Image ${game.tiebreak.imageIndex + 1} von ${MATCHING_TIEBREAK_IMAGES.length}`
+      : `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
   $("player-matching-blue-score").textContent = game.scores.blue;
   $("player-matching-red-score").textContent = game.scores.red;
   $("player-matching-board").classList.toggle("hidden", isPending);
+  $("player-matching-board").classList.toggle("tiebreak", isTiebreak);
   $("player-matching-board").innerHTML = isPending ? "" : round.images.map((image, imageIndex) => `
     <article class="matching-card">
       <div class="matching-image-frame">
@@ -1266,15 +1287,17 @@ function renderMatchingGame() {
   `).join("");
   if (isPending) {
     $("player-matching-turn").className = "matching-turn finished";
-    $("player-matching-turn").textContent = "Warte darauf, dass der Moderator die erste Runde startet.";
+    $("player-matching-turn").textContent = isTiebreak
+      ? "Gleichstand – wartet auf das nächste Golden Image."
+      : "Warte darauf, dass der Moderator die erste Runde startet.";
   } else if (isFinished || isRoundFinished || isRevealing) {
     $("player-matching-turn").className = "matching-turn finished";
     $("player-matching-turn").textContent = isFinished
       ? game.roundIndex < MATCHING_GAME_ROUNDS.length - 1
         ? "Das Spiel ist mathematisch entschieden."
-        : "Alle Runden sind ausgewertet."
+        : isTiebreak ? "Das Golden-Image-Stechen ist beendet." : "Alle Runden sind ausgewertet."
       : isRoundFinished
-        ? `Runde ${game.roundIndex + 1} ist beendet.`
+        ? isTiebreak ? "Beide Teams hatten dasselbe Ergebnis." : `Runde ${game.roundIndex + 1} ist beendet.`
         : "Der Moderator deckt gleich alle Antworten auf.";
   } else {
     if (game.activeTurnIndex === 0) {
@@ -1284,7 +1307,7 @@ function renderMatchingGame() {
           ? "Beide Zuordnungen sind eingeloggt."
           : matchingDraft.locked || game.submittedTeams?.[player.team]
           ? "Deine Zuordnungen sind eingeloggt. Warte auf das andere Team."
-          : "Ordne den vier Bildern jeweils eine Person zu."}`
+          : isTiebreak ? "Ordne dem Golden Image eine Person zu." : "Ordne den vier Bildern jeweils eine Person zu."}`
         : `Die beiden Spieler ${turn.playerIndex + 1} ordnen die Bilder zu.`;
     } else {
       $("player-matching-turn").className = `matching-turn ${turn.team}`;
@@ -1296,7 +1319,7 @@ function renderMatchingGame() {
   $("lock-player-matching").classList.toggle("hidden", !canSelfAssign || isPending);
   $("lock-player-matching").disabled = matchingSubmissionPending ||
     matchingDraft.values.some((value) => !value) ||
-    !areMatchingValuesUnique(matchingDraft.values);
+    (!isTiebreak && !areMatchingValuesUnique(matchingDraft.values));
   $("lock-player-matching").textContent = matchingSubmissionPending
     ? "Zuordnungen werden eingeloggt…"
     : "Zuordnungen einloggen";
@@ -1306,15 +1329,18 @@ function renderMatchingGame() {
       ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Da seh ich dich!`
       : "Da seh ich dich endet unentschieden.";
   } else if (isRoundFinished) {
-    $("player-matching-result").textContent =
-      `Team Blau: ${result.blue} Punkte · Team Rot: ${result.red} Punkte. Wartet auf die nächste Runde.`;
+    $("player-matching-result").textContent = isTiebreak
+      ? `Golden Image: Blau ${result.blue ? "trifft" : "verfehlt"} · Rot ${result.red ? "trifft" : "verfehlt"}. Nächstes Bild folgt.`
+      : `Team Blau: ${result.blue} Punkte · Team Rot: ${result.red} Punkte. Wartet auf die nächste Runde.`;
   } else if (isRevealing) {
     $("player-matching-result").textContent = "Der Moderator deckt gleich alle Antworten auf.";
   } else if (isPending) {
-    $("player-matching-result").textContent = "Die Bilder bleiben bis zum Rundenstart verborgen.";
+    $("player-matching-result").textContent = isTiebreak
+      ? "Das Finalbild bleibt bis zum Start verborgen."
+      : "Die Bilder bleiben bis zum Rundenstart verborgen.";
   } else {
     $("player-matching-result").textContent = game.activeTurnIndex === 0
-      ? "Beide Teams spielen mit denselben vier Bildern."
+      ? isTiebreak ? "Beide Teams ordnen dem Golden Image geheim eine Person zu." : "Beide Teams spielen mit denselben vier Bildern."
       : `${getTeamName(turn.team)} nennt die Zuordnungen. Der Moderator trägt sie ein.`;
   }
 }

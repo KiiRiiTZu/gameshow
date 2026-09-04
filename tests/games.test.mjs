@@ -26,8 +26,10 @@ import {
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
+  MATCHING_TIEBREAK_IMAGES,
   MATCHING_TURNS,
   areMatchingValuesUnique,
+  getMatchingRoleRoundIndex,
   getMatchingTurn,
   matchingGame
 } from "../js/games/matching-game.js";
@@ -755,6 +757,14 @@ test("collects both first players before the blue and red matching turns", () =>
   assert.equal("assignments" in state.game, false);
 });
 
+test("contains six complete Golden Image tiebreak pictures", () => {
+  assert.equal(MATCHING_TIEBREAK_IMAGES.length, 6);
+  assert.ok(MATCHING_TIEBREAK_IMAGES.every((image) =>
+    image.id && image.label && image.src.endsWith(".webp") &&
+    existsSync(new URL(`../${image.src.replace("./", "")}`, import.meta.url))
+  ));
+});
+
 test("contains all prepared buzzer questions", () => {
   assert.equal(BUZZER_QUESTIONS.length, 34);
   assert.ok(BUZZER_QUESTIONS.every((entry) => entry.question && entry.answer));
@@ -814,7 +824,7 @@ test("ends matching early when the trailing team cannot catch up", () => {
   assert.equal(matchingGame.revealAll(state, { blue: perfect, red: perfect }), false);
 });
 
-test("allows a draw in the matching game without awarding a match point", () => {
+test("starts Golden Image after a draw and alternates the assigning players", () => {
   const state = createInitialRoomState("TEST");
   const players = MATCHING_ASSIGNERS.map((assigner, index) => ({
     id: String(index),
@@ -831,8 +841,44 @@ test("allows a draw in the matching game without awarding a match point", () => 
     blue: equalAssignments,
     red: equalAssignments
   }), true);
-  assert.equal(state.game.winningTeam, null);
+  assert.equal(state.game.status, "tiebreak-pending");
+  assert.equal(state.game.tiebreak.imageIndex, 0);
   assert.deepEqual(state.scores, { blue: 0, red: 0 });
+
+  assert.equal(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).playerIndex, 0);
+  assert.equal(matchingGame.startTiebreakRound(state), true);
+  matchingGame.submitTeam(state, "blue");
+  matchingGame.submitTeam(state, "red");
+  matchingGame.completeTurn(state);
+  matchingGame.submitTeam(state, "blue");
+  matchingGame.completeTurn(state);
+  matchingGame.submitTeam(state, "red");
+  matchingGame.completeTurn(state);
+  assert.equal(state.game.status, "tiebreak-ready-to-reveal");
+  assert.equal(matchingGame.revealTiebreak(state, {
+    blue: ["Max", "Max"],
+    red: ["Lisa", "Lisa"]
+  }), true);
+  assert.equal(state.game.status, "tiebreak-round-finished");
+  assert.equal(matchingGame.startNextTiebreakRound(state), true);
+  assert.equal(state.game.tiebreak.imageIndex, 1);
+  assert.equal(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).playerIndex, 1);
+
+  matchingGame.startTiebreakRound(state);
+  matchingGame.submitTeam(state, "blue");
+  matchingGame.submitTeam(state, "red");
+  matchingGame.completeTurn(state);
+  matchingGame.submitTeam(state, "blue");
+  matchingGame.completeTurn(state);
+  matchingGame.submitTeam(state, "red");
+  matchingGame.completeTurn(state);
+  assert.equal(matchingGame.revealTiebreak(state, {
+    blue: ["Max", "Max"],
+    red: ["Lisa", "Mia"]
+  }), true);
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "blue");
+  assert.deepEqual(state.scores, { blue: 1, red: 0 });
 });
 
 test("encrypts player assignments so only the moderator key can read them", async () => {

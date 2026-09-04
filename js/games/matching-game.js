@@ -79,6 +79,21 @@ export const MATCHING_GAME_ROUNDS = [
   }
 ];
 
+export const MATCHING_TIEBREAK_IMAGES = [
+  { id: "alkohol", label: "Alkohol", src: `${IMAGE_ROOT}/finale/alkohol.webp` },
+  { id: "bbq", label: "BBQ", src: `${IMAGE_ROOT}/finale/bbq.webp` },
+  { id: "eiscreme", label: "Eiscreme", src: `${IMAGE_ROOT}/finale/eiscreme.webp` },
+  { id: "feuerwerk", label: "Feuerwerk", src: `${IMAGE_ROOT}/finale/feuerwerk.webp` },
+  { id: "kino", label: "Kino", src: `${IMAGE_ROOT}/finale/kino.webp` },
+  { id: "reich", label: "Reich", src: `${IMAGE_ROOT}/finale/reich.webp` }
+];
+
+export function getMatchingRoleRoundIndex(game) {
+  return game?.tiebreak
+    ? MATCHING_GAME_ROUNDS.length + (Number(game.tiebreak.imageIndex) || 0)
+    : Number(game?.roundIndex) || 0;
+}
+
 function emptyScores() {
   return { blue: 0, red: 0 };
 }
@@ -104,6 +119,25 @@ function finishMatchingGame(state, winningTeam) {
   state.game.status = "finished";
   state.game.winningTeam = winningTeam;
   if (winningTeam) state.scores[winningTeam] += 1;
+}
+
+function emptyTiebreak() {
+  return {
+    imageIndex: 0,
+    roundResults: []
+  };
+}
+
+function resetTurnState(game) {
+  game.activeTurnIndex = 0;
+  game.turnSubmitted = false;
+  game.submittedTeams = { blue: false, red: false };
+  game.revealedTeams = { blue: false, red: false };
+  game.revealedAssignments = emptyRevealedAssignments();
+}
+
+function isAssigningStatus(game) {
+  return ["assigning", "tiebreak-assigning"].includes(game.status);
 }
 
 function normalizeName(value) {
@@ -158,6 +192,7 @@ export const matchingGame = {
       revealedAssignments: emptyRevealedAssignments(),
       scores: emptyScores(),
       roundResults: [],
+      tiebreak: null,
       assignerOrder: assignerOrder.map((player) => ({
         id: player.id,
         name: player.name,
@@ -210,6 +245,17 @@ export const matchingGame = {
     state.game.roundResults = Array.isArray(state.game.roundResults)
       ? state.game.roundResults.slice(0, MATCHING_GAME_ROUNDS.length)
       : [];
+    if (state.game.tiebreak) {
+      state.game.tiebreak = {
+        imageIndex: Math.min(
+          Math.max(Number(state.game.tiebreak.imageIndex) || 0, 0),
+          MATCHING_TIEBREAK_IMAGES.length - 1
+        ),
+        roundResults: Array.isArray(state.game.tiebreak.roundResults)
+          ? state.game.tiebreak.roundResults.slice(0, MATCHING_TIEBREAK_IMAGES.length)
+          : []
+      };
+    }
     state.game.assignerOrder = Array.isArray(state.game.assignerOrder)
       ? state.game.assignerOrder.slice(0, MATCHING_ASSIGNERS.length)
       : [];
@@ -219,7 +265,7 @@ export const matchingGame = {
   },
 
   submitTeam(state, team) {
-    if (state.game.id !== this.id || state.game.status !== "assigning") return false;
+    if (state.game.id !== this.id || !isAssigningStatus(state.game)) return false;
     if (!["blue", "red"].includes(team)) return false;
 
     if (state.game.activeTurnIndex === 0) {
@@ -228,7 +274,7 @@ export const matchingGame = {
       return true;
     }
 
-    const turn = getMatchingTurn(state.game.roundIndex, state.game.activeTurnIndex);
+    const turn = getMatchingTurn(getMatchingRoleRoundIndex(state.game), state.game.activeTurnIndex);
     if (team !== turn.team || state.game.turnSubmitted) return false;
 
     state.game.turnSubmitted = true;
@@ -236,7 +282,7 @@ export const matchingGame = {
   },
 
   completeTurn(state) {
-    if (state.game.id !== this.id || state.game.status !== "assigning") return false;
+    if (state.game.id !== this.id || !isAssigningStatus(state.game)) return false;
     if (state.game.activeTurnIndex === 0) {
       if (!state.game.submittedTeams.blue || !state.game.submittedTeams.red) return false;
     } else if (!state.game.turnSubmitted) return false;
@@ -247,7 +293,7 @@ export const matchingGame = {
       return true;
     }
 
-    state.game.status = "ready-to-reveal";
+    state.game.status = state.game.tiebreak ? "tiebreak-ready-to-reveal" : "ready-to-reveal";
     state.game.turnSubmitted = false;
     return true;
   },
@@ -291,10 +337,62 @@ export const matchingGame = {
       return true;
     }
 
-    const winningTeam = state.game.scores.blue === state.game.scores.red
-      ? null
-      : state.game.scores.blue > state.game.scores.red ? "blue" : "red";
-    finishMatchingGame(state, winningTeam);
+    if (state.game.scores.blue === state.game.scores.red) {
+      state.game.tiebreak = emptyTiebreak();
+      resetTurnState(state.game);
+      state.game.status = "tiebreak-pending";
+      return true;
+    }
+    finishMatchingGame(
+      state,
+      state.game.scores.blue > state.game.scores.red ? "blue" : "red"
+    );
+    return true;
+  },
+
+  startTiebreakRound(state) {
+    if (state.game.id !== this.id || state.game.status !== "tiebreak-pending" ||
+        !state.game.tiebreak) return false;
+    state.game.status = "tiebreak-assigning";
+    return true;
+  },
+
+  revealTiebreak(state, assignments) {
+    if (state.game.id !== this.id || state.game.status !== "tiebreak-ready-to-reveal" ||
+        !state.game.tiebreak) return false;
+    for (const team of ["blue", "red"]) {
+      const pair = assignments?.[team];
+      if (!Array.isArray(pair) || pair.length !== 2 ||
+          pair.some((value) => !String(value || "").trim())) return false;
+      state.game.revealedAssignments[team] = [[...pair.map((value) => String(value).trim())]];
+      state.game.revealedTeams[team] = true;
+    }
+
+    const result = scoreMatchingAssignments([[
+      state.game.revealedAssignments.blue[0][0],
+      state.game.revealedAssignments.red[0][0],
+      state.game.revealedAssignments.blue[0][1],
+      state.game.revealedAssignments.red[0][1]
+    ]]);
+    state.game.tiebreak.roundResults[state.game.tiebreak.imageIndex] = result;
+
+    if (result.blue !== result.red) {
+      finishMatchingGame(state, result.blue > result.red ? "blue" : "red");
+    } else if (state.game.tiebreak.imageIndex < MATCHING_TIEBREAK_IMAGES.length - 1) {
+      state.game.status = "tiebreak-round-finished";
+    } else {
+      finishMatchingGame(state, null);
+    }
+    return true;
+  },
+
+  startNextTiebreakRound(state) {
+    if (state.game.id !== this.id || state.game.status !== "tiebreak-round-finished" ||
+        !state.game.tiebreak ||
+        state.game.tiebreak.imageIndex >= MATCHING_TIEBREAK_IMAGES.length - 1) return false;
+    state.game.tiebreak.imageIndex += 1;
+    resetTurnState(state.game);
+    state.game.status = "tiebreak-pending";
     return true;
   },
 
@@ -303,11 +401,7 @@ export const matchingGame = {
     if (state.game.roundIndex >= MATCHING_GAME_ROUNDS.length - 1) return false;
 
     state.game.roundIndex += 1;
-    state.game.activeTurnIndex = 0;
-    state.game.turnSubmitted = false;
-    state.game.submittedTeams = { blue: false, red: false };
-    state.game.revealedTeams = { blue: false, red: false };
-    state.game.revealedAssignments = emptyRevealedAssignments();
+    resetTurnState(state.game);
     state.game.status = "assigning";
     return true;
   }
