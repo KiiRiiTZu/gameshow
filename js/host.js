@@ -551,6 +551,23 @@ function formatEstimate(value) {
   return Number(value).toLocaleString("de-DE", { maximumFractionDigits: 3 });
 }
 
+function renderHostEstimationTeamBox(game, team, guesses, average) {
+  const participants = (game.participants || []).filter((item) => item.team === team);
+  return `<article class="estimation-team ${team}">
+    <strong>${getTeamName(team)}</strong>
+    ${participants.map((item) => `
+      <div class="estimation-player-entry">
+        <span>${escapeHtml(item.name)}</span>
+        <span>${formatEstimate(guesses[item.id])}</span>
+      </div>
+    `).join("")}
+    <div class="estimation-player-entry estimation-average-entry">
+      <span>Mittelwert</span>
+      <span>Ø ${formatEstimate(average)}</span>
+    </div>
+  </article>`;
+}
+
 function renderEstimationGame() {
   const game = state.game;
   const question = getEstimationQuestion(game.roundIndex);
@@ -635,10 +652,12 @@ function renderEstimationGame() {
       : "<p>Mittelwert endet unentschieden.</p>"
     : "";
   $("estimation-result").innerHTML = `
-    <strong>Richtige Antwort: ${escapeHtml(result.answerDisplay)}</strong>
-    <span>Team Blau: Ø ${formatEstimate(result.averages.blue)} · Abstand ${formatEstimate(result.distances.blue)}</span><br>
-    <span>Team Rot: Ø ${formatEstimate(result.averages.red)} · Abstand ${formatEstimate(result.distances.red)}</span>
-    <p>${winnerText}</p>
+    <strong class="estimation-result-summary">Richtige Antwort: ${escapeHtml(result.answerDisplay)}</strong>
+    <div class="estimation-submissions">
+      ${renderHostEstimationTeamBox(game, "blue", result.guesses, result.averages.blue)}
+      ${renderHostEstimationTeamBox(game, "red", result.guesses, result.averages.red)}
+    </div>
+    <span class="estimation-result-summary">${winnerText}</span>
     ${finalText}
   `;
 }
