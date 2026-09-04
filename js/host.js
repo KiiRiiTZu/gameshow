@@ -599,7 +599,7 @@ function renderEstimationGame() {
             <span class="${locked ? "locked" : ""}">${escapeHtml(displayValue)}${locked ? " · ✓" : ""}</span>
           </div>`;
         }).join("")}
-        ${isRevealed && Number.isFinite(game.averages?.[team]) ? `
+        ${Number.isFinite(game.averages?.[team]) ? `
           <div class="estimation-player-entry estimation-average-entry">
             <span>Mittelwert</span>
             <span>Ø ${formatEstimate(game.averages[team])}</span>
