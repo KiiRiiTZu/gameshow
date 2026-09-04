@@ -11,11 +11,22 @@ function startingTeamForRound(firstStartingTeam, roundIndex) {
   return roundIndex % 2 === 0 ? firstStartingTeam : otherTeam(firstStartingTeam);
 }
 
+function shuffle(items) {
+  const shuffled = [...items];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+  return shuffled;
+}
+
 function initialRoundState(roundIndex) {
   const list = getRankingList(roundIndex);
   return {
     placedIds: [list.anchorId],
-    remainingIds: list.entries.filter((entry) => entry.id !== list.anchorId).map((entry) => entry.id),
+    remainingIds: shuffle(
+      list.entries.filter((entry) => entry.id !== list.anchorId).map((entry) => entry.id)
+    ),
     proposal: null,
     lastResult: null,
     strikes: { blue: 0, red: 0 }
