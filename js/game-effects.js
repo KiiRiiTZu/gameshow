@@ -3,9 +3,9 @@ const GAME_PRESENTATIONS = {
   "matching-game": { number: 2, name: "Da seh ich dich" },
   "germany-map": { number: 3, name: "Kartenwissen" },
   "word-match-game": { number: 4, name: "Begriffsmatch" },
-  "guess-the-price": { number: 5, name: "Thrifty" },
-  "ranking-game": { number: 6, name: "Einordnen" },
-  "spotify-top-artists": { number: 6, name: "Top 20" },
+  "ranking-game": { number: 5, name: "Einordnen" },
+  "spotify-top-artists": { number: 5, name: "Top 20" },
+  "guess-the-price": { number: 6, name: "Thrifty" },
   buzzer: { number: 7, name: "Buzzer Quiz" }
 };
 

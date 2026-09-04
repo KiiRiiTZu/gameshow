@@ -539,8 +539,8 @@ function getNextGameDefinition(gameId) {
     { id: matchingGame.id, name: matchingGame.name },
     { id: germanyMapGame.id, name: germanyMapGame.name },
     { id: wordMatchGame.id, name: wordMatchGame.name },
-    { id: guessThePriceGame.id, name: guessThePriceGame.name },
     { id: rankingGame.id, name: rankingGame.name },
+    { id: guessThePriceGame.id, name: guessThePriceGame.name },
     { id: buzzerGame.id, name: buzzerGame.name }
   ];
   const currentIndex = games.findIndex((game) => game.id === gameId);
@@ -732,8 +732,8 @@ function renderWordMatchGame() {
   $("finish-red-guess-phase").classList.toggle("hidden", game.status !== "red-guessing");
   $("reveal-word-match-round").classList.toggle("hidden", game.status !== "results-pending");
   $("next-word-match-round").classList.toggle("hidden", !isRoundFinished);
-  $("start-price-game").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
-  $("start-price-game").disabled = moderatorActionPending;
+  $("start-ranking-after-word").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
+  $("start-ranking-after-word").disabled = moderatorActionPending;
   for (const id of [
     "start-word-seed-phase", "finish-word-seed-phase", "start-blue-guess-phase",
     "finish-blue-guess-phase", "start-red-guess-phase", "finish-red-guess-phase",
@@ -794,8 +794,8 @@ function renderPriceGame() {
   $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
   $("next-price-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-price-round").disabled = moderatorActionPending;
-  $("start-ranking-game").classList.toggle("hidden", !isFinished || showIsFinished);
-  $("start-ranking-game").disabled = moderatorActionPending;
+  $("start-buzzer-after-price").classList.toggle("hidden", !isFinished || showIsFinished);
+  $("start-buzzer-after-price").disabled = moderatorActionPending;
   $("price-round-result").classList.toggle("hidden", !isRevealed);
 
   if (!isRevealed) return;
@@ -907,8 +907,8 @@ function renderRankingGame() {
     !rankingSelection.itemId || !rankingSelection.position;
   $("reveal-ranking-placement").classList.toggle("hidden", game.status !== "ready-to-reveal");
   $("next-ranking-round").classList.toggle("hidden", !isRoundFinished);
-  $("start-buzzer-after-ranking").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
-  for (const id of ["start-first-ranking-round", "reveal-ranking-placement", "next-ranking-round", "start-buzzer-after-ranking"]) {
+  $("start-price-after-ranking").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
+  for (const id of ["start-first-ranking-round", "reveal-ranking-placement", "next-ranking-round", "start-price-after-ranking"]) {
     $(id).disabled = moderatorActionPending;
   }
 }
@@ -2046,9 +2046,14 @@ $("force-next-game").addEventListener("click", async () => {
       "Für Da seh ich dich müssen zwei Spieler pro Team im Raum sein.";
     return;
   }
-  if ([germanyMapGame.id, wordMatchGame.id].includes(currentGameId) && state.players.length !== 4) {
+  if (currentGameId === germanyMapGame.id && state.players.length !== 4) {
     $("force-next-game-error").textContent =
-      `Für ${currentGameId === germanyMapGame.id ? "Begriffsmatch" : "Thrifty"} müssen alle vier Spieler im Raum sein.`;
+      "Für Begriffsmatch müssen alle vier Spieler im Raum sein.";
+    return;
+  }
+  if (currentGameId === rankingGame.id && state.players.length !== 4) {
+    $("force-next-game-error").textContent =
+      "Für Thrifty müssen alle vier Spieler im Raum sein.";
     return;
   }
 
@@ -2072,17 +2077,17 @@ $("force-next-game").addEventListener("click", async () => {
       return true;
     }
     if (currentGameId === wordMatchGame.id) {
+      rankingGame.start(state);
+      rankingSelection = { itemId: null, position: null };
+      return true;
+    }
+    if (currentGameId === rankingGame.id) {
       guessThePriceGame.start(state);
       priceDrafts = emptyPriceDrafts(0);
       savePriceDrafts();
       return true;
     }
-    if (currentGameId === guessThePriceGame.id) {
-      rankingGame.start(state);
-      rankingSelection = { itemId: null, position: null };
-      return true;
-    }
-    if ([rankingGame.id, top20Game.id].includes(currentGameId)) {
+    if ([guessThePriceGame.id, top20Game.id].includes(currentGameId)) {
       buzzerGame.start(state);
       return true;
     }
@@ -2203,11 +2208,20 @@ $("next-ranking-round").addEventListener("click", async () => {
   await runModeratorAction(() => rankingGame.startNextRound(state));
 });
 
-$("start-buzzer-after-ranking").addEventListener("click", async () => {
-  await runModeratorAction(() => {
+$("start-price-after-ranking").addEventListener("click", async () => {
+  $("ranking-error").textContent = "";
+  if (state.players.length !== 4) {
+    $("ranking-error").textContent = "Für Thrifty müssen alle vier Spieler im Raum sein.";
+    return;
+  }
+  const accepted = await runModeratorAction(() => {
     if (getShowWinner(state) || state.game.id !== rankingGame.id || state.game.status !== "finished") return false;
-    return buzzerGame.start(state);
+    if (!guessThePriceGame.start(state)) return false;
+    priceDrafts = emptyPriceDrafts(0);
+    savePriceDrafts();
+    return true;
   });
+  if (accepted) await syncAllPriceTeams();
 });
 
 $("start-buzzer-game-after-top20").addEventListener("click", async () => {
@@ -2563,27 +2577,19 @@ setInterval(() => {
   }
 }, 750);
 
-$("start-price-game").addEventListener("click", async () => {
+$("start-ranking-after-word").addEventListener("click", async () => {
   $("word-match-error").textContent = "";
-  if (state.players.length !== 4) {
-    $("word-match-error").textContent = "Für Thrifty müssen alle vier Spieler im Raum sein.";
-    return;
-  }
-  const accepted = await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== wordMatchGame.id || state.game.status !== "finished") return false;
-    if (!guessThePriceGame.start(state)) return false;
-    priceDrafts = emptyPriceDrafts(0);
-    savePriceDrafts();
-    return true;
-  });
-  if (accepted) await syncAllPriceTeams();
-});
-
-$("start-ranking-game").addEventListener("click", async () => {
   await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
+    if (getShowWinner(state) || state.game.id !== wordMatchGame.id || state.game.status !== "finished") return false;
     rankingSelection = { itemId: null, position: null };
     return rankingGame.start(state);
+  });
+});
+
+$("start-buzzer-after-price").addEventListener("click", async () => {
+  await runModeratorAction(() => {
+    if (getShowWinner(state) || state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
+    return buzzerGame.start(state);
   });
 });
 

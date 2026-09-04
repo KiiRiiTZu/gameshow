@@ -115,8 +115,8 @@ test("contains presentation cards for all seven games", () => {
     "matching-game",
     "germany-map",
     "word-match-game",
-    "guess-the-price",
     "ranking-game",
+    "guess-the-price",
     "buzzer"
   ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6, 7]);
   assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");
