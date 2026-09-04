@@ -1525,12 +1525,21 @@ async function sendMatchingPrivateState(playerId) {
   if (assignerIndex < 0 || !publicKey) return false;
   const team = MATCHING_ASSIGNERS[assignerIndex].team;
   const roundAssignments = matchingAssignments[state.game.roundIndex];
+  const seederIndexes = getMatchingTurn(state.game.roundIndex, 0).assignerIndexes;
+  const opponentIndex = seederIndexes.find((index) => index !== assignerIndex);
+  const bothTeamsSubmitted = Boolean(
+    state.game.submittedTeams?.blue && state.game.submittedTeams?.red
+  );
 
   try {
     const encrypted = await encryptPrivatePayload(publicKey, {
       roundIndex: state.game.roundIndex,
       values: roundAssignments.map((imageAssignments) => imageAssignments[assignerIndex]),
-      locked: Boolean(state.game.submittedTeams?.[team])
+      locked: Boolean(state.game.submittedTeams?.[team]),
+      opponentAssignerIndex: bothTeamsSubmitted ? opponentIndex : null,
+      opponentValues: bothTeamsSubmitted
+        ? roundAssignments.map((imageAssignments) => imageAssignments[opponentIndex])
+        : null
     });
     await realtime.send("matching_private_state", { playerId, encrypted });
     return true;
@@ -1587,7 +1596,10 @@ async function handleMatchingSubmission(payload) {
           ? "Bitte ordne allen vier Bildern eine Person zu."
           : !unique ? "Jeder Spielername darf nur einmal verwendet werden." : ""
       });
-      if (accepted) await persistRenderAndBroadcast();
+      if (accepted) {
+        await persistRenderAndBroadcast();
+        await syncMatchingSeeders();
+      }
       else render();
     } else {
       render();

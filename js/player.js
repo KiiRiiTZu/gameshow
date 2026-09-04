@@ -70,7 +70,13 @@ let pricePublicKey = null;
 let priceDraft = { roundIndex: -1, amount: "", locked: false };
 let priceAmountTimer = null;
 let priceSubmissionPending = false;
-let matchingDraft = { roundIndex: -1, values: Array(4).fill(""), locked: false };
+let matchingDraft = {
+  roundIndex: -1,
+  values: Array(4).fill(""),
+  locked: false,
+  opponentAssignerIndex: null,
+  opponentValues: null
+};
 let matchingDraftTimer = null;
 let matchingSubmissionPending = false;
 let teamChatState = { gameId: null, team: null, messages: [], typing: [] };
@@ -580,7 +586,14 @@ async function handleEvent(event, payload) {
         values: Array.from({ length: 4 }, (_, index) =>
           String(privateState.values?.[index] || "")
         ),
-        locked: Boolean(privateState.locked)
+        locked: Boolean(privateState.locked),
+        opponentAssignerIndex: Number.isInteger(privateState.opponentAssignerIndex)
+          ? privateState.opponentAssignerIndex
+          : null,
+        opponentValues: Array.isArray(privateState.opponentValues)
+          ? Array.from({ length: 4 }, (_, index) =>
+            String(privateState.opponentValues[index] || "")
+          : null
       };
       matchingSubmissionPending = false;
       render();
@@ -719,7 +732,9 @@ async function handleEvent(event, payload) {
       matchingDraft = {
         roundIndex: roomState.game.roundIndex,
         values: Array(4).fill(""),
-        locked: false
+        locked: false,
+        opponentAssignerIndex: null,
+        opponentValues: null
       };
       matchingSubmissionPending = false;
       $("player-matching-error").textContent = "";
@@ -1201,6 +1216,10 @@ function renderPlayerMatchingOverlays(game, imageIndex, ownAssignerIndex, editab
   }
   if (!game.revealedTeams?.blue && !game.revealedTeams?.red && ownAssignerIndex >= 0) {
     overlays.push(renderPlayerMatchingOwnBox(imageIndex, ownAssignerIndex, editable));
+    const opponentValue = matchingDraft.opponentValues?.[imageIndex];
+    if (opponentValue && Number.isInteger(matchingDraft.opponentAssignerIndex)) {
+      overlays.push(renderPlayerMatchingBox(opponentValue, matchingDraft.opponentAssignerIndex));
+    }
   }
   return overlays.join("");
 }
@@ -1254,8 +1273,10 @@ function renderMatchingGame() {
     if (game.activeTurnIndex === 0) {
       $("player-matching-turn").className = "matching-turn split";
       $("player-matching-turn").textContent = isSeeder
-        ? `${matchingDraft.locked || game.submittedTeams?.[player.team]
-          ? "Deine Zuordnungen sind eingeloggt."
+        ? `${matchingDraft.opponentValues
+          ? "Beide Zuordnungen sind eingeloggt."
+          : matchingDraft.locked || game.submittedTeams?.[player.team]
+          ? "Deine Zuordnungen sind eingeloggt. Warte auf das andere Team."
           : "Ordne den vier Bildern jeweils eine Person zu."}`
         : `Die beiden Spieler ${turn.playerIndex + 1} ordnen die Bilder zu.`;
     } else {
