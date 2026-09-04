@@ -451,9 +451,9 @@ async function initializeHost() {
 function renderGameEffects() {
   const gameId = state.game.id;
 
-  if (previousGameId && previousGameId !== gameId) {
+  if (previousGameId && previousGameId !== gameId && state.game.status !== "not-started") {
     showGameTransition(gameId);
-  } else if ([buzzerGame.id, estimationGame.id].includes(gameId) &&
+  } else if ([buzzerGame.id, estimationGame.id, rankingGame.id].includes(gameId) &&
       previousGameStatus === "not-started" &&
       state.game.status !== "not-started") {
     showGameTransition(gameId);
@@ -837,7 +837,7 @@ function renderRankingBoard(game, list, interactive = false) {
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
       rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
-        <small>${isAnchor ? "Vorgabe" : "korrekt"}</small>
+        <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
       </div>`);
     }
   }
@@ -851,6 +851,7 @@ function renderRankingGame() {
   const list = getRankingList(game.roundIndex);
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
+  const isNotStarted = game.status === "not-started";
   const displayTeam = game.roundWinner || game.winningTeam || game.currentTeam;
   const interactionLocked = game.status !== "playing";
 
@@ -862,7 +863,7 @@ function renderRankingGame() {
     ? game.winningTeam ? `${getTeamName(game.winningTeam)} gewinnt Einordnen!` : "Einordnen endet unentschieden"
     : isRoundFinished
       ? game.roundWinner ? `${getTeamName(game.roundWinner)} gewinnt die Liste!` : "Liste endet unentschieden"
-      : `${getTeamName(game.currentTeam)} ist dran`;
+      : isNotStarted ? "Erste Liste noch nicht gestartet" : `${getTeamName(game.currentTeam)} ist dran`;
   $("ranking-turn").className = `turn-card ${displayTeam || "blue"}`;
   $("ranking-strikes").innerHTML =
     `<span>Blau: <strong>${renderStrikes(game.strikes.blue)}</strong></span>` +
@@ -870,7 +871,7 @@ function renderRankingGame() {
   $("ranking-status").textContent = isFinished
     ? "Spiel beendet" : isRoundFinished ? "Liste beendet"
       : game.status === "ready-to-reveal" ? "Bereit zum Aufdecken"
-        : game.status === "revealed" ? "Aufgedeckt" : "Einordnung wählen";
+        : game.status === "revealed" ? "Aufgedeckt" : isNotStarted ? "Noch nicht gestartet" : "Einordnung wählen";
   $("ranking-status").className = `status-pill ${interactionLocked ? "closed" : "open"}`;
 
   $("ranking-board").innerHTML = renderRankingBoard(game, list, true);
@@ -886,25 +887,25 @@ function renderRankingGame() {
     const entry = getRankingEntry(list, result.itemId);
     const resultText = result.correct
       ? `${entry.label} wurde richtig eingeordnet.`
-      : `${entry.label} war falsch eingeordnet und gehört an Position ${result.correctPosition}.`;
+      : `${entry.label} war falsch eingeordnet und bleibt verfügbar.`;
     const conclusion = isFinished
       ? game.winningTeam ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Einordnen!` : "Einordnen endet unentschieden."
       : isRoundFinished && game.roundWinner ? `${getTeamName(game.roundWinner)} gewinnt diese Liste.` : "";
     $("ranking-result").innerHTML = `<strong>${result.correct ? "✓ Richtig" : "✕ Falsch"}</strong>
-      <span>${escapeHtml(resultText)} Wert: ${escapeHtml(entry.value)}</span>
+      <span>${escapeHtml(resultText)}${result.correct ? ` Wert: ${escapeHtml(entry.value)}` : ""}</span>
       ${conclusion ? `<p>${escapeHtml(conclusion)}</p>` : ""}`;
   } else if (isFinished) {
     $("ranking-result").innerHTML = "<strong>Spiel beendet</strong><span>Einordnen endet unentschieden.</span>";
   }
 
+  $("start-first-ranking-round").classList.toggle("hidden", !isNotStarted);
   $("confirm-ranking-placement").classList.toggle("hidden", game.status !== "playing");
   $("confirm-ranking-placement").disabled = moderatorActionPending ||
     !rankingSelection.itemId || !rankingSelection.position;
   $("reveal-ranking-placement").classList.toggle("hidden", game.status !== "ready-to-reveal");
-  $("next-ranking-turn").classList.toggle("hidden", game.status !== "revealed");
   $("next-ranking-round").classList.toggle("hidden", !isRoundFinished);
   $("start-buzzer-after-ranking").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
-  for (const id of ["reveal-ranking-placement", "next-ranking-turn", "next-ranking-round", "start-buzzer-after-ranking"]) {
+  for (const id of ["start-first-ranking-round", "reveal-ranking-placement", "next-ranking-round", "start-buzzer-after-ranking"]) {
     $(id).disabled = moderatorActionPending;
   }
 }
@@ -1022,6 +1023,7 @@ function renderSpotifyGame() {
 function renderMapGame() {
   const game = state.game;
   const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
+  const isPending = game.status === "round-pending";
   const isRevealed = game.status === "revealed" || game.status === "finished";
   const isFinished = game.status === "finished";
   const showIsFinished = Boolean(getShowWinner(state));
@@ -1030,11 +1032,13 @@ function renderMapGame() {
 
   $("map-round-label").textContent = `Frage ${game.roundIndex + 1} von ${GERMANY_MAP_QUESTIONS.length}`;
   $("map-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
-  $("map-question").textContent = question.prompt;
+  $("map-question").textContent = isPending ? "" : question.prompt;
+  $("map-question-number").closest(".map-question-card").classList.toggle("hidden", isPending);
   $("map-blue-score").textContent = game.roundScores.blue;
   $("map-red-score").textContent = game.roundScores.red;
   $("map-status").textContent = isFinished
     ? "Spiel beendet"
+    : isPending ? "Runde noch nicht gestartet"
     : isRevealed
       ? "Ziel aufgedeckt"
       : "Pins setzen";
@@ -1048,12 +1052,13 @@ function renderMapGame() {
   });
 
   $("target-legend").classList.toggle("hidden", !isRevealed);
-  $("map-pin-status").innerHTML = `
+  $("map-pin-status").innerHTML = isPending ? "Wartet auf den Start der ersten Runde." : `
     <span class="${game.lockedTeams?.blue ? "ready" : ""}">Blau: ${game.lockedTeams?.blue ? "eingeloggt ✓" : game.pins?.blue ? "Pin gesetzt" : "wartet…"}</span>
     <span class="${game.lockedTeams?.red ? "ready" : ""}">Rot: ${game.lockedTeams?.red ? "eingeloggt ✓" : game.pins?.red ? "Pin gesetzt" : "wartet…"}</span>
   `;
 
-  $("reveal-map-round").classList.toggle("hidden", isRevealed);
+  $("start-first-map-round").classList.toggle("hidden", !isPending);
+  $("reveal-map-round").classList.toggle("hidden", isRevealed || isPending);
   $("reveal-map-round").disabled = moderatorActionPending || !bothPinsReady || !bothTeamsLocked;
   $("next-map-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-map-round").disabled = moderatorActionPending;
@@ -1608,6 +1613,9 @@ async function handlePriceKeyRegistration(payload) {
 
 function teamChatIsWritable(team) {
   if (state.game.id === top20Game.id) return state.game.status === "playing";
+  if (state.game.id === rankingGame.id) {
+    return ["playing", "ready-to-reveal"].includes(state.game.status);
+  }
   if (state.game.id === germanyMapGame.id) {
     return state.game.status === "placing" && !state.game.lockedTeams?.[team];
   }
@@ -2183,9 +2191,8 @@ $("reveal-ranking-placement").addEventListener("click", async () => {
   await runModeratorAction(() => rankingGame.revealPlacement(state));
 });
 
-$("next-ranking-turn").addEventListener("click", async () => {
-  rankingSelection = { itemId: null, position: null };
-  await runModeratorAction(() => rankingGame.startNextTurn(state));
+$("start-first-ranking-round").addEventListener("click", async () => {
+  await runModeratorAction(() => rankingGame.startFirstRound(state));
 });
 
 $("next-ranking-round").addEventListener("click", async () => {
@@ -2232,6 +2239,10 @@ $("next-map-round").addEventListener("click", async () => {
     return true;
   });
   if (accepted) await syncAllMapTeams();
+});
+
+$("start-first-map-round").addEventListener("click", async () => {
+  await runModeratorAction(() => germanyMapGame.startFirstRound(state));
 });
 
 $("start-matching-game").addEventListener("click", async () => {

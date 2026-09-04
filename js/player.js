@@ -16,7 +16,7 @@ import {
   getMatchingTurn
 } from "./games/matching-game.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
-import { formatEuroAmount, formatSignedEuroDifference, parseEuroAmount } from "./euro.js";
+import { formatEuroAmount, parseEuroAmount } from "./euro.js";
 import { ESTIMATION_ROUND_COUNT, parseEstimate } from "./games/estimation-game.js";
 import {
   WORD_MATCH_CATEGORIES,
@@ -267,6 +267,9 @@ $("lock-player-matching").addEventListener("click", async () => {
 function teamChatIsWritable() {
   if (!player || !roomState || teamChatState.gameId !== roomState.game.id) return false;
   if (roomState.game.id === TOP_20_GAME_ID) return roomState.game.status === "playing";
+  if (roomState.game.id === RANKING_GAME_ID) {
+    return ["playing", "ready-to-reveal"].includes(roomState.game.status);
+  }
   if (roomState.game.id === GERMANY_MAP_GAME_ID) {
     return roomState.game.status === "placing" && !roomState.game.lockedTeams?.[player.team];
   }
@@ -742,9 +745,9 @@ function render() {
   if (!joined || !roomState) return;
 
   const currentGameId = roomState.game?.id;
-  if (previousGameId && previousGameId !== currentGameId) {
+  if (previousGameId && previousGameId !== currentGameId && roomState.game.status !== "not-started") {
     showGameTransition(currentGameId);
-  } else if (["buzzer", ESTIMATION_GAME_ID].includes(currentGameId) &&
+  } else if (["buzzer", ESTIMATION_GAME_ID, RANKING_GAME_ID].includes(currentGameId) &&
       previousGameStatus === "not-started" &&
       roomState.game.status !== "not-started") {
     showGameTransition(currentGameId);
@@ -949,7 +952,7 @@ function renderPlayerRankingBoard(game, list) {
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
       rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
-        <small>${isAnchor ? "Vorgabe" : "korrekt"}</small>
+        <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
       </div>`);
     }
   }
@@ -960,6 +963,10 @@ function renderPlayerRankingBoard(game, list) {
 
 function renderRankingGame() {
   const game = roomState.game;
+  const isNotStarted = game.status === "not-started";
+  $("player-ranking-waiting").classList.toggle("hidden", !isNotStarted);
+  $("player-ranking-content").classList.toggle("hidden", isNotStarted);
+  if (isNotStarted) return;
   const list = getRankingList(game.roundIndex);
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
@@ -982,17 +989,18 @@ function renderRankingGame() {
     const entry = getRankingEntry(list, id);
     return `<span class="ranking-candidate">${escapeHtml(entry?.label || "")}</span>`;
   }).join("");
+  renderPlayerTeamChat("player-ranking-chat", teamChatIsWritable());
 
   const result = game.lastResult;
   if (result) {
     const entry = getRankingEntry(list, result.itemId);
     const resultText = result.correct
       ? `✓ ${entry.label} wurde richtig eingeordnet.`
-      : `✕ ${entry.label} war falsch eingeordnet und gehört an Position ${result.correctPosition}.`;
+      : `✕ ${entry.label} war falsch eingeordnet und bleibt verfügbar.`;
     const conclusion = isFinished
       ? game.winningTeam ? ` 🏆 ${getTeamName(game.winningTeam)} gewinnt Einordnen!` : " Einordnen endet unentschieden."
       : isRoundFinished && game.roundWinner ? ` ${getTeamName(game.roundWinner)} gewinnt diese Liste.` : "";
-    $("player-ranking-result").textContent = `${resultText} Wert: ${entry.value}.${conclusion}`;
+    $("player-ranking-result").textContent = `${resultText}${result.correct ? ` Wert: ${entry.value}.` : ""}${conclusion}`;
   } else {
     $("player-ranking-result").textContent = game.status === "ready-to-reveal"
       ? "Die Einordnung ist vorgemerkt. Der Moderator deckt gleich auf."
@@ -1061,6 +1069,7 @@ function renderSpotifySlots(revealed = []) {
 function renderMapGame() {
   const game = roomState.game;
   const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
+  const isPending = game.status === "round-pending";
   const isRevealed = game.status === "revealed" || game.status === "finished";
   const isFinished = game.status === "finished";
   const ownPin = game.pins?.[player.team];
@@ -1069,10 +1078,13 @@ function renderMapGame() {
 
   $("player-map-question-number").textContent =
     `FRAGE ${game.roundIndex + 1} VON ${GERMANY_MAP_QUESTIONS.length}`;
-  $("player-map-question").textContent = question.prompt;
+  $("player-map-question").textContent = isPending ? "" : question.prompt;
+  $("player-map-question-number").closest(".map-question-card").classList.toggle("hidden", isPending);
   $("player-map-blue-score").textContent = game.roundScores.blue;
   $("player-map-red-score").textContent = game.roundScores.red;
-  $("player-map-instruction").textContent = isRevealed
+  $("player-map-instruction").textContent = isPending
+    ? "Wartet darauf, dass der Moderator die erste Runde startet."
+    : isRevealed
     ? "Der Moderator hat das Ziel aufgedeckt."
     : bothTeamsLocked
       ? "Beide Antworten sind eingeloggt. Der Moderator deckt gleich die Distanz zum Ziel auf."
@@ -1082,14 +1094,16 @@ function renderMapGame() {
       ? "Euer Team-Pin ist gesetzt. Ihr könnt ihn noch verschieben oder einloggen."
       : "Tippt auf die Europakarte, um euren gemeinsamen Team-Pin zu setzen.";
 
-  $("lock-map-pin").disabled = isRevealed || ownTeamLocked || !ownPin;
+  $("lock-map-pin").classList.toggle("hidden", isPending);
+  $("lock-map-pin").disabled = isPending || isRevealed || ownTeamLocked || !ownPin;
   $("lock-map-pin").textContent = ownTeamLocked
     ? "Antwort eingeloggt ✓"
     : "Antwort einloggen";
-  renderPlayerTeamChat("player-map-chat", teamChatIsWritable());
+  $("player-map-chat").classList.toggle("hidden", isPending);
+  if (!isPending) renderPlayerTeamChat("player-map-chat", teamChatIsWritable());
 
   playerMap?.render({
-    pins: isRevealed || bothTeamsLocked
+    pins: isPending ? { blue: null, red: null } : isRevealed || bothTeamsLocked
       ? game.pins
       : { blue: player.team === "blue" ? ownPin : null, red: player.team === "red" ? ownPin : null },
     target: question.target,
@@ -1097,7 +1111,9 @@ function renderMapGame() {
     locked: isRevealed || ownTeamLocked
   });
 
-  if (isRevealed) {
+  if (isPending) {
+    $("player-map-result").textContent = "Die erste Frage bleibt bis zum Rundenstart verborgen.";
+  } else if (isRevealed) {
     const blueDistance = Math.round(game.distances.blue);
     const redDistance = Math.round(game.distances.red);
     const roundResult = `${question.location} · Blau: ${blueDistance} km · Rot: ${redDistance} km · ` +
@@ -1295,8 +1311,8 @@ function renderPriceGame() {
       : "Beide Teams liegen exakt gleich weit entfernt.";
     $("player-price-result").innerHTML = `
       <strong>Preis: ${formatEuroAmount(result.actualPrice)}</strong><br>
-      Blau: ${formatSignedEuroDifference(result.actualPrice, result.guesses.blue)}<br>
-      Rot: ${formatSignedEuroDifference(result.actualPrice, result.guesses.red)}<br>
+      Blau: ${formatEuroAmount(result.guesses.blue)}<br>
+      Rot: ${formatEuroAmount(result.guesses.red)}<br>
       ${roundMessage}
       ${isFinished
         ? game.winningTeam

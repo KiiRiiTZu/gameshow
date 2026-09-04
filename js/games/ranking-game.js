@@ -53,7 +53,7 @@ export const rankingGame = {
   start(state, startingTeam = "blue") {
     state.game = {
       id: this.id,
-      status: "playing",
+      status: "not-started",
       roundIndex: 0,
       roundWins: { blue: 0, red: 0 },
       roundWinner: null,
@@ -63,6 +63,12 @@ export const rankingGame = {
       ...initialRoundState(0),
       scoreSystemVersion: 1
     };
+    return true;
+  },
+
+  startFirstRound(state) {
+    if (state.game.id !== this.id || state.game.status !== "not-started") return false;
+    state.game.status = "playing";
     return true;
   },
 
@@ -105,6 +111,7 @@ export const rankingGame = {
       position: insertionIndex + 1,
       team: state.game.currentTeam
     };
+    state.game.lastResult = null;
     state.game.status = "ready-to-reveal";
     return true;
   },
@@ -123,8 +130,10 @@ export const rankingGame = {
     const correct = attemptedIndex === correctIndex;
     const team = state.game.proposal.team;
 
-    state.game.remainingIds = state.game.remainingIds.filter((id) => id !== item.id);
-    if (correct) state.game.placedIds.splice(correctIndex, 0, item.id);
+    if (correct) {
+      state.game.remainingIds = state.game.remainingIds.filter((id) => id !== item.id);
+      state.game.placedIds.splice(correctIndex, 0, item.id);
+    }
     else state.game.strikes[team] += 1;
     state.game.lastResult = {
       itemId: item.id,
@@ -148,14 +157,7 @@ export const rankingGame = {
       return true;
     }
 
-    state.game.status = "revealed";
-    return true;
-  },
-
-  startNextTurn(state) {
-    if (state.game.id !== this.id || state.game.status !== "revealed") return false;
     state.game.currentTeam = otherTeam(state.game.currentTeam);
-    state.game.lastResult = null;
     state.game.status = "playing";
     return true;
   },

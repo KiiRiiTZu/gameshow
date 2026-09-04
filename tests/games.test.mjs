@@ -68,7 +68,8 @@ import {
   clearExpiredTeamChatTyping,
   createTeamChat,
   getTeamChatView,
-  setTeamChatTyping
+  setTeamChatTyping,
+  supportsTeamChat
 } from "../js/team-chat.js";
 
 test("keeps session chat private per team and expires typing indicators", () => {
@@ -97,6 +98,10 @@ test("does not truncate a busy session chat after 100 messages", () => {
   }
   assert.equal(chat.blue.messages.length, 150);
   assert.equal(chat.blue.messages[0].text, "Nachricht 1");
+});
+
+test("enables the private session chat for Einordnen", () => {
+  assert.equal(supportsTeamChat("ranking-game"), true);
 });
 
 test("contains presentation cards for all seven games", () => {
@@ -132,33 +137,34 @@ test("Einordnen validates relative placements and alternates turns", () => {
   const state = createInitialRoomState("TEST");
   rankingGame.start(state, "blue");
 
+  assert.equal(state.game.status, "not-started");
+  assert.equal(rankingGame.startFirstRound(state), true);
   assert.deepEqual(state.game.placedIds, ["iso"]);
   assert.equal(rankingGame.proposePlacement(state, "sova", 1), true);
   assert.equal(rankingGame.revealPlacement(state), true);
   assert.equal(state.game.lastResult.correct, true);
   assert.deepEqual(state.game.placedIds, ["sova", "iso"]);
-  assert.equal(rankingGame.startNextTurn(state), true);
   assert.equal(state.game.currentTeam, "red");
 
   assert.equal(rankingGame.proposePlacement(state, "harbor", 1), true);
   assert.equal(rankingGame.revealPlacement(state), true);
   assert.equal(state.game.lastResult.correct, false);
   assert.equal(state.game.strikes.red, 1);
-  assert.equal(state.game.remainingIds.includes("harbor"), false);
+  assert.equal(state.game.remainingIds.includes("harbor"), true);
+  assert.equal(state.game.currentTeam, "blue");
 });
 
 test("Einordnen ends a list on the second error and alternates its starting team", () => {
   const state = createInitialRoomState("TEST");
   rankingGame.start(state, "blue");
+  rankingGame.startFirstRound(state);
   assert.equal(RANKING_MAX_STRIKES, 2);
   assert.equal(RANKING_ROUNDS_TO_WIN, 2);
 
   rankingGame.proposePlacement(state, "jett", 2);
   rankingGame.revealPlacement(state);
-  rankingGame.startNextTurn(state);
   rankingGame.proposePlacement(state, "harbor", 2);
   rankingGame.revealPlacement(state);
-  rankingGame.startNextTurn(state);
   rankingGame.proposePlacement(state, "reyna", 2);
   rankingGame.revealPlacement(state);
 
@@ -603,6 +609,8 @@ test("calculates geographic distances in kilometers", () => {
 test("shares one map pin per team and awards the closer team", () => {
   const state = createInitialRoomState("TEST");
   germanyMapGame.start(state);
+  assert.equal(state.game.status, "round-pending");
+  assert.equal(germanyMapGame.startFirstRound(state), true);
   const target = GERMANY_MAP_QUESTIONS[0].target;
 
   assert.equal(germanyMapGame.placePin(state, "blue", { lat: 53.5, lng: 10 }), true);
@@ -620,6 +628,7 @@ test("shares one map pin per team and awards the closer team", () => {
 test("finishes the best of seven map game at four points", () => {
   const state = createInitialRoomState("TEST");
   germanyMapGame.start(state);
+  germanyMapGame.startFirstRound(state);
   state.game.roundScores.blue = GERMANY_MAP_ROUNDS_TO_WIN - 1;
   const target = GERMANY_MAP_QUESTIONS[0].target;
 

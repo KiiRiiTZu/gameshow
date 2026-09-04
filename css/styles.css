@@ -510,7 +510,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .team-chat-form textarea { min-height: 52px; max-height: 110px; resize: vertical; padding: 10px 12px; }
 .team-chat-form .button { align-self: end; padding: 11px 14px; }
-#player-top20-chat, #player-map-chat, #player-price-chat { margin-top: 16px; }
+#player-top20-chat, #player-map-chat, #player-price-chat, #player-ranking-chat { margin-top: 16px; }
 
 .host-chat-rail .team-chat {
   height: 100%;

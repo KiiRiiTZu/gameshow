@@ -77,7 +77,7 @@ export const germanyMapGame = {
   start(state) {
     state.game = {
       id: this.id,
-      status: "placing",
+      status: "round-pending",
       roundIndex: 0,
       roundScores: { blue: 0, red: 0 },
       pins: emptyPins(),
@@ -87,6 +87,12 @@ export const germanyMapGame = {
       winningTeam: null,
       scoreSystemVersion: 2
     };
+    return true;
+  },
+
+  startFirstRound(state) {
+    if (state.game.id !== this.id || state.game.status !== "round-pending") return false;
+    state.game.status = "placing";
     return true;
   },
 
