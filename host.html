@@ -86,7 +86,7 @@
       </div>
 
       <div id="answer-controls" class="answer-controls hidden">
-        <button id="correct-answer" class="button success">✓ Richtig · +3 Quizpunkte</button>
+        <button id="correct-answer" class="button success">✓ Richtig · +4 Quizpunkte</button>
         <button id="wrong-answer" class="button danger">✕ Falsch · +1 Gegner</button>
       </div>
 
@@ -158,6 +158,7 @@
         <button id="start-first-ranking-round" class="button primary hidden">Erste Liste starten</button>
         <button id="confirm-ranking-placement" class="button primary">Einordnung vormerken</button>
         <button id="reveal-ranking-placement" class="button primary hidden">Einordnung aufdecken</button>
+        <button id="reveal-next-ranking-entry" class="button secondary hidden">Nächsten Begriff aufdecken</button>
         <button id="next-ranking-round" class="button primary hidden">Nächste Liste starten</button>
         <button id="start-matching-after-ranking" class="button primary hidden">Da seh ich dich starten</button>
       </div>
@@ -282,6 +283,7 @@
       <div id="price-round-result" class="map-result hidden"></div>
       <p id="price-error" class="error"></p>
       <div class="controls">
+        <button id="start-first-price-round" class="button primary hidden">Erstes Produkt zeigen</button>
         <button id="reveal-price-round" class="button primary">Preis aufdecken &amp; auswerten</button>
         <button id="next-price-round" class="button primary hidden">Nächstes Produkt</button>
         <button id="start-map-after-price" class="button primary hidden">Kartenwissen starten</button>
@@ -346,7 +348,7 @@
         <span class="eyebrow">OBERBEGRIFF</span>
         <h3 id="word-match-category"></h3>
         <p id="word-match-roles" class="muted"></p>
-        <strong id="word-match-timer" class="word-match-timer">01:20</strong>
+        <strong id="word-match-timer" class="word-match-timer">02:00</strong>
       </div>
 
       <div id="word-match-seed-status" class="map-pin-status"></div>
@@ -357,9 +359,12 @@
       <div class="controls">
         <button id="start-word-seed-phase" class="button primary">Listenphase starten</button>
         <button id="finish-word-seed-phase" class="button secondary hidden">Listenphase jetzt beenden</button>
-        <button id="start-blue-guess-phase" class="button primary hidden">Team Blau · 60 Sekunden starten</button>
+        <button id="start-blue-guess-phase" class="button primary hidden">Team Blau · 45 Sekunden starten</button>
         <button id="finish-blue-guess-phase" class="button secondary hidden">Zeit für Blau beenden</button>
-        <button id="start-red-guess-phase" class="button primary hidden">Team Rot · 60 Sekunden starten</button>
+        <button id="start-red-guess-phase" class="button primary hidden">Team Rot · 45 Sekunden starten</button>
+        <button id="start-word-tiebreak" class="button primary hidden">Finale · 90 Sekunden starten</button>
+        <button id="skip-word-tiebreak-turn" class="button secondary hidden">Kein Treffer · Nächster Spieler</button>
+        <button id="finish-word-tiebreak" class="button secondary hidden">Finale jetzt beenden</button>
         <button id="finish-red-guess-phase" class="button secondary hidden">Zeit für Rot beenden</button>
         <button id="reveal-word-match-round" class="button primary hidden">Ergebnisse aufdecken</button>
         <button id="next-word-match-round" class="button primary hidden">Nächste Runde</button>

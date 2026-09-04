@@ -42,8 +42,10 @@ import {
   WORD_MATCH_PHASE_SECONDS,
   WORD_MATCH_SEED_SECONDS,
   WORD_MATCH_TERM_COUNT,
+  WORD_MATCH_TIEBREAK_SECONDS,
   getWordMatchGuessOrder,
   getWordMatchRoles,
+  getWordMatchTiebreakTurn,
   wordMatchGame
 } from "./games/word-match-game.js";
 import {
@@ -639,6 +641,7 @@ function renderEstimationGame() {
 
 function wordMatchSecondsRemaining() {
   if (!state.game.phaseEndsAt) {
+    if (state.game.tiebreak) return WORD_MATCH_TIEBREAK_SECONDS;
     return ["round-pending", "seed-collecting"].includes(state.game.status)
       ? WORD_MATCH_SEED_SECONDS
       : WORD_MATCH_PHASE_SECONDS;
@@ -660,6 +663,60 @@ function renderWordMatchGame() {
   const game = state.game;
   const roles = getWordMatchRoles(game);
   const [firstGuessTeam] = getWordMatchGuessOrder(game);
+  const isTiebreak = Boolean(game.tiebreak) &&
+    ["tiebreak-pending", "tiebreak-playing", "finished"].includes(game.status);
+  if (isTiebreak) {
+    const turn = getWordMatchTiebreakTurn(game);
+    const playing = game.status === "tiebreak-playing";
+    const finished = game.status === "finished";
+    $("word-match-round-label").textContent = "Finale bei Gleichstand";
+    $("word-match-blue-score").textContent = game.tiebreak.scores.blue;
+    $("word-match-red-score").textContent = game.tiebreak.scores.red;
+    $("word-match-category").textContent = game.tiebreak.category;
+    $("word-match-category-card").classList.remove("hidden");
+    $("word-match-roles").textContent = finished
+      ? "Das Finale ist beendet."
+      : `${turn.player?.name || getTeamName(turn.team)} ist dran · Spieler ${turn.playerIndex + 1}`;
+    updateHostWordMatchTimer();
+    $("word-match-status").textContent = finished
+      ? "Spiel beendet" : playing ? "Finale läuft" : "Finale bereit";
+    $("word-match-status").className = `status-pill ${playing ? "open" : "closed"}`;
+    $("word-match-seed-status").innerHTML = "";
+    $("word-match-lists").innerHTML = `<article class="word-match-list word-match-tiebreak-list">
+      <strong>Moderator-Liste · Kino</strong>
+      ${game.tiebreak.terms.map((term, index) => {
+        const claimedBy = game.tiebreak.claimedBy[index];
+        return `<div class="word-match-tiebreak-term${claimedBy ? ` claimed ${claimedBy}` : ""}">
+          <span>${index + 1}. ${escapeHtml(term)}</span>
+          <div>
+            <button type="button" class="button tiny blue" data-word-tiebreak-index="${index}" data-word-tiebreak-team="blue"
+              ${!playing || claimedBy || turn.team !== "blue" ? " disabled" : ""}>Blau</button>
+            <button type="button" class="button tiny danger" data-word-tiebreak-index="${index}" data-word-tiebreak-team="red"
+              ${!playing || claimedBy || turn.team !== "red" ? " disabled" : ""}>Rot</button>
+          </div>
+        </div>`;
+      }).join("")}
+    </article>`;
+    for (const id of [
+      "start-word-seed-phase", "finish-word-seed-phase", "start-blue-guess-phase",
+      "finish-blue-guess-phase", "start-red-guess-phase", "finish-red-guess-phase",
+      "reveal-word-match-round", "next-word-match-round"
+    ]) $(id).classList.add("hidden");
+    $("start-word-tiebreak").classList.toggle("hidden", game.status !== "tiebreak-pending");
+    $("skip-word-tiebreak-turn").classList.toggle("hidden", !playing);
+    $("finish-word-tiebreak").classList.toggle("hidden", !playing);
+    $("start-ranking-after-word").classList.toggle("hidden", !finished || Boolean(getShowWinner(state)));
+    for (const id of ["start-word-tiebreak", "skip-word-tiebreak-turn", "finish-word-tiebreak", "start-ranking-after-word"]) {
+      $(id).disabled = moderatorActionPending || wordTimerActionPending;
+    }
+    $("word-match-result").classList.toggle("hidden", !finished);
+    if (finished) {
+      $("word-match-result").innerHTML = game.winningTeam
+        ? `<strong>Finale: Blau ${game.tiebreak.scores.blue} · Rot ${game.tiebreak.scores.red}</strong><span>🏆 ${getTeamName(game.winningTeam)} gewinnt Begriffsmatch!</span>`
+        : `<strong>Finale: Blau ${game.tiebreak.scores.blue} · Rot ${game.tiebreak.scores.red}</strong><span>Das Finale endet unentschieden.</span>`;
+    }
+    return;
+  }
   const category = game.category;
   const isSeedCollecting = game.status === "seed-collecting";
   const isRoundFinished = game.status === "round-finished";
@@ -727,6 +784,9 @@ function renderWordMatchGame() {
   $("reveal-word-match-round").classList.toggle("hidden", game.status !== "results-pending");
   $("next-word-match-round").classList.toggle("hidden", !isRoundFinished);
   $("start-ranking-after-word").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
+  $("start-word-tiebreak").classList.add("hidden");
+  $("skip-word-tiebreak-turn").classList.add("hidden");
+  $("finish-word-tiebreak").classList.add("hidden");
   $("start-ranking-after-word").disabled = moderatorActionPending;
   for (const id of [
     "start-word-seed-phase", "finish-word-seed-phase", "start-blue-guess-phase",
@@ -764,6 +824,7 @@ function renderHostPersonalNotes(containerId, team, notes = {}) {
 function renderPriceGame() {
   const game = state.game;
   const product = getPriceProduct(game.roundIndex);
+  const isPending = game.status === "product-pending";
   const isRevealed = ["revealed", "finished"].includes(game.status);
   const isFinished = game.status === "finished";
   const showIsFinished = Boolean(getShowWinner(state));
@@ -778,14 +839,17 @@ function renderPriceGame() {
   $("price-product-name").textContent = product.name;
   $("price-status").textContent = isFinished
     ? "Spiel beendet"
-    : isRevealed ? "Preis aufgedeckt" : bothLocked ? "Bereit zum Aufdecken" : "Teams beraten sich";
+    : isPending ? "Produkt bereit"
+      : isRevealed ? "Preis aufgedeckt" : bothLocked ? "Bereit zum Aufdecken" : "Teams beraten sich";
   $("price-status").className = `status-pill ${isRevealed ? "closed" : "open"}`;
 
   renderPriceDraft("blue");
   renderPriceDraft("red");
 
-  $("reveal-price-round").classList.toggle("hidden", isRevealed);
-  $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
+  $("start-first-price-round").classList.toggle("hidden", !isPending);
+  $("start-first-price-round").disabled = moderatorActionPending;
+  $("reveal-price-round").classList.toggle("hidden", isPending || isRevealed);
+  $("reveal-price-round").disabled = moderatorActionPending || isPending || !bothLocked;
   $("next-price-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-price-round").disabled = moderatorActionPending;
   $("start-map-after-price").classList.toggle("hidden", !isFinished || showIsFinished);
@@ -882,13 +946,15 @@ function renderRankingGame() {
   $("ranking-result").classList.toggle("hidden", !result && !isFinished);
   if (result) {
     const entry = getRankingEntry(list, result.itemId);
-    const resultText = result.correct
+    const resultText = result.cleanupReveal
+      ? `${entry.label} wurde aufgedeckt.`
+      : result.correct
       ? `${entry.label} wurde richtig eingeordnet.`
       : `${entry.label} war falsch eingeordnet und bleibt verfügbar.`;
     const conclusion = isFinished
       ? game.winningTeam ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Einordnen!` : "Einordnen endet unentschieden."
       : isRoundFinished && game.roundWinner ? `${getTeamName(game.roundWinner)} gewinnt diese Liste.` : "";
-    $("ranking-result").innerHTML = `<strong>${result.correct ? "✓ Richtig" : "✕ Falsch"}</strong>
+    $("ranking-result").innerHTML = `<strong>${result.cleanupReveal ? "Aufgedeckt" : result.correct ? "✓ Richtig" : "✕ Falsch"}</strong>
       <span>${escapeHtml(resultText)}${result.correct ? ` Wert: ${escapeHtml(entry.value)}` : ""}</span>
       ${conclusion ? `<p>${escapeHtml(conclusion)}</p>` : ""}`;
   } else if (isFinished) {
@@ -900,9 +966,13 @@ function renderRankingGame() {
   $("confirm-ranking-placement").disabled = moderatorActionPending ||
     !rankingSelection.itemId || !rankingSelection.position;
   $("reveal-ranking-placement").classList.toggle("hidden", game.status !== "ready-to-reveal");
+  $("reveal-next-ranking-entry").classList.toggle(
+    "hidden",
+    !["round-finished", "finished"].includes(game.status) || !game.remainingIds.length
+  );
   $("next-ranking-round").classList.toggle("hidden", !isRoundFinished);
   $("start-matching-after-ranking").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
-  for (const id of ["start-first-ranking-round", "reveal-ranking-placement", "next-ranking-round", "start-matching-after-ranking"]) {
+  for (const id of ["start-first-ranking-round", "reveal-ranking-placement", "reveal-next-ranking-entry", "next-ranking-round", "start-matching-after-ranking"]) {
     $(id).disabled = moderatorActionPending;
   }
 }
@@ -1355,6 +1425,7 @@ async function broadcastState() {
   }
   if (state.game.id === wordMatchGame.id) {
     publicState.wordMatchSubmissionKey = matchingPublicKey;
+    if (publicState.game.tiebreak) publicState.game.tiebreak.terms = [];
     if (["blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing", "results-pending"]
       .includes(state.game.status)) {
       publicState.game.currentMatches = { blue: [], red: [] };
@@ -2213,6 +2284,11 @@ $("reveal-ranking-placement").addEventListener("click", async () => {
   await runModeratorAction(() => rankingGame.revealPlacement(state));
 });
 
+$("reveal-next-ranking-entry").addEventListener("click", async () => {
+  $("ranking-error").textContent = "";
+  await runModeratorAction(() => rankingGame.revealNextRemaining(state));
+});
+
 $("start-first-ranking-round").addEventListener("click", async () => {
   await runModeratorAction(() => rankingGame.startFirstRound(state));
 });
@@ -2529,6 +2605,15 @@ $("word-match-lists").addEventListener("input", (event) => {
 });
 
 $("word-match-lists").addEventListener("click", async (event) => {
+  const tiebreakButton = event.target.closest("[data-word-tiebreak-index][data-word-tiebreak-team]");
+  if (tiebreakButton) {
+    await runModeratorAction(() => wordMatchGame.claimTiebreakTerm(
+      state,
+      Number(tiebreakButton.dataset.wordTiebreakIndex),
+      tiebreakButton.dataset.wordTiebreakTeam
+    ));
+    return;
+  }
   const button = event.target.closest("[data-word-team][data-word-index]");
   if (!button || button.disabled) return;
   await runModeratorAction(() => wordMatchGame.toggleMatch(
@@ -2536,6 +2621,18 @@ $("word-match-lists").addEventListener("click", async (event) => {
     button.dataset.wordTeam,
     Number(button.dataset.wordIndex)
   ));
+});
+
+$("start-word-tiebreak").addEventListener("click", async () => {
+  await runModeratorAction(() => wordMatchGame.startTiebreaker(state));
+});
+
+$("skip-word-tiebreak-turn").addEventListener("click", async () => {
+  await runModeratorAction(() => wordMatchGame.skipTiebreakTurn(state));
+});
+
+$("finish-word-tiebreak").addEventListener("click", async () => {
+  await runModeratorAction(() => wordMatchGame.finishTiebreaker(state));
 });
 
 $("next-word-match-round").addEventListener("click", async () => {
@@ -2567,6 +2664,8 @@ async function tickWordMatchTimer() {
       accepted = await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "blue"));
     } else if (status === "red-guessing") {
       accepted = await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "red"));
+    } else if (status === "tiebreak-playing") {
+      accepted = await runModeratorAction(() => wordMatchGame.finishTiebreaker(state));
     }
   } finally {
     wordTimerActionPending = false;
@@ -2604,6 +2703,12 @@ $("start-buzzer-after-matching").addEventListener("click", async () => {
     if (getShowWinner(state) || state.game.id !== matchingGame.id || state.game.status !== "finished") return false;
     return buzzerGame.start(state);
   });
+});
+
+$("start-first-price-round").addEventListener("click", async () => {
+  $("price-error").textContent = "";
+  const accepted = await runModeratorAction(() => guessThePriceGame.startFirstRound(state));
+  if (accepted) await syncAllPriceTeams();
 });
 
 $("reveal-price-round").addEventListener("click", async () => {

@@ -56,8 +56,11 @@ import {
   WORD_MATCH_PHASE_SECONDS,
   WORD_MATCH_SEED_SECONDS,
   WORD_MATCH_TERM_COUNT,
+  WORD_MATCH_TIEBREAK_SECONDS,
+  WORD_MATCH_TIEBREAK_TERMS,
   getWordMatchGuessOrder,
   getWordMatchRoles,
+  getWordMatchTiebreakTurn,
   wordMatchGame
 } from "../js/games/word-match-game.js";
 import {
@@ -180,6 +183,13 @@ test("Einordnen ends a list on the second error and alternates its starting team
   assert.equal(state.game.status, "round-finished");
   assert.equal(state.game.roundWinner, "red");
   assert.equal(state.game.roundWins.red, 1);
+  const nextRemainingId = RANKING_LISTS[0].entries.find((entry) =>
+    state.game.remainingIds.includes(entry.id)
+  ).id;
+  assert.equal(rankingGame.revealNextRemaining(state), true);
+  assert.equal(state.game.remainingIds.includes(nextRemainingId), false);
+  assert.equal(state.game.lastResult.itemId, nextRemainingId);
+  assert.equal(state.game.lastResult.cleanupReveal, true);
   assert.equal(rankingGame.startNextRound(state), true);
   assert.equal(state.game.currentTeam, "red");
   assert.deepEqual(state.game.placedIds, ["banana"]);
@@ -191,7 +201,7 @@ test("starts a new show with Mittelwert waiting for the moderator", () => {
   assert.equal(state.game.status, "not-started");
 });
 
-test("alternates Begriffsmatch roles with 80 seconds to write and 60 seconds to guess", () => {
+test("alternates Begriffsmatch roles with 120 seconds to write and 45 seconds to guess", () => {
   const state = createInitialRoomState("TEST");
   const participants = [
     { id: "b1", name: "B1", team: "blue" },
@@ -230,6 +240,46 @@ test("alternates Begriffsmatch roles with 80 seconds to write and 60 seconds to 
   assert.equal(wordMatchGame.startGuessPhase(state, "red"), true);
   assert.equal(wordMatchGame.finishGuessPhase(state, "red"), true);
   assert.equal(state.game.status, "blue-guess-pending");
+});
+
+test("starts the Begriffsmatch Kino tiebreak after four tied rounds", () => {
+  const state = createInitialRoomState("TEST");
+  const participants = [
+    { id: "b1", name: "B1", team: "blue" },
+    { id: "b2", name: "B2", team: "blue" },
+    { id: "r1", name: "R1", team: "red" },
+    { id: "r2", name: "R2", team: "red" }
+  ];
+  wordMatchGame.start(state, participants);
+
+  for (let round = 0; round < WORD_MATCH_CATEGORIES.length; round += 1) {
+    wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[round]);
+    wordMatchGame.finishSeedPhase(state);
+    for (const team of getWordMatchGuessOrder(state.game)) {
+      wordMatchGame.startGuessPhase(state, team);
+      wordMatchGame.finishGuessPhase(state, team);
+    }
+    wordMatchGame.revealRound(state, { blue: [], red: [] });
+    if (round < WORD_MATCH_CATEGORIES.length - 1) wordMatchGame.startNextRound(state);
+  }
+
+  assert.equal(state.game.status, "tiebreak-pending");
+  assert.deepEqual(state.game.tiebreak.terms, WORD_MATCH_TIEBREAK_TERMS);
+  assert.equal(wordMatchGame.startTiebreaker(state, 4_000), true);
+  assert.equal(state.game.phaseEndsAt, 4_000 + WORD_MATCH_TIEBREAK_SECONDS * 1000);
+  assert.equal(getWordMatchTiebreakTurn(state.game).player.id, "r1");
+  assert.equal(wordMatchGame.claimTiebreakTerm(state, 0, "blue"), false);
+  assert.equal(wordMatchGame.claimTiebreakTerm(state, 0, "red"), true);
+  assert.equal(getWordMatchTiebreakTurn(state.game).player.id, "b1");
+  assert.equal(wordMatchGame.skipTiebreakTurn(state), true);
+  assert.equal(getWordMatchTiebreakTurn(state.game).player.id, "r2");
+  assert.equal(wordMatchGame.claimTiebreakTerm(state, 1, "red"), true);
+  assert.equal(getWordMatchTiebreakTurn(state.game).player.id, "b2");
+  assert.equal(wordMatchGame.finishTiebreaker(state), true);
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "red");
+  assert.deepEqual(state.game.tiebreak.scores, { blue: 0, red: 2 });
+  assert.equal(state.scores.red, 1);
 });
 
 test("lets every Begriffsmatch player begin one guessing phase", () => {
@@ -854,6 +904,9 @@ test("locks both teams and awards the closer price guess", () => {
   const state = createInitialRoomState("TEST");
   guessThePriceGame.start(state);
 
+  assert.equal(state.game.status, "product-pending");
+  assert.equal(guessThePriceGame.lockTeam(state, "blue"), false);
+  assert.equal(guessThePriceGame.startFirstRound(state), true);
   assert.equal(guessThePriceGame.lockTeam(state, "blue"), true);
   assert.equal(state.game.status, "guessing");
   assert.equal(guessThePriceGame.lockTeam(state, "red"), true);
@@ -869,6 +922,7 @@ test("locks both teams and awards the closer price guess", () => {
 test("finishes the best of seven price game at four wins", () => {
   const state = createInitialRoomState("TEST");
   guessThePriceGame.start(state);
+  guessThePriceGame.startFirstRound(state);
 
   for (let round = 0; round < PRICE_GAME_WINNING_SCORE; round += 1) {
     guessThePriceGame.lockTeam(state, "blue");
@@ -888,6 +942,7 @@ test("uses the requested product order with matching prices", () => {
   const state = createInitialRoomState("TEST");
   const expectedPrices = [79.99, 82_220, 11.54, 25.95, 51_800, 49.95, 149.90];
   guessThePriceGame.start(state);
+  guessThePriceGame.startFirstRound(state);
 
   expectedPrices.forEach((expectedPrice, index) => {
     guessThePriceGame.lockTeam(state, "blue");

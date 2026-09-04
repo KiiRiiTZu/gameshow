@@ -14,9 +14,9 @@ Die Wertung besteht aus zwei Ebenen: Jedes Spiel verwaltet seine eigene interne 
 - Der erste gültige Buzz wird angenommen.
 - Sobald der erste Buzz bestätigt ist, wird der Buzzer-Sound beim Moderator und bei allen verbundenen Spielern abgespielt.
 - Der Moderator sieht die vorbereitete Frage vollständig, aber keine eingeblendete Antwort.
-- Für eine richtige Antwort erhält das Team drei Quizpunkte.
+- Für eine richtige Antwort erhält das Team vier Quizpunkte.
 - Bei einer falschen Antwort erhält das Gegnerteam einen Quizpunkt und der Buzzer wird für dieselbe Frage erneut geöffnet.
-- Das erste Team mit 20 Punkten gewinnt das Spiel.
+- Das erste Team mit 40 Punkten gewinnt das Spiel.
 - Das Gewinnerteam erhält einen Spielpunkt für die Gesamtwertung.
 - Danach kann der Moderator Spiel 2 starten.
 

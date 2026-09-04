@@ -1138,6 +1138,23 @@ button.ranking-candidate:disabled { opacity: .72; }
 .word-match-term:disabled { opacity: .7; cursor: default; }
 .word-match-term.matched { border-color: #35d08a; background: rgba(53,208,138,.16); color: #8bf0bd; }
 .word-match-term.empty { color: #72798b; }
+.word-match-tiebreak-list { grid-column: 1 / -1; }
+.word-match-tiebreak-term {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  background: #171b27;
+}
+.word-match-tiebreak-term > div { display: flex; gap: 8px; }
+.word-match-tiebreak-term.claimed.blue { border-color: #5a72f6; background: rgba(90,114,246,.16); }
+.word-match-tiebreak-term.claimed.red { border-color: #d23750; background: rgba(210,55,80,.16); }
+.button.tiny { min-height: 32px; padding: 5px 10px; font-size: .78rem; }
+.button.tiny.blue { background: #3554db; color: #fff; }
 .word-match-term-input {
   width: 100%;
   min-height: 42px;

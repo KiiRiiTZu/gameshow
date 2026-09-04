@@ -24,7 +24,7 @@ export const guessThePriceGame = {
   start(state) {
     state.game = {
       id: this.id,
-      status: "guessing",
+      status: "product-pending",
       roundIndex: 0,
       roundScores: emptyTeams(0),
       lockedTeams: emptyTeams(false),
@@ -33,6 +33,12 @@ export const guessThePriceGame = {
       winningTeam: null,
       scoreSystemVersion: 2
     };
+    return true;
+  },
+
+  startFirstRound(state) {
+    if (state.game.id !== this.id || state.game.status !== "product-pending") return false;
+    state.game.status = "guessing";
     return true;
   },
 

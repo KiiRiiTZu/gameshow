@@ -1,7 +1,12 @@
 export const WORD_MATCH_CATEGORIES = ["Sage", "Frühstück", "Golf", "Ascent"];
 export const WORD_MATCH_TERM_COUNT = 10;
-export const WORD_MATCH_PHASE_SECONDS = 60;
-export const WORD_MATCH_SEED_SECONDS = 80;
+export const WORD_MATCH_PHASE_SECONDS = 45;
+export const WORD_MATCH_SEED_SECONDS = 120;
+export const WORD_MATCH_TIEBREAK_SECONDS = 90;
+export const WORD_MATCH_TIEBREAK_TERMS = [
+  "Popcorn", "Nachos", "Film", "Leinwand", "Sitz",
+  "Saal", "Projektor", "Cola", "Getränk", "Ticket"
+];
 
 function emptyScores() {
   return { blue: 0, red: 0 };
@@ -29,12 +34,39 @@ function publicParticipants(participants) {
   );
 }
 
-function finishGame(state) {
+const WORD_MATCH_TIEBREAK_ORDER = [
+  { team: "red", playerIndex: 0 },
+  { team: "blue", playerIndex: 0 },
+  { team: "red", playerIndex: 1 },
+  { team: "blue", playerIndex: 1 }
+];
+
+function emptyTiebreak() {
+  return {
+    category: "Kino",
+    terms: [...WORD_MATCH_TIEBREAK_TERMS],
+    claimedBy: Array(WORD_MATCH_TIEBREAK_TERMS.length).fill(null),
+    turnIndex: 0,
+    scores: emptyScores()
+  };
+}
+
+function finishGame(state, winningTeam = null) {
   state.game.status = "finished";
   state.game.phaseEndsAt = null;
-  state.game.winningTeam = state.game.scores.blue === state.game.scores.red
-    ? null : state.game.scores.blue > state.game.scores.red ? "blue" : "red";
+  state.game.winningTeam = winningTeam || (state.game.scores.blue === state.game.scores.red
+    ? null : state.game.scores.blue > state.game.scores.red ? "blue" : "red");
   if (state.game.winningTeam) state.scores[state.game.winningTeam] += 1;
+}
+
+export function getWordMatchTiebreakTurn(game) {
+  const turn = WORD_MATCH_TIEBREAK_ORDER[
+    (Number(game?.tiebreak?.turnIndex) || 0) % WORD_MATCH_TIEBREAK_ORDER.length
+  ];
+  const player = game?.participants?.find((item) =>
+    item.team === turn.team && item.playerIndex === turn.playerIndex
+  ) || null;
+  return { ...turn, player };
 }
 
 export function getWordMatchRoles(game) {
@@ -81,6 +113,7 @@ export const wordMatchGame = {
       revealedLists: null,
       phaseEndsAt: null,
       roundResults: [],
+      tiebreak: null,
       winningTeam: null,
       scoreSystemVersion: 2
     };
@@ -117,6 +150,23 @@ export const wordMatchGame = {
     state.game.phaseEndsAt = Number(state.game.phaseEndsAt) || null;
     state.game.roundResults = Array.isArray(state.game.roundResults)
       ? state.game.roundResults.slice(0, WORD_MATCH_CATEGORIES.length) : [];
+    if (state.game.tiebreak) {
+      const defaults = emptyTiebreak();
+      state.game.tiebreak = {
+        category: "Kino",
+        terms: [...WORD_MATCH_TIEBREAK_TERMS],
+        claimedBy: Array.from({ length: WORD_MATCH_TIEBREAK_TERMS.length }, (_, index) =>
+          ["blue", "red"].includes(state.game.tiebreak.claimedBy?.[index])
+            ? state.game.tiebreak.claimedBy[index]
+            : null
+        ),
+        turnIndex: Math.max(0, Number(state.game.tiebreak.turnIndex) || 0),
+        scores: {
+          blue: Number(state.game.tiebreak.scores?.blue) || defaults.scores.blue,
+          red: Number(state.game.tiebreak.scores?.red) || defaults.scores.red
+        }
+      };
+    }
     state.game.winningTeam ||= null;
     state.game.scoreSystemVersion = 2;
     return true;
@@ -209,8 +259,53 @@ export const wordMatchGame = {
     const blueMaximum = state.game.scores.blue + remainingRounds * WORD_MATCH_TERM_COUNT;
     const redMaximum = state.game.scores.red + remainingRounds * WORD_MATCH_TERM_COUNT;
     const clinched = state.game.scores.blue > redMaximum || state.game.scores.red > blueMaximum;
-    if (clinched || remainingRounds === 0) finishGame(state);
+    if (clinched) finishGame(state);
+    else if (remainingRounds === 0 && state.game.scores.blue === state.game.scores.red) {
+      state.game.status = "tiebreak-pending";
+      state.game.phaseEndsAt = null;
+      state.game.tiebreak = emptyTiebreak();
+    }
+    else if (remainingRounds === 0) finishGame(state);
     else state.game.status = "round-finished";
+    return true;
+  },
+
+  startTiebreaker(state, now = Date.now()) {
+    if (state.game.id !== this.id || state.game.status !== "tiebreak-pending" ||
+        !state.game.tiebreak) return false;
+    state.game.status = "tiebreak-playing";
+    state.game.phaseEndsAt = now + WORD_MATCH_TIEBREAK_SECONDS * 1000;
+    return true;
+  },
+
+  claimTiebreakTerm(state, index, team) {
+    if (state.game.id !== this.id || state.game.status !== "tiebreak-playing" ||
+        !state.game.tiebreak) return false;
+    const termIndex = Number(index);
+    const turn = getWordMatchTiebreakTurn(state.game);
+    if (!Number.isInteger(termIndex) || termIndex < 0 ||
+        termIndex >= WORD_MATCH_TIEBREAK_TERMS.length ||
+        state.game.tiebreak.claimedBy[termIndex] || team !== turn.team) return false;
+    state.game.tiebreak.claimedBy[termIndex] = team;
+    state.game.tiebreak.scores[team] += 1;
+    state.game.tiebreak.turnIndex += 1;
+    if (state.game.tiebreak.claimedBy.every(Boolean)) this.finishTiebreaker(state);
+    return true;
+  },
+
+  skipTiebreakTurn(state) {
+    if (state.game.id !== this.id || state.game.status !== "tiebreak-playing" ||
+        !state.game.tiebreak) return false;
+    state.game.tiebreak.turnIndex += 1;
+    return true;
+  },
+
+  finishTiebreaker(state) {
+    if (state.game.id !== this.id || state.game.status !== "tiebreak-playing" ||
+        !state.game.tiebreak) return false;
+    const scores = state.game.tiebreak.scores;
+    const winner = scores.blue === scores.red ? null : scores.blue > scores.red ? "blue" : "red";
+    finishGame(state, winner);
     return true;
   },
 

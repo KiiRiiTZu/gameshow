@@ -24,8 +24,10 @@ import {
   WORD_MATCH_PHASE_SECONDS,
   WORD_MATCH_SEED_SECONDS,
   WORD_MATCH_TERM_COUNT,
+  WORD_MATCH_TIEBREAK_SECONDS,
   getWordMatchGuessOrder,
-  getWordMatchRoles
+  getWordMatchRoles,
+  getWordMatchTiebreakTurn
 } from "./games/word-match-game.js";
 import {
   createEncryptionKeyPair,
@@ -1024,7 +1026,9 @@ function renderRankingGame() {
   const result = game.lastResult;
   if (result) {
     const entry = getRankingEntry(list, result.itemId);
-    const resultText = result.correct
+    const resultText = result.cleanupReveal
+      ? `${entry.label} wurde aufgedeckt.`
+      : result.correct
       ? `✓ ${entry.label} wurde richtig eingeordnet.`
       : `✕ ${entry.label} war falsch eingeordnet und bleibt verfügbar.`;
     const conclusion = isFinished
@@ -1316,6 +1320,7 @@ function renderMatchingGame() {
 function renderPriceGame() {
   const game = roomState.game;
   const product = getPriceProduct(game.roundIndex);
+  const isPending = game.status === "product-pending";
   const isRevealed = ["revealed", "finished"].includes(game.status);
   const isFinished = game.status === "finished";
   const ownTeam = player?.team || "blue";
@@ -1329,16 +1334,23 @@ function renderPriceGame() {
   $("player-price-product-image").src = product.src;
   $("player-price-product-image").alt = product.name;
   $("player-price-product-name").textContent = product.name;
+  $("player-price-content").classList.toggle("hidden", isPending);
 
   const amountInput = $("player-price-amount");
   if (amountInput.value !== priceDraft.amount) amountInput.value = priceDraft.amount;
   amountInput.disabled = !editable;
-  renderPlayerTeamChat("player-price-chat", teamChatIsWritable());
+  $("player-price-chat").classList.toggle("hidden", isPending);
+  if (!isPending) renderPlayerTeamChat("player-price-chat", teamChatIsWritable());
   $("lock-price-guess").disabled = !editable || parseEuroAmount(priceDraft.amount) === null;
   $("lock-price-guess").textContent = priceSubmissionPending
     ? "Wird eingeloggt…"
     : locked ? "Team-Preis eingeloggt ✓" : "Preis einloggen";
   $("lock-price-guess").closest(".price-team-form").classList.toggle("locked", locked);
+
+  if (isPending) {
+    $("player-price-result").textContent = "Wartet darauf, dass der Moderator das erste Produkt zeigt.";
+    return;
+  }
 
   if (isRevealed) {
     const result = game.revealed;
@@ -1487,6 +1499,7 @@ function renderEstimationGame() {
 
 function wordMatchSecondsRemaining() {
   if (!roomState?.game?.phaseEndsAt) {
+    if (roomState?.game?.tiebreak) return WORD_MATCH_TIEBREAK_SECONDS;
     return ["round-pending", "seed-collecting"].includes(roomState?.game?.status)
       ? WORD_MATCH_SEED_SECONDS
       : WORD_MATCH_PHASE_SECONDS;
@@ -1542,6 +1555,34 @@ function renderWordMatchGame() {
   const [firstGuessTeam] = getWordMatchGuessOrder(game);
   const participant = game.participants.find((item) => item.id === playerId);
   const ownTeam = participant?.team;
+  const isTiebreak = Boolean(game.tiebreak) &&
+    ["tiebreak-pending", "tiebreak-playing", "finished"].includes(game.status);
+  if (isTiebreak) {
+    const turn = getWordMatchTiebreakTurn(game);
+    const finished = game.status === "finished";
+    const tiebreakVisible = game.status !== "tiebreak-pending";
+    $("player-word-match-round").textContent = "Finale bei Gleichstand";
+    $("player-word-match-blue-score").textContent = game.tiebreak.scores.blue;
+    $("player-word-match-red-score").textContent = game.tiebreak.scores.red;
+    $("player-word-match-category-card").classList.toggle("hidden", !tiebreakVisible);
+    $("player-word-match-category").textContent = tiebreakVisible ? game.tiebreak.category : "";
+    updatePlayerWordMatchTimer();
+    $("player-word-seed-form").classList.add("hidden");
+    $("player-word-match-locks").classList.add("hidden");
+    $("player-word-match-lists").classList.add("hidden");
+    $("player-word-match-lists").innerHTML = "";
+    $("player-word-match-role").textContent = finished
+      ? game.winningTeam
+        ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Begriffsmatch!`
+        : "Das Finale endet unentschieden."
+      : game.status === "tiebreak-pending"
+        ? "Wartet darauf, dass der Moderator das 90-Sekunden-Finale startet."
+        : `${turn.player?.name || getTeamName(turn.team)} ist dran · Spieler ${turn.playerIndex + 1}`;
+    $("player-word-match-result").textContent = finished
+      ? `Finale: Blau ${game.tiebreak.scores.blue} Treffer · Rot ${game.tiebreak.scores.red} Treffer`
+      : "";
+    return;
+  }
   const isSeeder = roles.seeders[ownTeam]?.id === playerId;
   const isGuesser = roles.guessers[ownTeam]?.id === playerId;
   const activeSeeder = game.status === "seed-collecting" && isSeeder;

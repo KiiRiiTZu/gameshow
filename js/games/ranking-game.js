@@ -162,6 +162,28 @@ export const rankingGame = {
     return true;
   },
 
+  revealNextRemaining(state) {
+    if (state.game.id !== this.id || !["round-finished", "finished"].includes(state.game.status) ||
+        !state.game.remainingIds.length) return false;
+    const list = getRankingList(state.game.roundIndex);
+    const nextItem = list.entries.find((entry) => state.game.remainingIds.includes(entry.id));
+    if (!nextItem) return false;
+    const itemRank = list.entries.findIndex((entry) => entry.id === nextItem.id);
+    const correctIndex = state.game.placedIds.filter((id) =>
+      list.entries.findIndex((entry) => entry.id === id) < itemRank
+    ).length;
+    state.game.remainingIds = state.game.remainingIds.filter((id) => id !== nextItem.id);
+    state.game.placedIds.splice(correctIndex, 0, nextItem.id);
+    state.game.lastResult = {
+      itemId: nextItem.id,
+      team: null,
+      correct: true,
+      cleanupReveal: true,
+      correctPosition: correctIndex + 1
+    };
+    return true;
+  },
+
   startNextRound(state) {
     if (state.game.id !== this.id || state.game.status !== "round-finished") return false;
     const nextRoundIndex = state.game.roundIndex + 1;
