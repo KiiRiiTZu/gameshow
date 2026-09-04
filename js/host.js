@@ -17,6 +17,7 @@ import { top20Game } from "./games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
 import { rankingGame } from "./games/ranking-game.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
+import { captureRankingMove, playRankingMove } from "./ranking-motion.js";
 import { GERMANY_MAP_QUESTIONS, GERMANY_MAP_ROUNDS_TO_WIN, germanyMapGame } from "./games/germany-map.js";
 import { createEuropeMap } from "./europe-map-view.js";
 import {
@@ -451,9 +452,9 @@ async function initializeHost() {
 function renderGameEffects() {
   const gameId = state.game.id;
 
-  if (previousGameId && previousGameId !== gameId && state.game.status !== "not-started") {
+  if (previousGameId && previousGameId !== gameId) {
     showGameTransition(gameId);
-  } else if ([buzzerGame.id, estimationGame.id, rankingGame.id].includes(gameId) &&
+  } else if ([buzzerGame.id, estimationGame.id].includes(gameId) &&
       previousGameStatus === "not-started" &&
       state.game.status !== "not-started") {
     showGameTransition(gameId);
@@ -827,7 +828,7 @@ function renderRankingBoard(game, list, interactive = false) {
     }
     if (proposalIndex === index) {
       const proposed = getRankingEntry(list, game.proposal.itemId);
-      rows.push(`<div class="ranking-row proposed ${game.proposal.team}">
+      rows.push(`<div class="ranking-row proposed ${game.proposal.team}" data-ranking-proposal="${escapeHtml(proposed?.id || "")}">
         <span>${index + 1}</span><strong>${escapeHtml(proposed?.label || "")}</strong><small>vorgemerkt</small>
       </div>`);
     }
@@ -848,6 +849,7 @@ function renderRankingBoard(game, list, interactive = false) {
 
 function renderRankingGame() {
   const game = state.game;
+  const rankingMove = captureRankingMove(game, $("ranking-pool"), $("ranking-board"));
   const list = getRankingList(game.roundIndex);
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
@@ -880,6 +882,7 @@ function renderRankingGame() {
     return `<button type="button" class="ranking-candidate${rankingSelection.itemId === id ? " selected" : ""}"
       data-ranking-item="${escapeHtml(id)}"${game.status !== "playing" ? " disabled" : ""}>${escapeHtml(entry?.label || "")}</button>`;
   }).join("");
+  playRankingMove(rankingMove, $("ranking-pool"), $("ranking-board"));
 
   const result = game.lastResult;
   $("ranking-result").classList.toggle("hidden", !result && !isFinished);

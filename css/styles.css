@@ -687,6 +687,27 @@ button.ranking-candidate:hover:not(:disabled),
 button.ranking-candidate.selected { border-color: #8ca2ff; background: #303a59; }
 button.ranking-candidate:disabled { opacity: .72; }
 
+.ranking-moving-token {
+  position: fixed;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  overflow: hidden;
+  border: 1px solid #8ca2ff;
+  border-radius: 11px;
+  background: #303a59;
+  color: white;
+  box-shadow: 0 16px 40px rgba(0,0,0,.42);
+  font-size: .86rem;
+  font-weight: 800;
+  text-align: center;
+  pointer-events: none;
+}
+
+.ranking-moving-token.red { border-color: #e14c65; background: #542535; }
+
 @media (max-width: 720px) {
   .ranking-meta { grid-template-columns: 1fr; }
   .ranking-pool { grid-template-columns: repeat(2, minmax(0, 1fr)); }
