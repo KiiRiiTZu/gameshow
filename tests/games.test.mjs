@@ -310,6 +310,10 @@ test("contains fifteen estimation questions and keeps the first question hidden 
   assert.equal(ESTIMATION_QUESTIONS.length, 15);
   assert.equal(estimationGame.start(state, participants), true);
   assert.equal(state.game.status, "question-pending");
+  assert.equal(
+    ESTIMATION_QUESTIONS[1].moderatorHint,
+    "Vor März 2022 war er noch kürzer; die neue Antenne erhöhte ihn um 6 Meter."
+  );
   assert.equal(state.game.questionPrompt, "");
   assert.equal(estimationGame.startQuestion(state, ESTIMATION_QUESTIONS[0].prompt), true);
   assert.equal(state.game.status, "guessing");

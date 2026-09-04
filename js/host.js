@@ -551,23 +551,6 @@ function formatEstimate(value) {
   return Number(value).toLocaleString("de-DE", { maximumFractionDigits: 3 });
 }
 
-function renderHostEstimationTeamBox(game, team, guesses, average) {
-  const participants = (game.participants || []).filter((item) => item.team === team);
-  return `<article class="estimation-team ${team}">
-    <strong>${getTeamName(team)}</strong>
-    ${participants.map((item) => `
-      <div class="estimation-player-entry">
-        <span>${escapeHtml(item.name)}</span>
-        <span>${formatEstimate(guesses[item.id])}</span>
-      </div>
-    `).join("")}
-    <div class="estimation-player-entry estimation-average-entry">
-      <span>Mittelwert</span>
-      <span>Ø ${formatEstimate(average)}</span>
-    </div>
-  </article>`;
-}
-
 function renderEstimationGame() {
   const game = state.game;
   const question = getEstimationQuestion(game.roundIndex);
@@ -616,6 +599,11 @@ function renderEstimationGame() {
             <span class="${locked ? "locked" : ""}">${escapeHtml(displayValue)}${locked ? " · ✓" : ""}</span>
           </div>`;
         }).join("")}
+        ${isRevealed && Number.isFinite(game.averages?.[team]) ? `
+          <div class="estimation-player-entry estimation-average-entry">
+            <span>Mittelwert</span>
+            <span>Ø ${formatEstimate(game.averages[team])}</span>
+          </div>` : ""}
       </article>
     `;
   }).join("");
@@ -631,16 +619,7 @@ function renderEstimationGame() {
   $("next-estimation-question").disabled = moderatorActionPending;
   $("start-matching-game").classList.toggle("hidden", !isFinished);
   $("start-matching-game").disabled = moderatorActionPending;
-  $("estimation-result").classList.toggle("hidden", !isReady && !isRevealed);
-
-  if (isReady) {
-    $("estimation-result").innerHTML = hasAverages
-      ? `<strong>Team-Mittelwerte</strong>
-        <span>Team Blau: Ø ${formatEstimate(game.averages.blue)}</span><br>
-        <span>Team Rot: Ø ${formatEstimate(game.averages.red)}</span>`
-      : "<strong>Mittelwerte werden berechnet…</strong>";
-    return;
-  }
+  $("estimation-result").classList.toggle("hidden", !isRevealed);
   if (!isRevealed) return;
   const result = game.revealed;
   const winnerText = result.roundWinner
@@ -653,10 +632,6 @@ function renderEstimationGame() {
     : "";
   $("estimation-result").innerHTML = `
     <strong class="estimation-result-summary">Richtige Antwort: ${escapeHtml(result.answerDisplay)}</strong>
-    <div class="estimation-submissions">
-      ${renderHostEstimationTeamBox(game, "blue", result.guesses, result.averages.blue)}
-      ${renderHostEstimationTeamBox(game, "red", result.guesses, result.averages.red)}
-    </div>
     <span class="estimation-result-summary">${winnerText}</span>
     ${finalText}
   `;
@@ -1776,13 +1751,21 @@ async function sendEstimationPrivateState(playerId) {
       item.team === participant.team && item.id !== participant.id
     );
     const teamResultAvailable = state.game.status === "ready-to-reveal";
+    const allGuesses = teamResultAvailable
+      ? Object.fromEntries(state.game.participants.map((item) => [
+          item.id,
+          estimationDrafts.values[item.id] || ""
+        ]))
+      : null;
     const encrypted = await encryptPrivatePayload(publicKey, {
       roundIndex: state.game.roundIndex,
       value: estimationDrafts.values[playerId] || "",
       locked: state.game.lockedPlayerIds.includes(playerId),
       partnerName: teamResultAvailable ? partner?.name || "Teampartner" : "",
       partnerValue: teamResultAvailable ? estimationDrafts.values[partner?.id] || "" : "",
-      teamAverage: teamResultAvailable ? state.game.averages?.[participant.team] ?? null : null
+      teamAverage: teamResultAvailable ? state.game.averages?.[participant.team] ?? null : null,
+      allGuesses,
+      averages: teamResultAvailable ? state.game.averages : null
     });
     await realtime.send("estimation_private_state", { playerId, encrypted });
     return true;

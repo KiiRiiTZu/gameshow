@@ -9,7 +9,7 @@ export const ESTIMATION_QUESTIONS = [
     prompt: "Wie hoch ist der Eiffelturm?",
     answer: 330,
     answerDisplay: "330 m",
-    moderatorHint: "Vor März 2022 waren es noch 324 m; die neue Antenne erhöhte ihn auf 330 m."
+    moderatorHint: "Vor März 2022 war er noch kürzer; die neue Antenne erhöhte ihn um 6 Meter."
   },
   {
     prompt: "Wie viele Liter Kunstblut wurden für Kill Bill 1 und 2 verwendet?",

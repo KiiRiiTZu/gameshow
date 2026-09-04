@@ -83,7 +83,9 @@ let estimationDraft = {
   locked: false,
   partnerName: "",
   partnerValue: "",
-  teamAverage: null
+  teamAverage: null,
+  allGuesses: null,
+  averages: null
 };
 let estimationDraftTimer = null;
 let estimationSubmissionPending = false;
@@ -602,6 +604,13 @@ async function handleEvent(event, payload) {
         partnerValue: String(privateState.partnerValue || ""),
         teamAverage: Number.isFinite(privateState.teamAverage)
           ? Number(privateState.teamAverage)
+          : null,
+        allGuesses: privateState.allGuesses && typeof privateState.allGuesses === "object"
+          ? privateState.allGuesses
+          : null,
+        averages: privateState.averages &&
+          Number.isFinite(privateState.averages.blue) && Number.isFinite(privateState.averages.red)
+          ? { blue: Number(privateState.averages.blue), red: Number(privateState.averages.red) }
           : null
       };
       estimationSubmissionPending = false;
@@ -723,7 +732,9 @@ async function handleEvent(event, payload) {
         locked: false,
         partnerName: "",
         partnerValue: "",
-        teamAverage: null
+        teamAverage: null,
+        allGuesses: null,
+        averages: null
       };
       estimationSubmissionPending = false;
       $("player-estimation-error").textContent = "";
@@ -1365,7 +1376,6 @@ function renderEstimationGame() {
   const isGuessing = game.status === "guessing";
   const isReady = game.status === "ready-to-reveal";
   const isRevealed = ["revealed", "finished"].includes(game.status);
-  const hasTeamAverage = Number.isFinite(estimationDraft.teamAverage);
   const locked = game.lockedPlayerIds?.includes(playerId) || false;
   const editable = isGuessing && !locked && !estimationSubmissionPending;
   const resultElement = $("player-estimation-result");
@@ -1430,30 +1440,17 @@ function renderEstimationGame() {
     return;
   }
   if (isReady) {
-    const ownEstimate = parseEstimate(estimationDraft.value);
-    const partnerEstimate = parseEstimate(estimationDraft.partnerValue);
-    const ownTeam = game.participants?.find((item) => item.id === playerId)?.team || player?.team;
-    const ownPlayer = {
-      id: "self",
-      name: "Du",
-      team: ownTeam
-    };
-    const partner = {
-      id: "partner",
-      name: estimationDraft.partnerName || "Partner",
-      team: ownTeam
-    };
-    resultElement.innerHTML = hasTeamAverage && ownEstimate !== null && partnerEstimate !== null
-      ? `<div class="estimation-submissions single-team">
-          ${renderEstimationTeamBox(
-            game,
-            ownTeam,
-            { self: ownEstimate, partner: partnerEstimate },
-            estimationDraft.teamAverage,
-            [ownPlayer, partner]
-          )}
+    const guesses = Object.fromEntries((game.participants || []).map((item) => [
+      item.id,
+      parseEstimate(estimationDraft.allGuesses?.[item.id])
+    ]));
+    const allGuessesAvailable = (game.participants || []).every((item) => guesses[item.id] !== null);
+    resultElement.innerHTML = allGuessesAvailable && estimationDraft.averages
+      ? `<div class="estimation-submissions">
+          ${renderEstimationTeamBox(game, "blue", guesses, estimationDraft.averages.blue)}
+          ${renderEstimationTeamBox(game, "red", guesses, estimationDraft.averages.red)}
         </div>`
-      : "Euer Mittelwert wird berechnet…";
+      : "Die Tipps und Mittelwerte werden berechnet…";
     return;
   }
   if (!locked && roomState.estimationSubmissionKey) {
