@@ -112,11 +112,11 @@ test("enables the private session chat for Einordnen", () => {
 test("contains presentation cards for all seven games", () => {
   assert.deepEqual([
     "estimation-game",
-    "matching-game",
+    "guess-the-price",
     "germany-map",
     "word-match-game",
     "ranking-game",
-    "guess-the-price",
+    "matching-game",
     "buzzer"
   ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6, 7]);
   assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");

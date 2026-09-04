@@ -1,11 +1,11 @@
 const GAME_PRESENTATIONS = {
   "estimation-game": { number: 1, name: "Mittelwert" },
-  "matching-game": { number: 2, name: "Da seh ich dich" },
+  "matching-game": { number: 6, name: "Da seh ich dich" },
   "germany-map": { number: 3, name: "Kartenwissen" },
   "word-match-game": { number: 4, name: "Begriffsmatch" },
   "ranking-game": { number: 5, name: "Einordnen" },
   "spotify-top-artists": { number: 5, name: "Top 20" },
-  "guess-the-price": { number: 6, name: "Thrifty" },
+  "guess-the-price": { number: 2, name: "Thrifty" },
   buzzer: { number: 7, name: "Buzzer Quiz" }
 };
 

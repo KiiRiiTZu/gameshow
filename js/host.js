@@ -536,11 +536,11 @@ function renderPriceDraft(team) {
 function getNextGameDefinition(gameId) {
   const games = [
     { id: estimationGame.id, name: estimationGame.name },
-    { id: matchingGame.id, name: matchingGame.name },
+    { id: guessThePriceGame.id, name: guessThePriceGame.name },
     { id: germanyMapGame.id, name: germanyMapGame.name },
     { id: wordMatchGame.id, name: wordMatchGame.name },
     { id: rankingGame.id, name: rankingGame.name },
-    { id: guessThePriceGame.id, name: guessThePriceGame.name },
+    { id: matchingGame.id, name: matchingGame.name },
     { id: buzzerGame.id, name: buzzerGame.name }
   ];
   const currentIndex = games.findIndex((game) => game.id === gameId);
@@ -617,8 +617,8 @@ function renderEstimationGame() {
   $("reveal-estimation-round").disabled = moderatorActionPending || !isReady || !hasAverages;
   $("next-estimation-question").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-estimation-question").disabled = moderatorActionPending;
-  $("start-matching-game").classList.toggle("hidden", !isFinished);
-  $("start-matching-game").disabled = moderatorActionPending;
+  $("start-price-after-estimation").classList.toggle("hidden", !isFinished);
+  $("start-price-after-estimation").disabled = moderatorActionPending;
   $("estimation-result").classList.toggle("hidden", !isRevealed);
   if (!isRevealed) return;
   const result = game.revealed;
@@ -788,8 +788,8 @@ function renderPriceGame() {
   $("reveal-price-round").disabled = moderatorActionPending || !bothLocked;
   $("next-price-round").classList.toggle("hidden", !isRevealed || isFinished);
   $("next-price-round").disabled = moderatorActionPending;
-  $("start-buzzer-after-price").classList.toggle("hidden", !isFinished || showIsFinished);
-  $("start-buzzer-after-price").disabled = moderatorActionPending;
+  $("start-map-after-price").classList.toggle("hidden", !isFinished || showIsFinished);
+  $("start-map-after-price").disabled = moderatorActionPending;
   $("price-round-result").classList.toggle("hidden", !isRevealed);
 
   if (!isRevealed) return;
@@ -901,8 +901,8 @@ function renderRankingGame() {
     !rankingSelection.itemId || !rankingSelection.position;
   $("reveal-ranking-placement").classList.toggle("hidden", game.status !== "ready-to-reveal");
   $("next-ranking-round").classList.toggle("hidden", !isRoundFinished);
-  $("start-price-after-ranking").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
-  for (const id of ["start-first-ranking-round", "reveal-ranking-placement", "next-ranking-round", "start-price-after-ranking"]) {
+  $("start-matching-after-ranking").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
+  for (const id of ["start-first-ranking-round", "reveal-ranking-placement", "next-ranking-round", "start-matching-after-ranking"]) {
     $(id).disabled = moderatorActionPending;
   }
 }
@@ -1232,8 +1232,8 @@ function renderMatchingGame() {
   $("reveal-matching-all").disabled = moderatorActionPending;
   $("next-matching-round").classList.toggle("hidden", game.status !== "round-finished");
   $("next-matching-round").disabled = moderatorActionPending;
-  $("start-map-game").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
-  $("start-map-game").disabled = moderatorActionPending;
+  $("start-buzzer-after-matching").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
+  $("start-buzzer-after-matching").disabled = moderatorActionPending;
   $("matching-round-result").classList.toggle("hidden", !result);
 
   if (result) {
@@ -2051,13 +2051,13 @@ function startRealtime() {
 $("force-next-game").addEventListener("click", async () => {
   $("force-next-game-error").textContent = "";
   const currentGameId = state.game.id;
-  const assignerOrder = currentGameId === estimationGame.id
+  const assignerOrder = currentGameId === rankingGame.id
     ? getMatchingAssignerOrder()
     : [];
 
-  if (currentGameId === estimationGame.id && assignerOrder.some((item) => !item)) {
+  if (currentGameId === estimationGame.id && state.players.length !== 4) {
     $("force-next-game-error").textContent =
-      "Für Da seh ich dich müssen zwei Spieler pro Team im Raum sein.";
+      "Für Thrifty müssen alle vier Spieler im Raum sein.";
     return;
   }
   if (currentGameId === germanyMapGame.id && state.players.length !== 4) {
@@ -2065,20 +2065,20 @@ $("force-next-game").addEventListener("click", async () => {
       "Für Begriffsmatch müssen alle vier Spieler im Raum sein.";
     return;
   }
-  if (currentGameId === rankingGame.id && state.players.length !== 4) {
+  if (currentGameId === rankingGame.id && assignerOrder.some((item) => !item)) {
     $("force-next-game-error").textContent =
-      "Für Thrifty müssen alle vier Spieler im Raum sein.";
+      "Für Da seh ich dich müssen zwei Spieler pro Team im Raum sein.";
     return;
   }
 
   const accepted = await runModeratorAction(() => {
     if (currentGameId === estimationGame.id) {
-      if (!matchingGame.start(state, assignerOrder)) return false;
-      matchingAssignments = emptyMatchingAssignments();
-      saveMatchingAssignments();
+      if (!guessThePriceGame.start(state)) return false;
+      priceDrafts = emptyPriceDrafts(0);
+      savePriceDrafts();
       return true;
     }
-    if (currentGameId === matchingGame.id) {
+    if (currentGameId === guessThePriceGame.id) {
       germanyMapGame.start(state);
       mapNotes = emptyMapNotes(0);
       saveMapNotes();
@@ -2096,12 +2096,12 @@ $("force-next-game").addEventListener("click", async () => {
       return true;
     }
     if (currentGameId === rankingGame.id) {
-      guessThePriceGame.start(state);
-      priceDrafts = emptyPriceDrafts(0);
-      savePriceDrafts();
+      if (!matchingGame.start(state, assignerOrder)) return false;
+      matchingAssignments = emptyMatchingAssignments();
+      saveMatchingAssignments();
       return true;
     }
-    if ([guessThePriceGame.id, top20Game.id].includes(currentGameId)) {
+    if ([matchingGame.id, top20Game.id].includes(currentGameId)) {
       buzzerGame.start(state);
       return true;
     }
@@ -2222,20 +2222,21 @@ $("next-ranking-round").addEventListener("click", async () => {
   await runModeratorAction(() => rankingGame.startNextRound(state));
 });
 
-$("start-price-after-ranking").addEventListener("click", async () => {
+$("start-matching-after-ranking").addEventListener("click", async () => {
   $("ranking-error").textContent = "";
-  if (state.players.length !== 4) {
-    $("ranking-error").textContent = "Für Thrifty müssen alle vier Spieler im Raum sein.";
+  const assignerOrder = getMatchingAssignerOrder();
+  if (assignerOrder.some((player) => !player)) {
+    $("ranking-error").textContent =
+      "Für Da seh ich dich müssen zwei Spieler pro Team im Raum sein.";
     return;
   }
-  const accepted = await runModeratorAction(() => {
+  await runModeratorAction(() => {
     if (getShowWinner(state) || state.game.id !== rankingGame.id || state.game.status !== "finished") return false;
-    if (!guessThePriceGame.start(state)) return false;
-    priceDrafts = emptyPriceDrafts(0);
-    savePriceDrafts();
+    if (!matchingGame.start(state, assignerOrder)) return false;
+    matchingAssignments = emptyMatchingAssignments();
+    saveMatchingAssignments();
     return true;
   });
-  if (accepted) await syncAllPriceTeams();
 });
 
 $("start-buzzer-game-after-top20").addEventListener("click", async () => {
@@ -2246,9 +2247,9 @@ $("start-buzzer-game-after-top20").addEventListener("click", async () => {
   });
 });
 
-$("start-map-game").addEventListener("click", async () => {
+$("start-map-after-price").addEventListener("click", async () => {
   const accepted = await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== matchingGame.id || state.game.status !== "finished") return false;
+    if (getShowWinner(state) || state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
     if (!germanyMapGame.start(state)) return false;
     mapNotes = emptyMapNotes(0);
     saveMapNotes();
@@ -2276,23 +2277,21 @@ $("start-first-map-round").addEventListener("click", async () => {
   await runModeratorAction(() => germanyMapGame.startFirstRound(state));
 });
 
-$("start-matching-game").addEventListener("click", async () => {
+$("start-price-after-estimation").addEventListener("click", async () => {
   $("estimation-error").textContent = "";
-  const assignerOrder = getMatchingAssignerOrder();
-
-  if (assignerOrder.some((player) => !player)) {
-    $("estimation-error").textContent =
-      "Für das Zuordnungsspiel müssen zwei Spieler pro Team im Raum sein.";
+  if (state.players.length !== 4) {
+    $("estimation-error").textContent = "Für Thrifty müssen alle vier Spieler im Raum sein.";
     return;
   }
 
   const accepted = await runModeratorAction(() => {
     if (getShowWinner(state) || state.game.id !== estimationGame.id || state.game.status !== "finished") return false;
-    if (!matchingGame.start(state, assignerOrder)) return false;
-    matchingAssignments = emptyMatchingAssignments();
-    saveMatchingAssignments();
+    if (!guessThePriceGame.start(state)) return false;
+    priceDrafts = emptyPriceDrafts(0);
+    savePriceDrafts();
     return true;
   });
+  if (accepted) await syncAllPriceTeams();
 });
 
 $("start-first-matching-round").addEventListener("click", async () => {
@@ -2600,9 +2599,9 @@ $("start-ranking-after-word").addEventListener("click", async () => {
   });
 });
 
-$("start-buzzer-after-price").addEventListener("click", async () => {
+$("start-buzzer-after-matching").addEventListener("click", async () => {
   await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
+    if (getShowWinner(state) || state.game.id !== matchingGame.id || state.game.status !== "finished") return false;
     return buzzerGame.start(state);
   });
 });
