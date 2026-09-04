@@ -131,7 +131,11 @@ test("contains presentation cards for all seven games", () => {
 test("contains the three prepared Einordnen lists and their anchors", () => {
   assert.equal(RANKING_LISTS.length, 3);
   assert.deepEqual(RANKING_LISTS.map((list) => list.anchorId), ["iso", "banana", "man-germany"]);
+  assert.deepEqual(RANKING_LISTS.map((list) => list.entries.length), [15, 15, 15]);
   assert.equal(RANKING_LISTS[0].entries.find((entry) => entry.id === "miks")?.label, "Miks");
+  assert.equal(RANKING_LISTS[1].entries[0].label, "Ja Blütenhonig");
+  assert.equal(RANKING_LISTS[1].entries.at(-2).label, "Avocado");
+  assert.equal(RANKING_LISTS[2].entries[5].label, "Ponys");
   for (const list of RANKING_LISTS) {
     assert.ok(list.entries.length > 1);
     assert.ok(list.entries.some((entry) => entry.id === list.anchorId));

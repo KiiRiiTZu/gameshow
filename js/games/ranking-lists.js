@@ -30,6 +30,7 @@ export const RANKING_LISTS = [
     lowLabel: "wenig Zucker",
     anchorId: "banana",
     entries: [
+      { id: "blossom-honey", label: "Ja Blütenhonig", value: "75 g" },
       { id: "raisins", label: "Rosinen", value: "65 g" },
       { id: "nutella", label: "Nutella", value: "56,3 g" },
       { id: "strawberry-jam", label: "Mövenpick Erdbeermarmelade", value: "52,3 g" },
@@ -40,7 +41,9 @@ export const RANKING_LISTS = [
       { id: "coke", label: "Coca-Cola", value: "10,6 g" },
       { id: "apple", label: "Apfel", value: "10 g" },
       { id: "strawberries", label: "Erdbeeren", value: "4,9 g" },
+      { id: "seasoning", label: "Maggie Würze", value: "3,5 g" },
       { id: "wholegrain-bread", label: "Vollkornbrot", value: "2 g" },
+      { id: "avocado", label: "Avocado", value: "0,7 g" },
       { id: "gouda", label: "Gouda Käse", value: "0 g" }
     ]
   },
@@ -56,6 +59,7 @@ export const RANKING_LISTS = [
       { id: "woman-germany", label: "Frau in Deutschland", value: "83,6 Jahre" },
       { id: "man-germany", label: "Mann in Deutschland", value: "79,1 Jahre" },
       { id: "african-elephant", label: "Afrikanischer Elefant", value: "65 Jahre" },
+      { id: "ponies", label: "Ponys", value: "30 Jahre" },
       { id: "king-penguin", label: "Königspinguin", value: "20 Jahre" },
       { id: "house-cat", label: "Hauskatze", value: "13 Jahre" },
       { id: "guinea-pig", label: "Meerschweinchen", value: "7 Jahre" },
