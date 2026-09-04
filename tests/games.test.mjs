@@ -2,7 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
-import { BUZZER_WINNING_SCORE, buzzerGame } from "../js/games/buzzer.js";
+import {
+  BUZZER_CORRECT_POINTS,
+  BUZZER_WINNING_SCORE,
+  BUZZER_WRONG_POINTS,
+  buzzerGame
+} from "../js/games/buzzer.js";
 import { BUZZER_QUESTIONS } from "../js/games/buzzer-questions.js";
 import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT } from "../js/games/top-20-lists.js";
@@ -370,16 +375,19 @@ test("scores estimation rounds from both team averages and finishes at five poin
   assert.equal(state.scores.blue, 1);
 });
 
-test("finishes the buzzer game at 30 points with three points per correct answer", () => {
+test("finishes the buzzer game at 40 points with four points per correct answer", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
     id: "buzzer",
     status: "locked",
     winner: { playerId: "1", playerName: "A", team: "blue" },
     winningTeam: null,
-    scores: { blue: BUZZER_WINNING_SCORE - 3, red: 2 }
+    scores: { blue: BUZZER_WINNING_SCORE - BUZZER_CORRECT_POINTS, red: 2 }
   };
 
+  assert.equal(BUZZER_WINNING_SCORE, 40);
+  assert.equal(BUZZER_CORRECT_POINTS, 4);
+  assert.equal(BUZZER_WRONG_POINTS, 1);
   assert.equal(buzzerGame.awardPoint(state), true);
   assert.equal(state.game.scores.blue, BUZZER_WINNING_SCORE);
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
@@ -690,8 +698,11 @@ test("collects both first players before the blue and red matching turns", () =>
 });
 
 test("contains all prepared buzzer questions", () => {
-  assert.equal(BUZZER_QUESTIONS.length, 26);
+  assert.equal(BUZZER_QUESTIONS.length, 34);
   assert.ok(BUZZER_QUESTIONS.every((entry) => entry.question && entry.answer));
+  assert.equal(BUZZER_QUESTIONS[0].answer, "Seismograph");
+  assert.equal(BUZZER_QUESTIONS.at(-1).answer, "Stäbchen");
+  assert.equal(BUZZER_QUESTIONS.some((entry) => entry.answer.includes("Burj Khalifa")), false);
 });
 
 test("reveals and scores both teams on the same four images", () => {
