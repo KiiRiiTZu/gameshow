@@ -271,28 +271,31 @@ export const wordMatchGame = {
         termIndex >= WORD_MATCH_TIEBREAK_TERMS.length ||
         state.game.tiebreak.claimedBy[termIndex] || !["blue", "red"].includes(team)) return false;
     state.game.tiebreak.claimedBy[termIndex] = team;
-    state.game.tiebreak.revealed[termIndex] = true;
     state.game.tiebreak.scores[team] += 1;
     return true;
   },
 
   revealTiebreakTerm(state, index) {
-    if (state.game.id !== this.id || !["tiebreak-playing", "finished"].includes(state.game.status) ||
+    if (state.game.id !== this.id || state.game.status !== "tiebreak-reveal" ||
         !state.game.tiebreak) return false;
     const termIndex = Number(index);
     if (!Number.isInteger(termIndex) || termIndex < 0 ||
         termIndex >= WORD_MATCH_TIEBREAK_TERMS.length ||
         state.game.tiebreak.revealed[termIndex]) return false;
     state.game.tiebreak.revealed[termIndex] = true;
+    if (state.game.tiebreak.revealed.every(Boolean)) {
+      const scores = state.game.tiebreak.scores;
+      const winner = scores.blue === scores.red ? null : scores.blue > scores.red ? "blue" : "red";
+      finishGame(state, winner);
+    }
     return true;
   },
 
   finishTiebreaker(state) {
     if (state.game.id !== this.id || state.game.status !== "tiebreak-playing" ||
         !state.game.tiebreak) return false;
-    const scores = state.game.tiebreak.scores;
-    const winner = scores.blue === scores.red ? null : scores.blue > scores.red ? "blue" : "red";
-    finishGame(state, winner);
+    state.game.status = "tiebreak-reveal";
+    state.game.phaseEndsAt = null;
     return true;
   },
 

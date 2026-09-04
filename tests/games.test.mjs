@@ -267,17 +267,18 @@ test("starts the Begriffsmatch Kino tiebreak after four tied rounds", () => {
   assert.equal(wordMatchGame.startTiebreaker(state, 4_000), true);
   assert.equal(state.game.phaseEndsAt, 4_000 + WORD_MATCH_TIEBREAK_SECONDS * 1000);
   assert.equal(wordMatchGame.claimTiebreakTerm(state, 0, "red"), true);
-  assert.equal(state.game.tiebreak.revealed[0], true);
+  assert.equal(state.game.tiebreak.revealed[0], false);
   assert.equal(wordMatchGame.claimTiebreakTerm(state, 1, "blue"), true);
-  assert.equal(wordMatchGame.revealTiebreakTerm(state, 2), true);
-  assert.equal(state.game.tiebreak.revealed[2], true);
-  assert.equal(state.game.tiebreak.claimedBy[2], null);
   assert.equal(wordMatchGame.claimTiebreakTerm(state, 3, "red"), true);
   assert.equal(wordMatchGame.finishTiebreaker(state), true);
+  assert.equal(state.game.status, "tiebreak-reveal");
+  assert.equal(wordMatchGame.claimTiebreakTerm(state, 4, "blue"), false);
+  for (let index = 0; index < WORD_MATCH_TIEBREAK_TERMS.length; index += 1) {
+    assert.equal(wordMatchGame.revealTiebreakTerm(state, index), true);
+  }
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "red");
   assert.deepEqual(state.game.tiebreak.scores, { blue: 1, red: 2 });
-  assert.equal(wordMatchGame.revealTiebreakTerm(state, 4), true);
   assert.equal(state.scores.red, 1);
 });
 

@@ -965,13 +965,14 @@ function renderSpotifyGame() {
       : "";
 }
 
-function renderPlayerRankingBoard(game, list) {
+function renderPlayerRankingBoard(game, list, rankingMove = null) {
   const rows = [];
   const proposalIndex = game.proposal ? Number(game.proposal.position) - 1 : -1;
   for (let index = 0; index <= game.placedIds.length; index += 1) {
     if (proposalIndex === index) {
       const proposed = getRankingEntry(list, game.proposal.itemId);
-      rows.push(`<div class="ranking-row proposed ${game.proposal.team}" data-ranking-proposal="${escapeHtml(proposed?.id || "")}">
+      const awaitingMove = rankingMove?.direction === "into-list" && rankingMove.itemId === proposed?.id;
+      rows.push(`<div class="ranking-row proposed ${game.proposal.team}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-proposal="${escapeHtml(proposed?.id || "")}">
         <span>${index + 1}</span><strong>${escapeHtml(proposed?.label || "")}</strong><small>vorgemerkt</small>
       </div>`);
     }
@@ -979,7 +980,8 @@ function renderPlayerRankingBoard(game, list) {
       const entry = getRankingEntry(list, game.placedIds[index]);
       const isAnchor = entry?.id === list.anchorId;
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
-      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
+      const awaitingMove = rankingMove?.direction === "cleanup-into-list" && rankingMove.itemId === entry?.id;
+      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
         <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
       </div>`);
@@ -1014,10 +1016,11 @@ function renderRankingGame() {
   $("player-ranking-strikes").innerHTML =
     `<span>Blau: <strong>${renderStrikes(game.strikes.blue)}</strong></span>` +
     `<span>Rot: <strong>${renderStrikes(game.strikes.red)}</strong></span>`;
-  $("player-ranking-board").innerHTML = renderPlayerRankingBoard(game, list);
+  $("player-ranking-board").innerHTML = renderPlayerRankingBoard(game, list, rankingMove);
   $("player-ranking-pool").innerHTML = game.remainingIds.filter((id) => id !== game.proposal?.itemId).map((id) => {
     const entry = getRankingEntry(list, id);
-    return `<span class="ranking-candidate" data-ranking-item="${escapeHtml(id)}">${escapeHtml(entry?.label || "")}</span>`;
+    const awaitingMove = rankingMove?.direction === "wrong-back-to-pool" && rankingMove.itemId === id;
+    return `<span class="ranking-candidate${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-item="${escapeHtml(id)}">${escapeHtml(entry?.label || "")}</span>`;
   }).join("");
   playRankingMove(rankingMove, $("player-ranking-pool"), $("player-ranking-board"));
   renderPlayerTeamChat("player-ranking-chat", teamChatIsWritable());
@@ -1498,7 +1501,8 @@ function renderEstimationGame() {
 
 function wordMatchSecondsRemaining() {
   if (!roomState?.game?.phaseEndsAt) {
-    if (roomState?.game?.tiebreak) return WORD_MATCH_TIEBREAK_SECONDS;
+    if (roomState?.game?.status === "tiebreak-pending") return WORD_MATCH_TIEBREAK_SECONDS;
+    if (roomState?.game?.tiebreak) return 0;
     return ["round-pending", "seed-collecting"].includes(roomState?.game?.status)
       ? WORD_MATCH_SEED_SECONDS
       : WORD_MATCH_PHASE_SECONDS;
@@ -1555,7 +1559,7 @@ function renderWordMatchGame() {
   const participant = game.participants.find((item) => item.id === playerId);
   const ownTeam = participant?.team;
   const isTiebreak = Boolean(game.tiebreak) &&
-    ["tiebreak-pending", "tiebreak-playing", "finished"].includes(game.status);
+    ["tiebreak-pending", "tiebreak-playing", "tiebreak-reveal", "finished"].includes(game.status);
   if (isTiebreak) {
     const finished = game.status === "finished";
     const tiebreakVisible = game.status !== "tiebreak-pending";
@@ -1587,7 +1591,9 @@ function renderWordMatchGame() {
         : "Das Finale endet unentschieden."
       : game.status === "tiebreak-pending"
         ? "Wartet darauf, dass der Moderator das 90-Sekunden-Finale startet."
-        : "Das Finale läuft. Der Moderator deckt Treffer einzeln auf.";
+        : game.status === "tiebreak-reveal"
+          ? "Der Moderator deckt die Finalbegriffe einzeln auf."
+          : "Das 90-Sekunden-Finale läuft.";
     $("player-word-match-result").textContent = finished
       ? `Finale: Blau ${game.tiebreak.scores.blue} Treffer · Rot ${game.tiebreak.scores.red} Treffer`
       : "";

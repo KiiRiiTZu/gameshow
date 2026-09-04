@@ -641,6 +641,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .ranking-row.proposed.red { border-color: #e14c65; background: rgba(151,44,65,.2); }
 .ranking-feedback-correct { animation: ranking-correct-flash 720ms ease-out; }
 .ranking-feedback-wrong { animation: ranking-wrong-flash 720ms ease-out; }
+.ranking-awaiting-motion { visibility: hidden; }
 
 @keyframes ranking-correct-flash {
   0%, 100% { border-color: rgba(255,255,255,.12); background: #11141e; }
@@ -1165,6 +1166,8 @@ button.ranking-candidate:disabled { opacity: .72; }
 .word-match-tiebreak-term > div { display: flex; gap: 8px; }
 .word-match-tiebreak-term.claimed.blue { border-color: #5a72f6; background: rgba(90,114,246,.16); }
 .word-match-tiebreak-term.claimed.red { border-color: #d23750; background: rgba(210,55,80,.16); }
+.word-match-tiebreak-term.assigned.blue { border-color: rgba(90,114,246,.55); }
+.word-match-tiebreak-term.assigned.red { border-color: rgba(210,55,80,.55); }
 .word-match-tiebreak-term.revealed { border-color: rgba(255,255,255,.2); color: #c8cedd; }
 .button.tiny { min-height: 32px; padding: 5px 10px; font-size: .78rem; }
 .button.tiny.blue { background: #3554db; color: #fff; }

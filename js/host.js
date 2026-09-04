@@ -640,7 +640,8 @@ function renderEstimationGame() {
 
 function wordMatchSecondsRemaining() {
   if (!state.game.phaseEndsAt) {
-    if (state.game.tiebreak) return WORD_MATCH_TIEBREAK_SECONDS;
+    if (state.game.status === "tiebreak-pending") return WORD_MATCH_TIEBREAK_SECONDS;
+    if (state.game.tiebreak) return 0;
     return ["round-pending", "seed-collecting"].includes(state.game.status)
       ? WORD_MATCH_SEED_SECONDS
       : WORD_MATCH_PHASE_SECONDS;
@@ -663,9 +664,10 @@ function renderWordMatchGame() {
   const roles = getWordMatchRoles(game);
   const [firstGuessTeam] = getWordMatchGuessOrder(game);
   const isTiebreak = Boolean(game.tiebreak) &&
-    ["tiebreak-pending", "tiebreak-playing", "finished"].includes(game.status);
+    ["tiebreak-pending", "tiebreak-playing", "tiebreak-reveal", "finished"].includes(game.status);
   if (isTiebreak) {
     const playing = game.status === "tiebreak-playing";
+    const revealing = game.status === "tiebreak-reveal";
     const finished = game.status === "finished";
     $("word-match-round-label").textContent = "Finale bei Gleichstand";
     $("word-match-blue-score").textContent = game.tiebreak.scores.blue;
@@ -674,10 +676,11 @@ function renderWordMatchGame() {
     $("word-match-category-card").classList.remove("hidden");
     $("word-match-roles").textContent = finished
       ? "Das Finale ist beendet."
-      : playing ? "Der Moderator ordnet Treffer Team Blau oder Team Rot zu." : "Das Finale ist bereit.";
+      : playing ? "Treffer Team Blau oder Team Rot zuordnen."
+        : revealing ? "Begriffe jetzt einzeln aufdecken." : "Das Finale ist bereit.";
     updateHostWordMatchTimer();
     $("word-match-status").textContent = finished
-      ? "Spiel beendet" : playing ? "Finale läuft" : "Finale bereit";
+      ? "Spiel beendet" : revealing ? "Aufdeckung" : playing ? "Finale läuft" : "Finale bereit";
     $("word-match-status").className = `status-pill ${playing ? "open" : "closed"}`;
     $("word-match-seed-status").innerHTML = "";
     $("word-match-lists").innerHTML = `<article class="word-match-list word-match-tiebreak-list">
@@ -685,15 +688,15 @@ function renderWordMatchGame() {
       ${game.tiebreak.terms.map((term, index) => {
         const claimedBy = game.tiebreak.claimedBy[index];
         const revealed = game.tiebreak.revealed[index];
-        return `<div class="word-match-tiebreak-term${claimedBy ? ` claimed ${claimedBy}` : revealed ? " revealed" : ""}">
+        return `<div class="word-match-tiebreak-term${revealed && claimedBy ? ` claimed ${claimedBy}` : revealed ? " revealed" : claimedBy ? ` assigned ${claimedBy}` : ""}">
           <span>${index + 1}. ${escapeHtml(term)}</span>
           <div>
             <button type="button" class="button tiny blue" data-word-tiebreak-index="${index}" data-word-tiebreak-team="blue"
-              ${!playing || claimedBy ? " disabled" : ""}>Blau</button>
+              ${!playing || claimedBy ? " disabled" : ""}>Blau${claimedBy === "blue" ? " ✓" : ""}</button>
             <button type="button" class="button tiny danger" data-word-tiebreak-index="${index}" data-word-tiebreak-team="red"
-              ${!playing || claimedBy ? " disabled" : ""}>Rot</button>
-            <button type="button" class="button tiny secondary" data-word-tiebreak-reveal="${index}"
-              ${revealed ? " disabled" : ""}>Aufdecken</button>
+              ${!playing || claimedBy ? " disabled" : ""}>Rot${claimedBy === "red" ? " ✓" : ""}</button>
+            <button type="button" class="button tiny secondary${revealing ? "" : " hidden"}" data-word-tiebreak-reveal="${index}"
+              ${!revealing || revealed ? " disabled" : ""}>Aufdecken</button>
           </div>
         </div>`;
       }).join("")}
@@ -875,7 +878,7 @@ function renderPriceGame() {
   `;
 }
 
-function renderRankingBoard(game, list, interactive = false) {
+function renderRankingBoard(game, list, interactive = false, rankingMove = null) {
   const rows = [];
   const proposalIndex = game.proposal ? Number(game.proposal.position) - 1 : -1;
   for (let index = 0; index <= game.placedIds.length; index += 1) {
@@ -885,7 +888,8 @@ function renderRankingBoard(game, list, interactive = false) {
     }
     if (proposalIndex === index) {
       const proposed = getRankingEntry(list, game.proposal.itemId);
-      rows.push(`<div class="ranking-row proposed ${game.proposal.team}" data-ranking-proposal="${escapeHtml(proposed?.id || "")}">
+      const awaitingMove = rankingMove?.direction === "into-list" && rankingMove.itemId === proposed?.id;
+      rows.push(`<div class="ranking-row proposed ${game.proposal.team}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-proposal="${escapeHtml(proposed?.id || "")}">
         <span>${index + 1}</span><strong>${escapeHtml(proposed?.label || "")}</strong><small>vorgemerkt</small>
       </div>`);
     }
@@ -893,7 +897,8 @@ function renderRankingBoard(game, list, interactive = false) {
       const entry = getRankingEntry(list, game.placedIds[index]);
       const isAnchor = entry?.id === list.anchorId;
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
-      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
+      const awaitingMove = rankingMove?.direction === "cleanup-into-list" && rankingMove.itemId === entry?.id;
+      rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
         <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
       </div>`);
@@ -933,10 +938,11 @@ function renderRankingGame() {
         : game.status === "revealed" ? "Aufgedeckt" : isNotStarted ? "Noch nicht gestartet" : "Einordnung wählen";
   $("ranking-status").className = `status-pill ${interactionLocked ? "closed" : "open"}`;
 
-  $("ranking-board").innerHTML = renderRankingBoard(game, list, true);
+  $("ranking-board").innerHTML = renderRankingBoard(game, list, true, rankingMove);
   $("ranking-pool").innerHTML = game.remainingIds.filter((id) => id !== game.proposal?.itemId).map((id) => {
     const entry = getRankingEntry(list, id);
-    return `<button type="button" class="ranking-candidate${rankingSelection.itemId === id ? " selected" : ""}"
+    const awaitingMove = rankingMove?.direction === "wrong-back-to-pool" && rankingMove.itemId === id;
+    return `<button type="button" class="ranking-candidate${rankingSelection.itemId === id ? " selected" : ""}${awaitingMove ? " ranking-awaiting-motion" : ""}"
       data-ranking-item="${escapeHtml(id)}"${game.status !== "playing" ? " disabled" : ""}>${escapeHtml(entry?.label || "")}</button>`;
   }).join("");
   playRankingMove(rankingMove, $("ranking-pool"), $("ranking-board"));
@@ -1428,6 +1434,13 @@ async function broadcastState() {
       publicState.game.tiebreak.terms = publicState.game.tiebreak.terms.map((term, index) =>
         publicState.game.tiebreak.revealed[index] ? term : ""
       );
+      publicState.game.tiebreak.claimedBy = publicState.game.tiebreak.claimedBy.map((team, index) =>
+        publicState.game.tiebreak.revealed[index] ? team : null
+      );
+      publicState.game.tiebreak.scores = publicState.game.tiebreak.claimedBy.reduce((scores, team) => {
+        if (team) scores[team] += 1;
+        return scores;
+      }, { blue: 0, red: 0 });
     }
     if (["blue-guess-pending", "blue-guessing", "red-guess-pending", "red-guessing", "results-pending"]
       .includes(state.game.status)) {
