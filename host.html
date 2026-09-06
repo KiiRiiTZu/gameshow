@@ -23,11 +23,7 @@
       <article class="team-card blue">
         <p class="team-label">Team Blau</p>
         <p class="score-caption">Gewonnene Spiele</p>
-        <div class="show-score-editor">
-          <button class="score-adjust-button" type="button" data-score-scope="show" data-score-team="blue" data-score-delta="-1" aria-label="Spielpunkt von Team Blau abziehen">−</button>
-          <div id="blue-score" class="score">0</div>
-          <button class="score-adjust-button" type="button" data-score-scope="show" data-score-team="blue" data-score-delta="1" aria-label="Spielpunkt für Team Blau hinzufügen">+</button>
-        </div>
+        <div id="blue-score" class="score editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="Gewonnene Spiele von Team Blau" data-score-scope="show" data-score-team="blue">0</div>
         <div id="blue-players" class="player-list"></div>
       </article>
 
@@ -36,32 +32,12 @@
       <article class="team-card red">
         <p class="team-label">Team Rot</p>
         <p class="score-caption">Gewonnene Spiele</p>
-        <div class="show-score-editor">
-          <button class="score-adjust-button" type="button" data-score-scope="show" data-score-team="red" data-score-delta="-1" aria-label="Spielpunkt von Team Rot abziehen">−</button>
-          <div id="red-score" class="score">0</div>
-          <button class="score-adjust-button" type="button" data-score-scope="show" data-score-team="red" data-score-delta="1" aria-label="Spielpunkt für Team Rot hinzufügen">+</button>
-        </div>
+        <div id="red-score" class="score editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="Gewonnene Spiele von Team Rot" data-score-scope="show" data-score-team="red">0</div>
         <div id="red-players" class="player-list"></div>
       </article>
     </section>
 
     <section id="show-winner-banner" class="show-winner-banner hidden"></section>
-
-    <section id="game-score-editor" class="game-score-editor">
-      <strong id="game-score-editor-label">Aktuellen Spielstand korrigieren</strong>
-      <div class="game-score-editor-team blue">
-        <span>Blau</span>
-        <button class="score-adjust-button small" type="button" data-score-scope="game" data-score-team="blue" data-score-delta="-1" aria-label="Punkt von Team Blau abziehen">−</button>
-        <output id="game-score-editor-blue">0</output>
-        <button class="score-adjust-button small" type="button" data-score-scope="game" data-score-team="blue" data-score-delta="1" aria-label="Punkt für Team Blau hinzufügen">+</button>
-      </div>
-      <div class="game-score-editor-team red">
-        <span>Rot</span>
-        <button class="score-adjust-button small" type="button" data-score-scope="game" data-score-team="red" data-score-delta="-1" aria-label="Punkt von Team Rot abziehen">−</button>
-        <output id="game-score-editor-red">0</output>
-        <button class="score-adjust-button small" type="button" data-score-scope="game" data-score-team="red" data-score-delta="1" aria-label="Punkt für Team Rot hinzufügen">+</button>
-      </div>
-    </section>
 
     <section id="moderator-test-controls" class="moderator-test-controls">
       <div>
@@ -84,9 +60,9 @@
       </div>
 
       <div class="round-score" aria-label="Punktestand im Buzzer Quiz">
-        <span>Blau <strong id="buzzer-blue-score">0</strong></span>
+        <span>Blau <strong id="buzzer-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="Quizpunkte von Team Blau" data-score-scope="game" data-score-team="blue">0</strong></span>
         <span>Quizpunkte</span>
-        <span><strong id="buzzer-red-score">0</strong> Rot</span>
+        <span><strong id="buzzer-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="Quizpunkte von Team Rot" data-score-scope="game" data-score-team="red">0</strong> Rot</span>
       </div>
 
       <div id="buzzer-start-controls" class="game-finished">
@@ -137,7 +113,7 @@
           <span>Rot: <strong id="red-strikes">—</strong></span>
         </div>
       </div>
-      <div id="top20-round-wins" class="round-wins">Rundensiege · Blau 0 : 0 Rot</div>
+      <div id="top20-round-wins" class="round-wins">Rundensiege · Blau <strong id="top20-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="blue">0</strong> : <strong id="top20-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="red">0</strong> Rot</div>
 
       <div class="top20-actions">
         <button id="spotify-miss" class="button danger" type="button">✕ Nicht dabei</button>
@@ -162,7 +138,7 @@
         </div>
         <span id="ranking-status" class="status-pill open">Läuft</span>
       </div>
-      <div id="ranking-round-wins" class="round-wins">Listensiege · Blau 0 : 0 Rot</div>
+      <div id="ranking-round-wins" class="round-wins">Listensiege · Blau <strong id="ranking-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="blue">0</strong> : <strong id="ranking-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="red">0</strong> Rot</div>
       <div class="ranking-meta">
         <div id="ranking-turn" class="turn-card blue">Team Blau ist dran</div>
         <div id="ranking-strikes" class="strike-board">Blau: — · Rot: —</div>
@@ -199,9 +175,9 @@
       </div>
 
       <div class="round-score" aria-label="Punktestand im Kartenspiel">
-        <span>Blau <strong id="map-blue-score">0</strong></span>
+        <span>Blau <strong id="map-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="blue">0</strong></span>
         <span>Kartenpunkte</span>
-        <span><strong id="map-red-score">0</strong> Rot</span>
+        <span><strong id="map-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="red">0</strong> Rot</span>
       </div>
 
       <div class="map-question-card">
@@ -240,9 +216,9 @@
       </div>
 
       <div class="round-score" aria-label="Punktestand im Zuordnungsspiel">
-        <span>Blau <strong id="matching-blue-score">0</strong></span>
+        <span>Blau <strong id="matching-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="blue">0</strong></span>
         <span>Übereinstimmungen</span>
-        <span><strong id="matching-red-score">0</strong> Rot</span>
+        <span><strong id="matching-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="red">0</strong> Rot</span>
       </div>
 
       <div id="matching-turn" class="matching-turn blue"></div>
@@ -273,9 +249,9 @@
       </div>
 
       <div class="round-score" aria-label="Punktestand im Preisratespiel">
-        <span>Blau <strong id="price-blue-score">0</strong></span>
+        <span>Blau <strong id="price-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="blue">0</strong></span>
         <span>Rundensiege</span>
-        <span><strong id="price-red-score">0</strong> Rot</span>
+        <span><strong id="price-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="red">0</strong> Rot</span>
       </div>
 
       <div class="price-host-layout">
@@ -326,9 +302,9 @@
       </div>
 
       <div class="round-score" aria-label="Punktestand bei Mittelwert">
-        <span>Blau <strong id="estimation-blue-score">0</strong></span>
+        <span>Blau <strong id="estimation-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="blue">0</strong></span>
         <span>Rundensiege</span>
-        <span><strong id="estimation-red-score">0</strong> Rot</span>
+        <span><strong id="estimation-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="red">0</strong> Rot</span>
       </div>
 
       <div id="estimation-question-card" class="map-question-card hidden">
@@ -363,9 +339,9 @@
       </div>
 
       <div class="round-score" aria-label="Punktestand bei Begriffsmatch">
-        <span>Blau <strong id="word-match-blue-score">0</strong></span>
+        <span>Blau <strong id="word-match-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="blue">0</strong></span>
         <span>Treffer</span>
-        <span><strong id="word-match-red-score">0</strong> Rot</span>
+        <span><strong id="word-match-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="red">0</strong> Rot</span>
       </div>
 
       <div id="word-match-category-card" class="word-match-category-card">

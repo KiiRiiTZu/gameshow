@@ -54,8 +54,8 @@ import {
   exportMatchingPublicKey
 } from "./matching-crypto.js";
 import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
-import { getGamePresentation, showGameTransition } from "./game-effects.js";
-import { adjustModeratorScore, getModeratorGameScore } from "./moderator-score.js";
+import { showGameTransition } from "./game-effects.js";
+import { setModeratorScore } from "./moderator-score.js";
 import {
   addTeamChatMessage,
   clearExpiredTeamChatTyping,
@@ -471,21 +471,18 @@ function renderGameEffects() {
   previousGameStatus = state.game.status;
 }
 
+function renderEditableScore(id, value) {
+  const element = $(id);
+  if (!element) return;
+  const score = Math.max(0, Math.trunc(Number(value) || 0));
+  if (document.activeElement !== element) element.textContent = score;
+  element.setAttribute("aria-valuenow", String(score));
+}
+
 function render() {
   renderGameEffects();
-  $("blue-score").textContent = state.scores.blue;
-  $("red-score").textContent = state.scores.red;
-  const editableGameScore = getModeratorGameScore(state.game);
-  $("game-score-editor").classList.toggle("hidden", !editableGameScore);
-  if (editableGameScore) {
-    $("game-score-editor-label").textContent =
-      `${getGamePresentation(state.game.id).name} · ${editableGameScore.label} korrigieren`;
-    $("game-score-editor-blue").textContent = editableGameScore.scores.blue;
-    $("game-score-editor-red").textContent = editableGameScore.scores.red;
-  }
-  document.querySelectorAll("[data-score-scope]").forEach((button) => {
-    button.disabled = moderatorActionPending;
-  });
+  renderEditableScore("blue-score", state.scores.blue);
+  renderEditableScore("red-score", state.scores.red);
   const showWinner = getShowWinner(state);
   $("show-winner-banner").classList.toggle("hidden", !showWinner);
   $("show-winner-banner").textContent = showWinner
@@ -582,8 +579,8 @@ function renderEstimationGame() {
 
   $("estimation-round-label").textContent =
     `Frage ${game.roundIndex + 1} von ${ESTIMATION_QUESTIONS.length}`;
-  $("estimation-blue-score").textContent = game.roundScores.blue;
-  $("estimation-red-score").textContent = game.roundScores.red;
+  renderEditableScore("estimation-blue-score", game.roundScores.blue);
+  renderEditableScore("estimation-red-score", game.roundScores.red);
   $("estimation-status").textContent = isPending
     ? "Frage noch nicht gestartet"
     : isGameNotStarted ? "Spiel noch nicht gestartet"
@@ -687,8 +684,8 @@ function renderWordMatchGame() {
     const revealing = game.status === "tiebreak-reveal";
     const finished = game.status === "finished";
     $("word-match-round-label").textContent = "Finale bei Gleichstand";
-    $("word-match-blue-score").textContent = game.tiebreak.scores.blue;
-    $("word-match-red-score").textContent = game.tiebreak.scores.red;
+    renderEditableScore("word-match-blue-score", game.tiebreak.scores.blue);
+    renderEditableScore("word-match-red-score", game.tiebreak.scores.red);
     $("word-match-category").textContent = game.tiebreak.category;
     $("word-match-category-card").classList.remove("hidden");
     $("word-match-roles").textContent = finished
@@ -743,8 +740,8 @@ function renderWordMatchGame() {
   const isFinished = game.status === "finished";
   $("word-match-round-label").textContent =
     `Runde ${game.roundIndex + 1} von ${WORD_MATCH_CATEGORIES.length}`;
-  $("word-match-blue-score").textContent = game.scores.blue;
-  $("word-match-red-score").textContent = game.scores.red;
+  renderEditableScore("word-match-blue-score", game.scores.blue);
+  renderEditableScore("word-match-red-score", game.scores.red);
   $("word-match-category").textContent = category;
   $("word-match-category-card").classList.toggle("hidden", game.status === "round-pending");
   $("word-match-roles").textContent =
@@ -851,8 +848,8 @@ function renderPriceGame() {
 
   $("price-round-label").textContent =
     `Produkt ${game.roundIndex + 1} von ${PRICE_PRODUCTS.length}`;
-  $("price-blue-score").textContent = game.roundScores.blue;
-  $("price-red-score").textContent = game.roundScores.red;
+  renderEditableScore("price-blue-score", game.roundScores.blue);
+  renderEditableScore("price-red-score", game.roundScores.red);
   $("price-product-image").src = product.src;
   $("price-product-image").alt = product.name;
   $("price-product-name").textContent = product.name;
@@ -941,8 +938,8 @@ function renderRankingGame() {
   const interactionLocked = game.status !== "playing";
 
   $("ranking-round-label").textContent = `Liste ${game.roundIndex + 1} von ${RANKING_LISTS.length}`;
-  $("ranking-round-wins").textContent =
-    `Listensiege · Blau ${game.roundWins.blue} : ${game.roundWins.red} Rot`;
+  renderEditableScore("ranking-blue-score", game.roundWins.blue);
+  renderEditableScore("ranking-red-score", game.roundWins.red);
   $("ranking-title").textContent = list.title;
   $("ranking-turn").textContent = isFinished
     ? game.winningTeam ? `${getTeamName(game.winningTeam)} gewinnt Einordnen!` : "Einordnen endet unentschieden"
@@ -1014,8 +1011,8 @@ function renderBuzzerGame() {
   const questionIndex = Number(state.game.questionIndex) || 0;
   const question = getBuzzerQuestion(questionIndex);
 
-  $("buzzer-blue-score").textContent = gameScores.blue;
-  $("buzzer-red-score").textContent = gameScores.red;
+  renderEditableScore("buzzer-blue-score", gameScores.blue);
+  renderEditableScore("buzzer-red-score", gameScores.red);
   $("buzzer-question-number").textContent = `FRAGE ${questionIndex + 1} VON ${BUZZER_QUESTIONS.length}`;
   $("buzzer-question").textContent = question.question;
 
@@ -1082,8 +1079,8 @@ function renderSpotifyGame() {
 
   $("top20-title").textContent = `Liste ${roundNumber}: ${list.title}`;
   $("top20-description").textContent = list.description;
-  $("top20-round-wins").textContent =
-    `Rundensiege · Blau ${game.roundWins.blue} : ${game.roundWins.red} Rot`;
+  renderEditableScore("top20-blue-score", game.roundWins.blue);
+  renderEditableScore("top20-red-score", game.roundWins.red);
   $("spotify-status").textContent = isFinished
     ? "Spiel beendet"
     : isRoundFinished
@@ -1127,8 +1124,8 @@ function renderMapGame() {
   $("map-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
   $("map-question").textContent = isPending ? "" : question.prompt;
   $("map-question-number").closest(".map-question-card").classList.toggle("hidden", isPending);
-  $("map-blue-score").textContent = game.roundScores.blue;
-  $("map-red-score").textContent = game.roundScores.red;
+  renderEditableScore("map-blue-score", game.roundScores.blue);
+  renderEditableScore("map-red-score", game.roundScores.red);
   $("map-status").textContent = isFinished
     ? "Spiel beendet"
     : isPending ? "Runde noch nicht gestartet"
@@ -1272,8 +1269,8 @@ function renderMatchingGame() {
     isTiebreak
       ? `Stechen · Bild ${game.tiebreak.imageIndex + 1} von ${MATCHING_TIEBREAK_IMAGES.length} · Golden Image`
       : `Runde ${game.roundIndex + 1} von ${MATCHING_GAME_ROUNDS.length} · ${round.title}`;
-  $("matching-blue-score").textContent = game.scores.blue;
-  $("matching-red-score").textContent = game.scores.red;
+  renderEditableScore("matching-blue-score", game.scores.blue);
+  renderEditableScore("matching-red-score", game.scores.red);
   $("matching-status").textContent = isFinished
     ? "Spiel beendet"
     : isPending ? isTiebreak ? "Finalbild bereit" : "Runde noch nicht gestartet"
@@ -2260,14 +2257,42 @@ $("force-next-game").addEventListener("click", async () => {
   if (state.game.id === wordMatchGame.id) await syncWordMatchSeeders();
 });
 
-document.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-score-scope][data-score-team][data-score-delta]");
-  if (!button || button.disabled) return;
-  await runModeratorAction(() => adjustModeratorScore(
+document.addEventListener("focusin", (event) => {
+  const score = event.target.closest(".editable-score[data-score-scope][data-score-team]");
+  if (!score) return;
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(score);
+  selection.removeAllRanges();
+  selection.addRange(range);
+});
+
+document.addEventListener("keydown", (event) => {
+  const score = event.target.closest(".editable-score[data-score-scope][data-score-team]");
+  if (!score) return;
+  if (event.key === "Enter") {
+    event.preventDefault();
+    score.blur();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    score.dataset.cancelScoreEdit = "true";
+    score.blur();
+  }
+});
+
+document.addEventListener("focusout", async (event) => {
+  const score = event.target.closest(".editable-score[data-score-scope][data-score-team]");
+  if (!score) return;
+  if (score.dataset.cancelScoreEdit === "true") {
+    delete score.dataset.cancelScoreEdit;
+    render();
+    return;
+  }
+  await runModeratorAction(() => setModeratorScore(
     state,
-    button.dataset.scoreScope,
-    button.dataset.scoreTeam,
-    Number(button.dataset.scoreDelta)
+    score.dataset.scoreScope,
+    score.dataset.scoreTeam,
+    score.textContent
   ));
 });
 

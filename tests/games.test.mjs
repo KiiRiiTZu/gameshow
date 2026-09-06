@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
-import { adjustModeratorScore, getModeratorGameScore } from "../js/moderator-score.js";
+import {
+  adjustModeratorScore,
+  getModeratorGameScore,
+  setModeratorScore
+} from "../js/moderator-score.js";
 
 import {
   BUZZER_CORRECT_POINTS,
@@ -194,8 +198,12 @@ test("lets the moderator correct overall and active game scores without going be
   assert.equal(getModeratorGameScore(state.game).label, "Rundensiege");
   assert.equal(adjustModeratorScore(state, "game", "red", 1), true);
   assert.deepEqual(state.game.roundScores, { blue: 0, red: 1 });
+  assert.equal(setModeratorScore(state, "game", "red", "7"), true);
+  assert.equal(state.game.roundScores.red, 7);
+  assert.equal(setModeratorScore(state, "game", "red", "falsch"), false);
+  assert.equal(state.game.roundScores.red, 7);
   assert.equal(adjustModeratorScore(state, "game", "red", -1), true);
-  assert.equal(adjustModeratorScore(state, "game", "red", -1), false);
+  assert.equal(state.game.roundScores.red, 6);
 });
 
 test("maps every game to the score shown to the moderator", () => {

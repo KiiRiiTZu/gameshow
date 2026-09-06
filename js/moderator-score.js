@@ -50,3 +50,21 @@ export function adjustModeratorScore(state, scope, team, delta) {
   target[team] = next;
   return true;
 }
+
+export function setModeratorScore(state, scope, team, value) {
+  if (!state || !["blue", "red"].includes(team) || !/^\d+$/.test(String(value).trim())) {
+    return false;
+  }
+
+  const target = scope === "show"
+    ? state.scores
+    : scope === "game"
+      ? getModeratorGameScore(state.game)?.target
+      : null;
+  if (!target || typeof target !== "object") return false;
+
+  const next = normalizeScore(value);
+  if (normalizeScore(target[team]) === next) return false;
+  target[team] = next;
+  return true;
+}
