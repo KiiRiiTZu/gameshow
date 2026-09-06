@@ -233,23 +233,6 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .game-panel { margin-bottom: 22px; }
 
-.moderator-test-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin: 0 0 16px;
-  padding: 11px 14px;
-  border: 1px dashed rgba(255,255,255,.18);
-  border-radius: 14px;
-  background: rgba(255,255,255,.025);
-}
-
-.moderator-test-controls > div { display: grid; gap: 2px; }
-.moderator-test-controls .error { flex-basis: 100%; margin: 0; }
-.moderator-test-controls .error:empty { display: none; }
-
 .round-score {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

@@ -492,13 +492,6 @@ function render() {
   renderPlayers("blue");
   renderPlayers("red");
 
-  const nextGame = getNextGameDefinition(state.game.id);
-  $("moderator-test-controls").classList.toggle("hidden", !nextGame);
-  $("moderator-next-game-hint").textContent = nextGame
-    ? `Überspringt den aktuellen Stand und startet ${nextGame.name}.`
-    : "";
-  $("force-next-game").disabled = moderatorActionPending;
-
   const spotifyIsActive = state.game.id === top20Game.id;
   const rankingIsActive = state.game.id === rankingGame.id;
   const mapIsActive = state.game.id === germanyMapGame.id;
@@ -546,20 +539,6 @@ function renderPriceDraft(team) {
     : formatEuroAmount(parsedAmount);
   $(`price-${team}-lock`).textContent = locked ? "Eingeloggt ✓" : "Offen";
   $(`price-${team}-lock`).className = `status-pill ${locked ? "open" : ""}`;
-}
-
-function getNextGameDefinition(gameId) {
-  const games = [
-    { id: estimationGame.id, name: estimationGame.name },
-    { id: guessThePriceGame.id, name: guessThePriceGame.name },
-    { id: germanyMapGame.id, name: germanyMapGame.name },
-    { id: wordMatchGame.id, name: wordMatchGame.name },
-    { id: rankingGame.id, name: rankingGame.name },
-    { id: matchingGame.id, name: matchingGame.name },
-    { id: buzzerGame.id, name: buzzerGame.name }
-  ];
-  const currentIndex = games.findIndex((game) => game.id === gameId);
-  return currentIndex >= 0 ? games[currentIndex + 1] || null : null;
 }
 
 function formatEstimate(value) {
@@ -2184,78 +2163,6 @@ function startRealtime() {
     }
   });
 }
-
-$("force-next-game").addEventListener("click", async () => {
-  $("force-next-game-error").textContent = "";
-  const currentGameId = state.game.id;
-  const assignerOrder = currentGameId === rankingGame.id
-    ? getMatchingAssignerOrder()
-    : [];
-
-  if (currentGameId === estimationGame.id && state.players.length !== 4) {
-    $("force-next-game-error").textContent =
-      "Für Thrifty müssen alle vier Spieler im Raum sein.";
-    return;
-  }
-  if (currentGameId === germanyMapGame.id && state.players.length !== 4) {
-    $("force-next-game-error").textContent =
-      "Für Begriffsmatch müssen alle vier Spieler im Raum sein.";
-    return;
-  }
-  if (currentGameId === rankingGame.id && assignerOrder.some((item) => !item)) {
-    $("force-next-game-error").textContent =
-      "Für Da seh ich dich müssen zwei Spieler pro Team im Raum sein.";
-    return;
-  }
-
-  const accepted = await runModeratorAction(() => {
-    if (currentGameId === estimationGame.id) {
-      if (!guessThePriceGame.start(state)) return false;
-      priceDrafts = emptyPriceDrafts(0);
-      savePriceDrafts();
-      return true;
-    }
-    if (currentGameId === guessThePriceGame.id) {
-      germanyMapGame.start(state);
-      mapNotes = emptyMapNotes(0);
-      saveMapNotes();
-      return true;
-    }
-    if (currentGameId === germanyMapGame.id) {
-      if (!wordMatchGame.start(state, state.players)) return false;
-      wordMatchDrafts = emptyWordMatchDrafts(0);
-      saveWordMatchDrafts();
-      return true;
-    }
-    if (currentGameId === wordMatchGame.id) {
-      rankingGame.start(state);
-      rankingSelection = { itemId: null, position: null };
-      return true;
-    }
-    if (currentGameId === rankingGame.id) {
-      if (!matchingGame.start(state, assignerOrder)) return false;
-      matchingAssignments = emptyMatchingAssignments();
-      saveMatchingAssignments();
-      return true;
-    }
-    if ([matchingGame.id, top20Game.id].includes(currentGameId)) {
-      buzzerGame.start(state);
-      return true;
-    }
-    return false;
-  });
-
-  if (!accepted) {
-    $("force-next-game-error").textContent = "Das nächste Spiel konnte nicht gestartet werden.";
-    return;
-  }
-
-  if (state.game.id === guessThePriceGame.id) await syncAllPriceTeams();
-  if (state.game.id === top20Game.id) await syncAllTop20Teams();
-  if (state.game.id === germanyMapGame.id) await syncAllMapTeams();
-  if (state.game.id === estimationGame.id) await syncAllEstimationPlayers();
-  if (state.game.id === wordMatchGame.id) await syncWordMatchSeeders();
-});
 
 document.addEventListener("focusin", (event) => {
   const score = event.target.closest(".editable-score[data-score-scope][data-score-team]");
