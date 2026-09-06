@@ -730,6 +730,12 @@ test("ships detailed European country geometry", () => {
   ));
 });
 
+test("keeps map distance lines visually constant while zooming", () => {
+  const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
+  const distanceLineRule = styles.match(/\.distance-line\s*\{([^}]*)\}/)?.[1] || "";
+  assert.match(distanceLineRule, /vector-effect:\s*non-scaling-stroke/);
+});
+
 test("calculates geographic distances in kilometers", () => {
   const berlin = { lat: 52.5200, lng: 13.4050 };
   const hamburg = { lat: 53.5511, lng: 9.9937 };

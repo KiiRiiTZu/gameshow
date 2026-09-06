@@ -800,7 +800,12 @@ button.ranking-candidate:disabled { opacity: .72; }
 .map-marker.compact circle { stroke-width: 1.2; }
 .map-marker.compact text { font-size: 9px; stroke-width: 2.4px; }
 
-.distance-line { stroke-width: 3; stroke-dasharray: 8 7; opacity: .8; }
+.distance-line {
+  stroke-width: 3;
+  stroke-dasharray: 8 7;
+  vector-effect: non-scaling-stroke;
+  opacity: .8;
+}
 .distance-line.blue { stroke: #7f94ff; }
 .distance-line.red { stroke: #ff7185; }
 
