@@ -23,7 +23,11 @@
       <article class="team-card blue">
         <p class="team-label">Team Blau</p>
         <p class="score-caption">Gewonnene Spiele</p>
-        <div id="blue-score" class="score">0</div>
+        <div class="show-score-editor">
+          <button class="score-adjust-button" type="button" data-score-scope="show" data-score-team="blue" data-score-delta="-1" aria-label="Spielpunkt von Team Blau abziehen">−</button>
+          <div id="blue-score" class="score">0</div>
+          <button class="score-adjust-button" type="button" data-score-scope="show" data-score-team="blue" data-score-delta="1" aria-label="Spielpunkt für Team Blau hinzufügen">+</button>
+        </div>
         <div id="blue-players" class="player-list"></div>
       </article>
 
@@ -32,12 +36,32 @@
       <article class="team-card red">
         <p class="team-label">Team Rot</p>
         <p class="score-caption">Gewonnene Spiele</p>
-        <div id="red-score" class="score">0</div>
+        <div class="show-score-editor">
+          <button class="score-adjust-button" type="button" data-score-scope="show" data-score-team="red" data-score-delta="-1" aria-label="Spielpunkt von Team Rot abziehen">−</button>
+          <div id="red-score" class="score">0</div>
+          <button class="score-adjust-button" type="button" data-score-scope="show" data-score-team="red" data-score-delta="1" aria-label="Spielpunkt für Team Rot hinzufügen">+</button>
+        </div>
         <div id="red-players" class="player-list"></div>
       </article>
     </section>
 
     <section id="show-winner-banner" class="show-winner-banner hidden"></section>
+
+    <section id="game-score-editor" class="game-score-editor">
+      <strong id="game-score-editor-label">Aktuellen Spielstand korrigieren</strong>
+      <div class="game-score-editor-team blue">
+        <span>Blau</span>
+        <button class="score-adjust-button small" type="button" data-score-scope="game" data-score-team="blue" data-score-delta="-1" aria-label="Punkt von Team Blau abziehen">−</button>
+        <output id="game-score-editor-blue">0</output>
+        <button class="score-adjust-button small" type="button" data-score-scope="game" data-score-team="blue" data-score-delta="1" aria-label="Punkt für Team Blau hinzufügen">+</button>
+      </div>
+      <div class="game-score-editor-team red">
+        <span>Rot</span>
+        <button class="score-adjust-button small" type="button" data-score-scope="game" data-score-team="red" data-score-delta="-1" aria-label="Punkt von Team Rot abziehen">−</button>
+        <output id="game-score-editor-red">0</output>
+        <button class="score-adjust-button small" type="button" data-score-scope="game" data-score-team="red" data-score-delta="1" aria-label="Punkt für Team Rot hinzufügen">+</button>
+      </div>
+    </section>
 
     <section id="moderator-test-controls" class="moderator-test-controls">
       <div>

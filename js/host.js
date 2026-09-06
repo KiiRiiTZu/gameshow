@@ -54,7 +54,8 @@ import {
   exportMatchingPublicKey
 } from "./matching-crypto.js";
 import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
-import { showGameTransition } from "./game-effects.js";
+import { getGamePresentation, showGameTransition } from "./game-effects.js";
+import { adjustModeratorScore, getModeratorGameScore } from "./moderator-score.js";
 import {
   addTeamChatMessage,
   clearExpiredTeamChatTyping,
@@ -474,6 +475,17 @@ function render() {
   renderGameEffects();
   $("blue-score").textContent = state.scores.blue;
   $("red-score").textContent = state.scores.red;
+  const editableGameScore = getModeratorGameScore(state.game);
+  $("game-score-editor").classList.toggle("hidden", !editableGameScore);
+  if (editableGameScore) {
+    $("game-score-editor-label").textContent =
+      `${getGamePresentation(state.game.id).name} · ${editableGameScore.label} korrigieren`;
+    $("game-score-editor-blue").textContent = editableGameScore.scores.blue;
+    $("game-score-editor-red").textContent = editableGameScore.scores.red;
+  }
+  document.querySelectorAll("[data-score-scope]").forEach((button) => {
+    button.disabled = moderatorActionPending;
+  });
   const showWinner = getShowWinner(state);
   $("show-winner-banner").classList.toggle("hidden", !showWinner);
   $("show-winner-banner").textContent = showWinner
@@ -886,9 +898,13 @@ function renderPriceGame() {
 function renderRankingBoard(game, list, interactive = false, rankingMove = null) {
   const rows = [];
   const proposalIndex = game.proposal ? Number(game.proposal.position) - 1 : -1;
+  const canChoosePosition = interactive && ["playing", "ready-to-reveal"].includes(game.status);
+  const selectedPosition = game.status === "ready-to-reveal"
+    ? game.proposal?.position
+    : rankingSelection.position;
   for (let index = 0; index <= game.placedIds.length; index += 1) {
-    if (interactive && game.status === "playing") {
-      rows.push(`<button type="button" class="ranking-insert${rankingSelection.position === index + 1 ? " selected" : ""}"
+    if (canChoosePosition) {
+      rows.push(`<button type="button" class="ranking-insert${selectedPosition === index + 1 ? " selected" : ""}"
         data-ranking-position="${index + 1}">Position ${index + 1}</button>`);
     }
     if (proposalIndex === index) {
@@ -2244,6 +2260,17 @@ $("force-next-game").addEventListener("click", async () => {
   if (state.game.id === wordMatchGame.id) await syncWordMatchSeeders();
 });
 
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-score-scope][data-score-team][data-score-delta]");
+  if (!button || button.disabled) return;
+  await runModeratorAction(() => adjustModeratorScore(
+    state,
+    button.dataset.scoreScope,
+    button.dataset.scoreTeam,
+    Number(button.dataset.scoreDelta)
+  ));
+});
+
 $("open-buzzer").addEventListener("click", async () => {
   await runModeratorAction(() => buzzerGame.open(state));
 });
@@ -2316,7 +2343,16 @@ $("ranking-pool").addEventListener("click", (event) => {
 
 $("ranking-board").addEventListener("click", (event) => {
   const position = event.target.closest("[data-ranking-position]");
-  if (!position || state.game.id !== rankingGame.id || state.game.status !== "playing") return;
+  if (!position || state.game.id !== rankingGame.id) return;
+  if (state.game.status === "ready-to-reveal") {
+    $("ranking-error").textContent = "";
+    void runModeratorAction(() => rankingGame.updateProposalPosition(
+      state,
+      Number(position.dataset.rankingPosition)
+    ));
+    return;
+  }
+  if (state.game.status !== "playing") return;
   rankingSelection.position = Number(position.dataset.rankingPosition);
   renderRankingGame();
 });

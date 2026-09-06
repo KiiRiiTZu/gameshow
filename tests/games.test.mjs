@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { adjustModeratorScore, getModeratorGameScore } from "../js/moderator-score.js";
 
 import {
   BUZZER_CORRECT_POINTS,
@@ -165,6 +166,61 @@ test("Einordnen validates relative placements and alternates turns", () => {
   assert.equal(state.game.strikes.red, 1);
   assert.equal(state.game.remainingIds.includes("harbor"), true);
   assert.equal(state.game.currentTeam, "blue");
+});
+
+test("Einordnen lets the moderator move a pending placement before revealing it", () => {
+  const state = createInitialRoomState("TEST");
+  rankingGame.start(state, "blue");
+  rankingGame.startFirstRound(state);
+
+  assert.equal(rankingGame.proposePlacement(state, "sova", 1), true);
+  assert.equal(state.game.status, "ready-to-reveal");
+  assert.equal(state.game.proposal.position, 1);
+  assert.equal(rankingGame.updateProposalPosition(state, 2), true);
+  assert.equal(state.game.proposal.position, 2);
+  assert.equal(rankingGame.updateProposalPosition(state, 3), false);
+
+  assert.equal(rankingGame.revealPlacement(state), true);
+  assert.equal(rankingGame.updateProposalPosition(state, 1), false);
+});
+
+test("lets the moderator correct overall and active game scores without going below zero", () => {
+  const state = createInitialRoomState("TEST");
+
+  assert.equal(adjustModeratorScore(state, "show", "blue", 1), true);
+  assert.deepEqual(state.scores, { blue: 1, red: 0 });
+  assert.equal(adjustModeratorScore(state, "show", "red", -1), false);
+
+  assert.equal(getModeratorGameScore(state.game).label, "Rundensiege");
+  assert.equal(adjustModeratorScore(state, "game", "red", 1), true);
+  assert.deepEqual(state.game.roundScores, { blue: 0, red: 1 });
+  assert.equal(adjustModeratorScore(state, "game", "red", -1), true);
+  assert.equal(adjustModeratorScore(state, "game", "red", -1), false);
+});
+
+test("maps every game to the score shown to the moderator", () => {
+  const cases = [
+    ["buzzer", "scores"],
+    ["spotify-top-artists", "roundWins"],
+    ["ranking-game", "roundWins"],
+    ["germany-map", "roundScores"],
+    ["matching-game", "scores"],
+    ["guess-the-price", "roundScores"],
+    ["estimation-game", "roundScores"],
+    ["word-match-game", "scores"]
+  ];
+
+  for (const [id, key] of cases) {
+    const game = { id, [key]: { blue: 2, red: 3 } };
+    assert.deepEqual(getModeratorGameScore(game).scores, { blue: 2, red: 3 });
+  }
+
+  const tiebreak = {
+    id: "word-match-game",
+    scores: { blue: 8, red: 8 },
+    tiebreak: { scores: { blue: 1, red: 2 } }
+  };
+  assert.deepEqual(getModeratorGameScore(tiebreak).scores, { blue: 1, red: 2 });
 });
 
 test("Einordnen ends a list on the second error and alternates its starting team", () => {

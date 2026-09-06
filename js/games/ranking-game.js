@@ -127,6 +127,16 @@ export const rankingGame = {
     return true;
   },
 
+  updateProposalPosition(state, position) {
+    if (state.game.id !== this.id || state.game.status !== "ready-to-reveal" ||
+        !state.game.proposal) return false;
+    const insertionIndex = Number(position) - 1;
+    if (!Number.isInteger(insertionIndex) || insertionIndex < 0 ||
+        insertionIndex > state.game.placedIds.length) return false;
+    state.game.proposal.position = insertionIndex + 1;
+    return true;
+  },
+
   revealPlacement(state) {
     if (state.game.id !== this.id || state.game.status !== "ready-to-reveal" ||
         !state.game.proposal) return false;
