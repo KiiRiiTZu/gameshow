@@ -447,7 +447,9 @@ async function initializeHost() {
   }
 
   $("room-code").textContent = roomCode;
-  hostMap = createEuropeMap($("host-germany-map"));
+  hostMap = createEuropeMap($("host-germany-map"), {
+    enableZoom: true
+  });
   matchingKeyPair = await createMatchingKeyPair();
   matchingPublicKey = await exportMatchingPublicKey(matchingKeyPair.publicKey);
   previousGameId = state.game.id;
