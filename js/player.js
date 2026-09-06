@@ -1119,8 +1119,9 @@ function renderMapGame() {
   const game = roomState.game;
   const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
   const isPending = game.status === "round-pending";
-  const isRevealed = game.status === "revealed" || game.status === "finished";
   const isFinished = game.status === "finished";
+  const hasRoundResult = Number.isFinite(game.distances?.blue) && Number.isFinite(game.distances?.red);
+  const isRevealed = game.status === "revealed" || (isFinished && hasRoundResult);
   const ownPin = game.pins?.[player.team];
   const ownTeamLocked = Boolean(game.lockedTeams?.[player.team]);
   const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
@@ -1162,6 +1163,8 @@ function renderMapGame() {
 
   if (isPending) {
     $("player-map-result").textContent = "Die erste Frage bleibt bis zum Rundenstart verborgen.";
+  } else if (isFinished && !hasRoundResult) {
+    $("player-map-result").textContent = `🏆 ${getTeamName(game.winningTeam)} gewinnt das Kartenspiel!`;
   } else if (isRevealed) {
     const blueDistance = Math.round(game.distances.blue);
     const redDistance = Math.round(game.distances.red);
@@ -1349,8 +1352,8 @@ function renderPriceGame() {
   const game = roomState.game;
   const product = getPriceProduct(game.roundIndex);
   const isPending = game.status === "product-pending";
-  const isRevealed = ["revealed", "finished"].includes(game.status);
   const isFinished = game.status === "finished";
+  const isRevealed = game.status === "revealed" || (isFinished && Boolean(game.revealed));
   const ownTeam = player?.team || "blue";
   const locked = Boolean(game.lockedTeams?.[ownTeam] || priceDraft.locked);
   const editable = game.status === "guessing" && !locked && !priceSubmissionPending;
@@ -1377,6 +1380,11 @@ function renderPriceGame() {
 
   if (isPending) {
     $("player-price-result").textContent = "Wartet darauf, dass der Moderator das erste Produkt zeigt.";
+    return;
+  }
+
+  if (isFinished && !game.revealed) {
+    $("player-price-result").textContent = `🏆 ${getTeamName(game.winningTeam)} gewinnt Thrifty!`;
     return;
   }
 
@@ -1437,7 +1445,8 @@ function renderEstimationGame() {
   const isPending = game.status === "question-pending";
   const isGuessing = game.status === "guessing";
   const isReady = game.status === "ready-to-reveal";
-  const isRevealed = ["revealed", "finished"].includes(game.status);
+  const isFinished = game.status === "finished";
+  const isRevealed = game.status === "revealed" || (isFinished && Boolean(game.revealed));
   const locked = game.lockedPlayerIds?.includes(playerId) || false;
   const editable = isGuessing && !locked && !estimationSubmissionPending;
   const resultElement = $("player-estimation-result");
@@ -1479,6 +1488,10 @@ function renderEstimationGame() {
       isGameNotStarted
         ? "Wartet darauf, dass der Moderator Spiel 1 startet"
         : "Wartet darauf, dass der Moderator die erste Frage startet.";
+    return;
+  }
+  if (isFinished && !game.revealed) {
+    resultElement.textContent = `🏆 ${getTeamName(game.winningTeam)} gewinnt Mittelwert!`;
     return;
   }
   if (isRevealed) {

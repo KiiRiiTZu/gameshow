@@ -552,8 +552,8 @@ function renderEstimationGame() {
   const isPending = game.status === "question-pending";
   const isGuessing = game.status === "guessing";
   const isReady = game.status === "ready-to-reveal";
-  const isRevealed = ["revealed", "finished"].includes(game.status);
   const isFinished = game.status === "finished";
+  const isRevealed = game.status === "revealed" || (isFinished && Boolean(game.revealed));
   const hasAverages = Number.isFinite(game.averages?.blue) && Number.isFinite(game.averages?.red);
 
   $("estimation-round-label").textContent =
@@ -613,7 +613,11 @@ function renderEstimationGame() {
   $("next-estimation-question").disabled = moderatorActionPending;
   $("start-price-after-estimation").classList.toggle("hidden", !isFinished);
   $("start-price-after-estimation").disabled = moderatorActionPending;
-  $("estimation-result").classList.toggle("hidden", !isRevealed);
+  $("estimation-result").classList.toggle("hidden", !isRevealed && !isFinished);
+  if (isFinished && !game.revealed) {
+    $("estimation-result").innerHTML = `<p>🏆 ${getTeamName(game.winningTeam)} gewinnt Mittelwert!</p>`;
+    return;
+  }
   if (!isRevealed) return;
   const result = game.revealed;
   const winnerText = result.roundWinner
@@ -820,8 +824,8 @@ function renderPriceGame() {
   const game = state.game;
   const product = getPriceProduct(game.roundIndex);
   const isPending = game.status === "product-pending";
-  const isRevealed = ["revealed", "finished"].includes(game.status);
   const isFinished = game.status === "finished";
+  const isRevealed = game.status === "revealed" || (isFinished && Boolean(game.revealed));
   const showIsFinished = Boolean(getShowWinner(state));
   const bothLocked = game.lockedTeams.blue && game.lockedTeams.red;
 
@@ -849,8 +853,12 @@ function renderPriceGame() {
   $("next-price-round").disabled = moderatorActionPending;
   $("start-map-after-price").classList.toggle("hidden", !isFinished || showIsFinished);
   $("start-map-after-price").disabled = moderatorActionPending;
-  $("price-round-result").classList.toggle("hidden", !isRevealed);
+  $("price-round-result").classList.toggle("hidden", !isRevealed && !isFinished);
 
+  if (isFinished && !game.revealed) {
+    $("price-round-result").innerHTML = `<p>🏆 ${getTeamName(game.winningTeam)} gewinnt Thrifty!</p>`;
+    return;
+  }
   if (!isRevealed) return;
 
   const result = game.revealed;
@@ -960,7 +968,7 @@ function renderRankingGame() {
       <span>${escapeHtml(resultText)}${result.correct ? ` Wert: ${escapeHtml(entry.value)}` : ""}</span>
       ${conclusion ? `<p>${escapeHtml(conclusion)}</p>` : ""}`;
   } else if (isFinished) {
-    $("ranking-result").innerHTML = "<strong>Spiel beendet</strong><span>Einordnen endet unentschieden.</span>";
+    $("ranking-result").innerHTML = `<strong>Spiel beendet</strong><span>🏆 ${getTeamName(game.winningTeam)} gewinnt Einordnen!</span>`;
   }
 
   $("start-first-ranking-round").classList.toggle("hidden", !isNotStarted);
@@ -1093,8 +1101,9 @@ function renderMapGame() {
   const game = state.game;
   const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
   const isPending = game.status === "round-pending";
-  const isRevealed = game.status === "revealed" || game.status === "finished";
   const isFinished = game.status === "finished";
+  const hasRoundResult = Number.isFinite(game.distances?.blue) && Number.isFinite(game.distances?.red);
+  const isRevealed = game.status === "revealed" || (isFinished && hasRoundResult);
   const showIsFinished = Boolean(getShowWinner(state));
   const bothPinsReady = Boolean(game.pins?.blue && game.pins?.red);
   const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
@@ -1136,9 +1145,11 @@ function renderMapGame() {
   $("next-map-round").textContent = game.roundScores[game.roundWinner] >= GERMANY_MAP_ROUNDS_TO_WIN
     ? "Spiel abschließen"
     : "Nächste Frage";
-  $("map-result").classList.toggle("hidden", !isRevealed);
+  $("map-result").classList.toggle("hidden", !isRevealed && !isFinished);
 
-  if (isRevealed) {
+  if (isFinished && !hasRoundResult) {
+    $("map-result").innerHTML = `<p>🏆 ${getTeamName(game.winningTeam)} gewinnt das Kartenspiel!</p>`;
+  } else if (isRevealed) {
     const blueDistance = Math.round(game.distances.blue);
     const redDistance = Math.round(game.distances.red);
     const winner = getTeamName(game.roundWinner || game.winningTeam);

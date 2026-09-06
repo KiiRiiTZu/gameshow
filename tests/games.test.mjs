@@ -206,6 +206,41 @@ test("lets the moderator correct overall and active game scores without going be
   assert.equal(state.game.roundScores.red, 6);
 });
 
+test("finishes fixed-target games when the moderator enters a winning score", () => {
+  const state = createInitialRoomState("TEST");
+
+  assert.equal(setModeratorScore(state, "game", "red", "5"), true);
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "red");
+  assert.equal(state.game.manualFinish, true);
+  assert.deepEqual(state.scores, { blue: 0, red: 1 });
+});
+
+test("does not award the same manually selected game winner twice", () => {
+  const state = createInitialRoomState("TEST");
+
+  setModeratorScore(state, "game", "blue", "5");
+  assert.equal(setModeratorScore(state, "game", "blue", "6"), true);
+  assert.deepEqual(state.scores, { blue: 1, red: 0 });
+});
+
+test("finishes cumulative games once a manually entered lead is unreachable", () => {
+  const state = createInitialRoomState("TEST");
+  state.game = {
+    id: "matching-game",
+    status: "assigning",
+    roundIndex: 2,
+    scores: { blue: 5, red: 4 },
+    roundResults: [{ blue: 2, red: 2 }, { blue: 3, red: 2 }],
+    winningTeam: null
+  };
+
+  assert.equal(setModeratorScore(state, "game", "blue", "13"), true);
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "blue");
+  assert.equal(state.scores.blue, 1);
+});
+
 test("maps every game to the score shown to the moderator", () => {
   const cases = [
     ["buzzer", "scores"],
