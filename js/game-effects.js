@@ -11,6 +11,18 @@ const GAME_PRESENTATIONS = {
   buzzer: { number: 7, name: "Buzzer Quiz" }
 };
 
+// Reihenfolge der aktiven Spiele. Die Nummer auf Übergangskarte und
+// Punkteübersicht ergibt sich aus dieser Liste, nicht aus einer zweiten Tabelle.
+export const GAME_SEQUENCE = [
+  "estimation-game",
+  "guess-the-price",
+  "germany-map",
+  "word-match-game",
+  "ranking-game",
+  "matching-game",
+  "buzzer"
+];
+
 // Ablauf der Übergangskarte. Die Werte werden als CSS-Variablen gesetzt,
 // damit Timing in JS und Animation im Stylesheet nicht auseinanderlaufen.
 const TRANSITION_DURATION = 2900;
@@ -18,6 +30,10 @@ const TRANSITION_FADE_OUT = 450;
 
 const WINNER_DURATION = 3200;
 const WINNER_FADE_OUT = 480;
+
+// Die Übersicht schliesst direkt an die Siegerehrung an.
+const OVERVIEW_DURATION = 5600;
+const OVERVIEW_FADE_OUT = 520;
 
 const TEAM_LABELS = { blue: "Team Blau", red: "Team Rot" };
 
@@ -85,9 +101,10 @@ export function showGameTransition(gameId) {
  * Siegerehrung nach einem beendeten Spiel: Banner in Teamfarbe plus Konfetti.
  * Bei einem Unentschieden (team === null) bleibt es beim Banner ohne Konfetti.
  */
-export function showGameWinner(gameId, team, detail = "") {
+export function showGameWinner(gameId, team, detail = "", overview = null) {
   const presentation = getGamePresentation(gameId);
   replaceOverlay(".game-winner-overlay");
+  replaceOverlay(".score-overview-overlay");
 
   const isDraw = !["blue", "red"].includes(team);
   const headline = isDraw
@@ -111,11 +128,87 @@ export function showGameWinner(gameId, team, detail = "") {
   document.body.append(overlay);
   if (!isDraw) burstConfetti(team);
   scheduleTeardown(overlay, WINNER_DURATION - WINNER_FADE_OUT, WINNER_FADE_OUT);
+
+  if (!overview) return;
+  // Die Übersicht übernimmt, sobald das Banner ausgeblendet ist.
+  const chain = setTimeout(() => {
+    showScoreOverview({ ...overview, highlightGameId: gameId });
+  }, WINNER_DURATION);
+  overlay.addEventListener("effect-cancelled", () => clearTimeout(chain), { once: true });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function renderOverviewGame(gameId, index, results, highlightGameId) {
+  const presentation = getGamePresentation(gameId);
+  const winner = results.find((entry) => entry.gameId === gameId)?.team || null;
+  const isHighlight = gameId === highlightGameId && Boolean(winner);
+  // Das gerade gewonnene Spiel startet neutral und blinkt sich in seine Farbe;
+  // alle übrigen sind sofort eingefärbt.
+  const stateClass = isHighlight ? `claiming ${winner}` : winner ? `won ${winner}` : "open";
+  return `<div class="score-overview-game ${stateClass}">
+    <strong>Spiel ${index + 1}</strong>
+    <span>${escapeHtml(presentation.name)}</span>
+  </div>`;
+}
+
+/**
+ * Punkteübersicht der ganzen Show: beide Teamstände und ein Feld je Spiel.
+ * highlightGameId blinkt dreimal auf und bleibt dann in der Siegerfarbe stehen.
+ */
+export function showScoreOverview({
+  results = [],
+  scores = { blue: 0, red: 0 },
+  highlightGameId = null,
+  winningScore = 4
+} = {}) {
+  replaceOverlay(".score-overview-overlay");
+
+  const overlay = document.createElement("div");
+  overlay.className = "score-overview-overlay";
+  overlay.setAttribute("role", "status");
+  overlay.setAttribute(
+    "aria-label",
+    `Punktestand: Team Blau ${scores.blue}, Team Rot ${scores.red}`
+  );
+  overlay.style.setProperty("--overview-fade-out", `${OVERVIEW_FADE_OUT}ms`);
+  overlay.innerHTML = `
+    <div class="score-overview">
+      <div class="score-overview-team blue">
+        <span>Team Blau</span>
+        <strong>${Number(scores.blue) || 0}</strong>
+      </div>
+      <div class="score-overview-middle">
+        <div class="score-overview-grid">
+          ${GAME_SEQUENCE.map((gameId, index) =>
+            renderOverviewGame(gameId, index, results, highlightGameId)).join("")}
+        </div>
+        <p class="score-overview-note">
+          Wer zuerst ${winningScore} Spiele für sich entscheidet,<br>gewinnt den Abend.
+        </p>
+      </div>
+      <div class="score-overview-team red">
+        <span>Team Rot</span>
+        <strong>${Number(scores.red) || 0}</strong>
+      </div>
+    </div>
+  `;
+  document.body.append(overlay);
+  scheduleTeardown(overlay, OVERVIEW_DURATION - OVERVIEW_FADE_OUT, OVERVIEW_FADE_OUT);
+  return overlay;
 }
 
 /** Räumt laufende Effekte ab, z. B. wenn ein Spiel neu geladen wird. */
 export function clearGameEffects() {
   stopConfetti();
   replaceOverlay(".game-winner-overlay");
+  replaceOverlay(".score-overview-overlay");
   removeEffect(".game-transition-overlay");
 }

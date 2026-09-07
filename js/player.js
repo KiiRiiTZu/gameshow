@@ -3,7 +3,7 @@ import {
   getPlayers
 } from "./database.js";
 
-import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode } from "./room.js";
+import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode, SHOW_WINNING_SCORE } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
@@ -804,7 +804,11 @@ function render() {
       previousGameStatus !== "finished" && roomState.game.status === "finished") {
     // Erst der Übergang von "läuft" auf "beendet" feiert — wer in ein bereits
     // beendetes Spiel hineinlädt, bekommt kein Konfetti.
-    showGameWinner(currentGameId, roomState.game.winningTeam, gameWinnerDetail(roomState.game));
+    showGameWinner(currentGameId, roomState.game.winningTeam, gameWinnerDetail(roomState.game), {
+      results: roomState.gameResults || [],
+      scores: roomState.scores,
+      winningScore: SHOW_WINNING_SCORE
+    });
   }
   previousGameId = currentGameId;
   previousGameStatus = roomState.game.status;

@@ -85,8 +85,49 @@ export function createInitialRoomState(roomCode) {
     roomCode,
     scores: emptyTeamScores(),
     players: [],
+    gameResults: [],
     game: createInitialGame()
   };
+}
+
+/**
+ * Hält fest, welches Team welches Spiel gewonnen hat. Die Gesamtwertung in
+ * state.scores zählt nur, sie weiss nicht welches Spiel — für die Punkteübersicht
+ * wird aber genau diese Zuordnung gebraucht.
+ * Ein bereits erfasstes Spiel wird überschrieben, damit eine Korrektur des
+ * Moderators keinen zweiten Eintrag erzeugt.
+ */
+export function recordGameResult(state, gameId, team) {
+  if (!state || !gameId) return false;
+  state.gameResults ||= [];
+
+  const winner = ["blue", "red"].includes(team) ? team : null;
+  const existing = state.gameResults.find((entry) => entry.gameId === gameId);
+
+  if (existing) {
+    if (existing.team === winner) return false;
+    existing.team = winner;
+    return true;
+  }
+
+  state.gameResults.push({ gameId, team: winner });
+  return true;
+}
+
+export function normalizeGameResults(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const results = [];
+  for (const entry of value) {
+    const gameId = String(entry?.gameId || "");
+    if (!gameId || seen.has(gameId)) continue;
+    seen.add(gameId);
+    results.push({
+      gameId,
+      team: ["blue", "red"].includes(entry?.team) ? entry.team : null
+    });
+  }
+  return results;
 }
 
 export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
@@ -128,6 +169,7 @@ export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
       ? inferCompletedGameScores(game, legacyScores)
       : legacyScores,
     players: [],
+    gameResults: normalizeGameResults(room.game_results),
     game: isLegacyPersistedGame
       ? upgradePersistedGameScores(game, legacyScores)
       : game

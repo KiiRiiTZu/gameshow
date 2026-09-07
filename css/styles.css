@@ -1409,6 +1409,152 @@ button.ranking-candidate:disabled { opacity: .72; }
   pointer-events: none;
 }
 
+/* ---- Punkteübersicht der Show ---- */
+
+.score-overview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 45%, rgba(30,38,72,.72) 0%, rgba(7,9,15,.94) 66%);
+  backdrop-filter: blur(10px);
+  animation: effect-fade-in .34s ease both;
+}
+
+.score-overview-overlay.leaving { animation: effect-fade-out var(--overview-fade-out, .52s) ease both; }
+
+.score-overview {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(18px, 4vw, 54px);
+}
+
+.score-overview-team {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  animation: overview-team-in .55s cubic-bezier(.24, 1.2, .4, 1) both;
+}
+
+.score-overview-team > span {
+  color: rgba(255,255,255,.82);
+  letter-spacing: .16em;
+  font-size: clamp(.66rem, 1.5vw, .82rem);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.score-overview-team > strong {
+  display: grid;
+  place-items: center;
+  width: clamp(96px, 15vw, 168px);
+  aspect-ratio: 1;
+  border-radius: clamp(22px, 3.4vw, 36px);
+  font-size: clamp(3rem, 8vw, 5.6rem);
+  line-height: 1;
+}
+
+.score-overview-team.blue > strong {
+  background: linear-gradient(150deg, #5a72f6, #2f3f9e);
+  box-shadow: 0 20px 54px rgba(90,114,246,.34), inset 0 0 40px rgba(255,255,255,.1);
+}
+
+.score-overview-team.red > strong {
+  background: linear-gradient(150deg, #e14c65, #8d2035);
+  box-shadow: 0 20px 54px rgba(210,55,80,.34), inset 0 0 40px rgba(255,255,255,.1);
+}
+
+.score-overview-middle { display: grid; justify-items: center; gap: 18px; }
+
+/* Breit genug für vier Felder in der ersten Reihe: die sieben Spiele stehen
+   dann als 4 + 3 statt als 3 + 3 + 1 mit einem einzelnen Feld darunter. */
+.score-overview-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(8px, 1.2vw, 14px);
+  max-width: min(566px, 100%);
+}
+
+.score-overview-game {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  width: clamp(94px, 13vw, 122px);
+  min-height: clamp(74px, 9vw, 96px);
+  padding: 10px 8px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px;
+  background: #202532;
+  text-align: center;
+}
+
+.score-overview-game strong { font-size: clamp(.92rem, 2vw, 1.1rem); }
+
+.score-overview-game span {
+  color: rgba(255,255,255,.58);
+  font-size: clamp(.6rem, 1.3vw, .7rem);
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.score-overview-game.won.blue,
+.score-overview-game.claiming.blue { --claim: #5a72f6; --claim-edge: #8ca2ff; --claim-glow: rgba(90,114,246,.5); }
+.score-overview-game.won.red,
+.score-overview-game.claiming.red { --claim: #e14c65; --claim-edge: #ef8095; --claim-glow: rgba(210,55,80,.5); }
+
+.score-overview-game.won {
+  border-color: var(--claim-edge);
+  background: var(--claim);
+  box-shadow: 0 0 20px var(--claim-glow);
+}
+
+.score-overview-game.won span { color: rgba(255,255,255,.85); }
+
+/* Dreimal kurz in der Siegerfarbe aufblitzen, danach darin stehen bleiben. */
+.score-overview-game.claiming {
+  animation: overview-claim 2000ms ease-out both;
+  animation-delay: .45s;
+}
+
+/* Drei Blitze von je rund 120 ms, danach bleibt das Feld in der Siegerfarbe.
+   Die Pause vor dem Einrasten ist bewusst länger, damit der Endzustand nicht
+   als vierter Blitz gelesen wird. */
+@keyframes overview-claim {
+  0%, 5% { border-color: rgba(255,255,255,.1); background: #202532; box-shadow: none; transform: scale(1); }
+  8%, 14% { border-color: var(--claim-edge); background: var(--claim); box-shadow: 0 0 30px var(--claim-glow); transform: scale(1.09); }
+  17%, 23% { border-color: rgba(255,255,255,.1); background: #202532; box-shadow: none; transform: scale(1); }
+  26%, 32% { border-color: var(--claim-edge); background: var(--claim); box-shadow: 0 0 30px var(--claim-glow); transform: scale(1.09); }
+  35%, 41% { border-color: rgba(255,255,255,.1); background: #202532; box-shadow: none; transform: scale(1); }
+  44%, 50% { border-color: var(--claim-edge); background: var(--claim); box-shadow: 0 0 30px var(--claim-glow); transform: scale(1.09); }
+  53%, 62% { border-color: rgba(255,255,255,.1); background: #202532; box-shadow: none; transform: scale(1); }
+  72%, 100% { border-color: var(--claim-edge); background: var(--claim); box-shadow: 0 0 20px var(--claim-glow); transform: scale(1); }
+}
+
+@keyframes overview-team-in {
+  from { opacity: 0; transform: translateY(22px) scale(.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.score-overview-note {
+  margin: 0;
+  color: rgba(255,255,255,.66);
+  font-size: clamp(.74rem, 1.7vw, .9rem);
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .score-overview { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .score-overview-middle { grid-column: 1 / -1; order: -1; }
+}
+
 @keyframes winner-card-pop {
   0% { opacity: 0; transform: scale(.72) translateY(26px); }
   100% { opacity: 1; transform: scale(1) translateY(0); }
@@ -1425,7 +1571,15 @@ button.ranking-candidate:disabled { opacity: .72; }
   .game-transition-card-inner { animation: none; transform: rotateY(180deg); }
   .game-transition-face::after { animation: none; opacity: 0; }
   .game-winner-card,
-  .game-winner-trophy { animation: none; }
+  .game-winner-trophy,
+  .score-overview-team { animation: none; }
+  /* Ohne Blinken direkt in der Siegerfarbe zeigen. */
+  .score-overview-game.claiming {
+    animation: none;
+    border-color: var(--claim-edge);
+    background: var(--claim);
+    box-shadow: 0 0 20px var(--claim-glow);
+  }
 }
 
 .team-picker {

@@ -7,7 +7,7 @@ import {
   createConfettiParticles,
   getConfettiPalette
 } from "../js/confetti.js";
-import { getGamePresentation, getTeamLabel } from "../js/game-effects.js";
+import { GAME_SEQUENCE, getGamePresentation, getTeamLabel } from "../js/game-effects.js";
 
 const VIEWPORT = { width: 1280, height: 720 };
 
@@ -56,13 +56,15 @@ test("lets confetti rise before gravity pulls it down again", () => {
     });
   }
 
-  assert.ok(
-    peakY.every((value, index) => value < startY[index] - 100),
-    "jede Flocke steigt deutlich über ihren Startpunkt"
-  );
+  // Die Schwelle richtet sich nach der langsamsten möglichen Flocke: Startspeed 13
+  // im flachsten Winkel steigt rund 85 Pixel. Ein engerer Wert macht den Test flaky,
+  // weil die Startwerte zufällig sind.
+  const rise = peakY.map((value, index) => startY[index] - value);
+  assert.ok(Math.min(...rise) > 40, `jede Flocke steigt (kleinster Anstieg: ${Math.round(Math.min(...rise))}px)`);
+  assert.ok(Math.max(...rise) > 400, "die schnellsten Flocken fliegen weit nach oben");
   assert.ok(
     particles.every((item, index) => item.y > peakY[index]),
-    "und fällt anschließend wieder unter ihren Scheitelpunkt"
+    "und jede fällt anschließend wieder unter ihren Scheitelpunkt"
   );
 });
 
@@ -102,4 +104,19 @@ test("labels both teams and falls back on a draw", () => {
   assert.equal(getTeamLabel("blue"), "Team Blau");
   assert.equal(getTeamLabel("red"), "Team Rot");
   assert.equal(getTeamLabel(null), "Kein Team");
+});
+
+test("lists the seven active games in playing order", () => {
+  assert.deepEqual(GAME_SEQUENCE, [
+    "estimation-game",
+    "guess-the-price",
+    "germany-map",
+    "word-match-game",
+    "ranking-game",
+    "matching-game",
+    "buzzer"
+  ]);
+  // Das Bankspiel Top 20 gehört nicht zur aktiven Reihenfolge.
+  assert.ok(!GAME_SEQUENCE.includes("spotify-top-artists"));
+  assert.equal(new Set(GAME_SEQUENCE).size, GAME_SEQUENCE.length, "keine Dopplungen");
 });

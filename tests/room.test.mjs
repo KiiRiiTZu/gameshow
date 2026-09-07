@@ -6,6 +6,8 @@ import {
   createInitialRoomState,
   createRoomStateFromRecords,
   getShowWinner,
+  normalizeGameResults,
+  recordGameResult,
   SHOW_WINNING_SCORE
 } from "../js/room.js";
 
@@ -107,4 +109,56 @@ test("upgrades legacy buzzer points into separate quiz and match scores", () => 
 
   assert.deepEqual(state.game.scores, { blue: 5, red: 3 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
+});
+
+test("records which team won which game and keeps the playing order", () => {
+  const state = createInitialRoomState("TEST");
+
+  assert.deepEqual(state.gameResults, []);
+  assert.equal(recordGameResult(state, "estimation-game", "blue"), true);
+  assert.equal(recordGameResult(state, "guess-the-price", "red"), true);
+
+  assert.deepEqual(state.gameResults, [
+    { gameId: "estimation-game", team: "blue" },
+    { gameId: "guess-the-price", team: "red" }
+  ]);
+});
+
+test("does not record the same game twice when the host renders again", () => {
+  const state = createInitialRoomState("TEST");
+
+  assert.equal(recordGameResult(state, "germany-map", "red"), true);
+  assert.equal(recordGameResult(state, "germany-map", "red"), false);
+  assert.equal(state.gameResults.length, 1);
+});
+
+test("follows a corrected game winner instead of adding a second entry", () => {
+  const state = createInitialRoomState("TEST");
+
+  recordGameResult(state, "buzzer", "blue");
+  assert.equal(recordGameResult(state, "buzzer", "red"), true);
+  assert.deepEqual(state.gameResults, [{ gameId: "buzzer", team: "red" }]);
+});
+
+test("stores a drawn game without a winning team", () => {
+  const state = createInitialRoomState("TEST");
+
+  recordGameResult(state, "word-match-game", null);
+  assert.deepEqual(state.gameResults, [{ gameId: "word-match-game", team: null }]);
+});
+
+test("drops damaged entries when restoring the game results", () => {
+  const restored = normalizeGameResults([
+    { gameId: "estimation-game", team: "blue" },
+    { gameId: "estimation-game", team: "red" },
+    { gameId: "guess-the-price", team: "gruen" },
+    { gameId: "", team: "blue" },
+    null
+  ]);
+
+  assert.deepEqual(restored, [
+    { gameId: "estimation-game", team: "blue" },
+    { gameId: "guess-the-price", team: null }
+  ]);
+  assert.deepEqual(normalizeGameResults("kaputt"), []);
 });

@@ -7,7 +7,15 @@ import {
   updateRoomGameState
 } from "./database.js";
 
-import { addOrUpdatePlayer, createRoomStateFromRecords, generateRoomCode, getShowWinner } from "./room.js";
+import {
+  addOrUpdatePlayer,
+  createRoomStateFromRecords,
+  generateRoomCode,
+  getShowWinner,
+  normalizeGameResults,
+  recordGameResult,
+  SHOW_WINNING_SCORE
+} from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { registerGame } from "./games/game-engine.js";
@@ -370,6 +378,33 @@ function restoreLocalGameState() {
   }
 }
 
+function gameResultsStorageKey() {
+  return `gameshow-game-results-${roomRecord.id}`;
+}
+
+function saveGameResults() {
+  try {
+    localStorage.setItem(gameResultsStorageKey(), JSON.stringify(state.gameResults));
+  } catch (error) {
+    console.warn("Game results could not be saved:", error);
+  }
+}
+
+function restoreGameResults() {
+  // Die Spalte rooms.game_results ist optional; ohne sie hält der Moderator-Browser
+  // die Historie lokal, genau wie beim Spielzustand.
+  if (state.gameResults?.length) return;
+
+  try {
+    state.gameResults = normalizeGameResults(
+      JSON.parse(localStorage.getItem(gameResultsStorageKey()))
+    );
+  } catch (error) {
+    console.warn("Game results could not be restored:", error);
+    state.gameResults = [];
+  }
+}
+
 async function persistRoomState() {
   saveLocalGameState();
 
@@ -414,6 +449,7 @@ async function initializeHost() {
   const players = await getPlayers(roomRecord.id);
   state = createRoomStateFromRecords(roomCode, roomRecord, players);
   restoreLocalGameState();
+  restoreGameResults();
   teamChat = createTeamChat(supportsTeamChat(state.game.id) ? state.game.id : null);
 
   if (state.game.id === top20Game.id) {
@@ -477,7 +513,11 @@ function renderGameEffects() {
       previousGameStatus !== "finished" && state.game.status === "finished") {
     // Erst der Übergang von "läuft" auf "beendet" feiert — ein Reload in ein
     // bereits beendetes Spiel startet kein Konfetti.
-    showGameWinner(gameId, state.game.winningTeam, gameWinnerDetail(state.game));
+    showGameWinner(gameId, state.game.winningTeam, gameWinnerDetail(state.game), {
+      results: state.gameResults || [],
+      scores: state.scores,
+      winningScore: SHOW_WINNING_SCORE
+    });
   }
 
   previousGameId = gameId;
@@ -1502,7 +1542,16 @@ async function broadcastState() {
   await realtime.send("room_state", publicState);
 }
 
+// Jede Zustandsänderung läuft hier durch, also wird hier auch festgehalten,
+// welches Team welches Spiel gewonnen hat. recordGameResult überschreibt einen
+// vorhandenen Eintrag, damit eine Korrektur des Moderators nachgezogen wird.
+function syncGameResult() {
+  if (state.game.status !== "finished") return;
+  if (recordGameResult(state, state.game.id, state.game.winningTeam)) saveGameResults();
+}
+
 async function persistRenderAndBroadcast() {
+  syncGameResult();
   render();
   await persistRoomState();
   await broadcastState();
