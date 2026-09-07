@@ -57,8 +57,8 @@ function finishRound(state, winner) {
   state.game.status = "round-finished";
 }
 
-export const rankingGame = {
-  id: "ranking-game",
+export const einordnenGame = {
+  id: "einordnen",
   name: "Einordnen",
 
   start(state, startingTeam = "blue") {

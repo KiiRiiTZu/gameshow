@@ -17,10 +17,10 @@ import {
   areMatchingValuesUnique,
   getMatchingRoleRoundIndex,
   getMatchingTurn
-} from "./games/matching-game.js";
+} from "./games/da-seh-ich-dich.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
 import { formatEuroAmount, parseEuroAmount } from "./euro.js";
-import { ESTIMATION_ROUND_COUNT, parseEstimate } from "./games/estimation-game.js";
+import { ESTIMATION_ROUND_COUNT, parseEstimate } from "./games/mittelwert.js";
 import {
   WORD_MATCH_CATEGORIES,
   WORD_MATCH_PHASE_SECONDS,
@@ -29,7 +29,7 @@ import {
   WORD_MATCH_TIEBREAK_SECONDS,
   getWordMatchGuessOrder,
   getWordMatchRoles
-} from "./games/word-match-game.js";
+} from "./games/begriffsmatch.js";
 import {
   createEncryptionKeyPair,
   decryptPrivatePayload,
@@ -41,13 +41,13 @@ import { getModeratorGameScore } from "./moderator-score.js";
 import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
 
 const TOP_20_GAME_ID = "top-20";
-const RANKING_GAME_ID = "ranking-game";
+const RANKING_GAME_ID = "einordnen";
 const TOP_20_SLOT_COUNT = 20;
 const KARTENWISSEN_GAME_ID = "kartenwissen";
-const MATCHING_GAME_ID = "matching-game";
-const PRICE_GAME_ID = "guess-the-price";
-const ESTIMATION_GAME_ID = "estimation-game";
-const WORD_MATCH_GAME_ID = "word-match-game";
+const MATCHING_GAME_ID = "da-seh-ich-dich";
+const PRICE_GAME_ID = "thrifty";
+const ESTIMATION_GAME_ID = "mittelwert";
+const WORD_MATCH_GAME_ID = "begriffsmatch";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -832,7 +832,7 @@ function render() {
   const currentGameId = roomState.game?.id;
   if (previousGameId && previousGameId !== currentGameId) {
     showGameTransition(currentGameId);
-  } else if (["buzzer", ESTIMATION_GAME_ID].includes(currentGameId) &&
+  } else if (["buzzer-quiz", ESTIMATION_GAME_ID].includes(currentGameId) &&
       previousGameStatus === "not-started" &&
       roomState.game.status !== "not-started") {
     showGameTransition(currentGameId);

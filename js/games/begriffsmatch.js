@@ -78,8 +78,8 @@ export function getWordMatchGuessOrder(game) {
   return firstTeam === "blue" ? ["blue", "red"] : ["red", "blue"];
 }
 
-export const wordMatchGame = {
-  id: "word-match-game",
+export const begriffsmatchGame = {
+  id: "begriffsmatch",
   name: "Begriffsmatch",
 
   start(state, participants) {

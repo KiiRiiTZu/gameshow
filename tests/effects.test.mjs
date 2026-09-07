@@ -89,13 +89,13 @@ test("ends the confetti run once every flake left the viewport", () => {
 
 test("names every game of the active sequence for the transition card", () => {
   const sequence = [
-    ["estimation-game", 1, "Mittelwert"],
-    ["guess-the-price", 2, "Thrifty"],
+    ["mittelwert", 1, "Mittelwert"],
+    ["thrifty", 2, "Thrifty"],
     ["kartenwissen", 3, "Kartenwissen"],
-    ["word-match-game", 4, "Begriffsmatch"],
-    ["ranking-game", 5, "Einordnen"],
-    ["matching-game", 6, "Da seh ich dich"],
-    ["buzzer", 7, "Buzzer Quiz"]
+    ["begriffsmatch", 4, "Begriffsmatch"],
+    ["einordnen", 5, "Einordnen"],
+    ["da-seh-ich-dich", 6, "Da seh ich dich"],
+    ["buzzer-quiz", 7, "Buzzer Quiz"]
   ];
 
   for (const [gameId, number, name] of sequence) {
@@ -113,13 +113,13 @@ test("labels both teams and falls back on a draw", () => {
 
 test("lists the seven active games in playing order", () => {
   assert.deepEqual(GAME_SEQUENCE, [
-    "estimation-game",
-    "guess-the-price",
+    "mittelwert",
+    "thrifty",
     "kartenwissen",
-    "word-match-game",
-    "ranking-game",
-    "matching-game",
-    "buzzer"
+    "begriffsmatch",
+    "einordnen",
+    "da-seh-ich-dich",
+    "buzzer-quiz"
   ]);
   // Das Bankspiel Top 20 gehört nicht zur aktiven Reihenfolge.
   assert.ok(!GAME_SEQUENCE.includes("top-20"));
@@ -127,9 +127,9 @@ test("lists the seven active games in playing order", () => {
 });
 
 test("keeps the name of an unplayed game hidden from the overview", () => {
-  const results = [{ gameId: "estimation-game", team: "blue" }];
+  const results = [{ gameId: "mittelwert", team: "blue" }];
 
-  const gespielt = getOverviewGameView("estimation-game", 0, results);
+  const gespielt = getOverviewGameView("mittelwert", 0, results);
   assert.equal(gespielt.played, true);
   assert.equal(gespielt.name, "Mittelwert", "gespielte Spiele zeigen ihren Namen");
 
@@ -142,8 +142,8 @@ test("keeps the name of an unplayed game hidden from the overview", () => {
 });
 
 test("shows the name of a drawn game even though no team won it", () => {
-  const view = getOverviewGameView("guess-the-price", 1, [
-    { gameId: "guess-the-price", team: null }
+  const view = getOverviewGameView("thrifty", 1, [
+    { gameId: "thrifty", team: null }
   ]);
 
   assert.equal(view.played, true, "ein Unentschieden ist gespielt");
@@ -154,12 +154,12 @@ test("shows the name of a drawn game even though no team won it", () => {
 
 test("highlights only the game that was just won", () => {
   const results = [
-    { gameId: "estimation-game", team: "blue" },
-    { gameId: "guess-the-price", team: "red" }
+    { gameId: "mittelwert", team: "blue" },
+    { gameId: "thrifty", team: "red" }
   ];
 
-  assert.equal(getOverviewGameView("guess-the-price", 1, results, "guess-the-price").highlighted, true);
-  assert.equal(getOverviewGameView("estimation-game", 0, results, "guess-the-price").highlighted, false);
+  assert.equal(getOverviewGameView("thrifty", 1, results, "thrifty").highlighted, true);
+  assert.equal(getOverviewGameView("mittelwert", 0, results, "thrifty").highlighted, false);
   // Ein noch nicht gespieltes Spiel blinkt nicht, auch wenn es benannt wird.
-  assert.equal(getOverviewGameView("buzzer", 6, results, "buzzer").highlighted, false);
+  assert.equal(getOverviewGameView("buzzer-quiz", 6, results, "buzzer-quiz").highlighted, false);
 });

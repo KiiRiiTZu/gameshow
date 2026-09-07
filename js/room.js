@@ -4,14 +4,26 @@ export const SHOW_WINNING_SCORE = 4;
 
 /**
  * Frühere Spiel-Ids, die noch in rooms.current_game und in gespeicherten
- * Spielzuständen stehen können. Die Ids heissen jetzt wie die Spiele:
- * "germany-map" hiess so, fragte aber längst nach Barcelona, Rom und Istanbul,
- * und "spotify-top-artists" spielt drei Listen, von denen nur eine von Spotify
+ * Spielzuständen stehen können.
+ *
+ * Jedes Spiel heisst jetzt im Code so wie in der Show. Vorher trugen die Ids
+ * technische Namen, die teils etwas anderes sagten als der Anzeigename:
+ * "germany-map" fragte längst nach Barcelona, Rom und Istanbul, und
+ * "spotify-top-artists" spielt drei Listen, von denen nur eine von Spotify
  * kommt. "europe-map" war ein Zwischenschritt auf dem Testbranch.
+ *
+ * Ohne diese Tabelle würde ein laufender Raum sein Spiel nicht wiedererkennen
+ * und auf den Anfangszustand zurückfallen.
  */
 const LEGACY_GAME_IDS = {
+  "estimation-game": "mittelwert",
+  "guess-the-price": "thrifty",
   "germany-map": "kartenwissen",
   "europe-map": "kartenwissen",
+  "word-match-game": "begriffsmatch",
+  "ranking-game": "einordnen",
+  "matching-game": "da-seh-ich-dich",
+  buzzer: "buzzer-quiz",
   "spotify-top-artists": "top-20"
 };
 
@@ -31,7 +43,7 @@ function emptyTeamScores() {
 
 function createInitialGame() {
   return {
-    id: "estimation-game",
+    id: "mittelwert",
     status: "not-started",
     roundIndex: 0,
     roundScores: emptyTeamScores(),
@@ -61,7 +73,7 @@ function upgradePersistedGameScores(game, legacyScores) {
     scoreSystemVersion: SCORE_SYSTEM_VERSION
   };
 
-  if (game.id === "buzzer") {
+  if (game.id === "buzzer-quiz") {
     upgradedGame.scores = normalizeTeamScores(legacyScores);
   }
 
@@ -71,7 +83,7 @@ function upgradePersistedGameScores(game, legacyScores) {
 function inferCompletedGameScores(game, legacyScores) {
   const matchScores = emptyTeamScores();
 
-  if (game.id === "buzzer") {
+  if (game.id === "buzzer-quiz") {
     if (game.status === "finished" && game.winningTeam) matchScores[game.winningTeam] = 1;
     return matchScores;
   }
@@ -161,7 +173,7 @@ export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
     blue: room.blue_score,
     red: room.red_score
   });
-  const fallbackGame = currentGame === "estimation-game" || !currentGame
+  const fallbackGame = currentGame === "mittelwert" || !currentGame
     ? { ...createInitialGame(), status: room.game_status || "not-started" }
     : {
     id: currentGame,

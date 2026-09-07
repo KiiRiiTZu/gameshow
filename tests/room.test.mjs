@@ -46,7 +46,7 @@ test("restores room, game and accepted players from database records", () => {
   const room = {
     blue_score: 2,
     red_score: 4,
-    current_game: "buzzer",
+    current_game: "buzzer-quiz",
     game_status: "locked",
     buzzer_winner_id: "2",
     buzzer_winner_name: "B",
@@ -98,10 +98,10 @@ test("upgrades legacy buzzer points into separate quiz and match scores", () => 
   const room = {
     blue_score: 5,
     red_score: 3,
-    current_game: "buzzer",
+    current_game: "buzzer-quiz",
     game_status: "finished",
     game_state: {
-      id: "buzzer",
+      id: "buzzer-quiz",
       status: "finished",
       winner: null,
       winningTeam: "blue"
@@ -118,12 +118,12 @@ test("records which team won which game and keeps the playing order", () => {
   const state = createInitialRoomState("TEST");
 
   assert.deepEqual(state.gameResults, []);
-  assert.equal(recordGameResult(state, "estimation-game", "blue"), true);
-  assert.equal(recordGameResult(state, "guess-the-price", "red"), true);
+  assert.equal(recordGameResult(state, "mittelwert", "blue"), true);
+  assert.equal(recordGameResult(state, "thrifty", "red"), true);
 
   assert.deepEqual(state.gameResults, [
-    { gameId: "estimation-game", team: "blue" },
-    { gameId: "guess-the-price", team: "red" }
+    { gameId: "mittelwert", team: "blue" },
+    { gameId: "thrifty", team: "red" }
   ]);
 });
 
@@ -138,30 +138,30 @@ test("does not record the same game twice when the host renders again", () => {
 test("follows a corrected game winner instead of adding a second entry", () => {
   const state = createInitialRoomState("TEST");
 
-  recordGameResult(state, "buzzer", "blue");
-  assert.equal(recordGameResult(state, "buzzer", "red"), true);
-  assert.deepEqual(state.gameResults, [{ gameId: "buzzer", team: "red" }]);
+  recordGameResult(state, "buzzer-quiz", "blue");
+  assert.equal(recordGameResult(state, "buzzer-quiz", "red"), true);
+  assert.deepEqual(state.gameResults, [{ gameId: "buzzer-quiz", team: "red" }]);
 });
 
 test("stores a drawn game without a winning team", () => {
   const state = createInitialRoomState("TEST");
 
-  recordGameResult(state, "word-match-game", null);
-  assert.deepEqual(state.gameResults, [{ gameId: "word-match-game", team: null }]);
+  recordGameResult(state, "begriffsmatch", null);
+  assert.deepEqual(state.gameResults, [{ gameId: "begriffsmatch", team: null }]);
 });
 
 test("drops damaged entries when restoring the game results", () => {
   const restored = normalizeGameResults([
-    { gameId: "estimation-game", team: "blue" },
-    { gameId: "estimation-game", team: "red" },
-    { gameId: "guess-the-price", team: "gruen" },
+    { gameId: "mittelwert", team: "blue" },
+    { gameId: "mittelwert", team: "red" },
+    { gameId: "thrifty", team: "gruen" },
     { gameId: "", team: "blue" },
     null
   ]);
 
   assert.deepEqual(restored, [
-    { gameId: "estimation-game", team: "blue" },
-    { gameId: "guess-the-price", team: null }
+    { gameId: "mittelwert", team: "blue" },
+    { gameId: "thrifty", team: null }
   ]);
   assert.deepEqual(normalizeGameResults("kaputt"), []);
 });
@@ -214,12 +214,26 @@ test("prevents a second entry under the same name while the team still has room"
 });
 
 test("translates renamed game ids so existing rooms keep working", () => {
-  assert.equal(normalizeGameId("germany-map"), "kartenwissen");
-  assert.equal(normalizeGameId("europe-map"), "kartenwissen");
-  assert.equal(normalizeGameId("spotify-top-artists"), "top-20");
+  const alt = {
+    "estimation-game": "mittelwert",
+    "guess-the-price": "thrifty",
+    "germany-map": "kartenwissen",
+    "europe-map": "kartenwissen",
+    "word-match-game": "begriffsmatch",
+    "ranking-game": "einordnen",
+    "matching-game": "da-seh-ich-dich",
+    buzzer: "buzzer-quiz",
+    "spotify-top-artists": "top-20"
+  };
+  for (const [alteId, neueId] of Object.entries(alt)) {
+    assert.equal(normalizeGameId(alteId), neueId, alteId);
+  }
+
   // Aktuelle und unbekannte Ids bleiben unberührt.
-  assert.equal(normalizeGameId("kartenwissen"), "kartenwissen");
-  assert.equal(normalizeGameId("buzzer"), "buzzer");
+  for (const neueId of Object.values(alt)) {
+    assert.equal(normalizeGameId(neueId), neueId, neueId);
+  }
+  assert.equal(normalizeGameId("gibt-es-nicht"), "gibt-es-nicht");
   assert.equal(normalizeGameId(undefined), undefined);
 });
 

@@ -1,30 +1,30 @@
-import { BUZZER_WINNING_SCORE } from "./games/buzzer.js";
+import { BUZZER_WINNING_SCORE } from "./games/buzzer-quiz.js";
 import { TOP_20_ROUNDS_TO_WIN } from "./games/top-20.js";
-import { RANKING_ROUNDS_TO_WIN } from "./games/ranking-game.js";
+import { RANKING_ROUNDS_TO_WIN } from "./games/einordnen.js";
 import { KARTENWISSEN_ROUNDS_TO_WIN } from "./games/kartenwissen.js";
-import { MATCHING_GAME_ROUNDS } from "./games/matching-game.js";
-import { PRICE_GAME_WINNING_SCORE } from "./games/guess-the-price.js";
-import { ESTIMATION_ROUNDS_TO_WIN } from "./games/estimation-game.js";
-import { WORD_MATCH_CATEGORIES, WORD_MATCH_TERM_COUNT } from "./games/word-match-game.js";
+import { MATCHING_GAME_ROUNDS } from "./games/da-seh-ich-dich.js";
+import { PRICE_GAME_WINNING_SCORE } from "./games/thrifty.js";
+import { ESTIMATION_ROUNDS_TO_WIN } from "./games/mittelwert.js";
+import { WORD_MATCH_CATEGORIES, WORD_MATCH_TERM_COUNT } from "./games/begriffsmatch.js";
 
 const GAME_SCORE_CONFIG = {
-  buzzer: { key: "scores", label: "Quizpunkte" },
+  "buzzer-quiz": { key: "scores", label: "Quizpunkte" },
   "top-20": { key: "roundWins", label: "Rundensiege" },
-  "ranking-game": { key: "roundWins", label: "Listensiege" },
+  "einordnen": { key: "roundWins", label: "Listensiege" },
   "kartenwissen": { key: "roundScores", label: "Kartenpunkte" },
-  "matching-game": { key: "scores", label: "Übereinstimmungen" },
-  "guess-the-price": { key: "roundScores", label: "Rundensiege" },
-  "estimation-game": { key: "roundScores", label: "Rundensiege" },
-  "word-match-game": { key: "scores", label: "Treffer" }
+  "da-seh-ich-dich": { key: "scores", label: "Übereinstimmungen" },
+  "thrifty": { key: "roundScores", label: "Rundensiege" },
+  "mittelwert": { key: "roundScores", label: "Rundensiege" },
+  "begriffsmatch": { key: "scores", label: "Treffer" }
 };
 
 const FIXED_WINNING_SCORES = {
-  buzzer: BUZZER_WINNING_SCORE,
+  "buzzer-quiz": BUZZER_WINNING_SCORE,
   "top-20": TOP_20_ROUNDS_TO_WIN,
-  "ranking-game": RANKING_ROUNDS_TO_WIN,
+  "einordnen": RANKING_ROUNDS_TO_WIN,
   "kartenwissen": KARTENWISSEN_ROUNDS_TO_WIN,
-  "guess-the-price": PRICE_GAME_WINNING_SCORE,
-  "estimation-game": ESTIMATION_ROUNDS_TO_WIN
+  "thrifty": PRICE_GAME_WINNING_SCORE,
+  "mittelwert": ESTIMATION_ROUNDS_TO_WIN
 };
 
 function normalizeScore(value) {
@@ -48,13 +48,13 @@ function manualWinningTeam(game, editedTeam) {
   if (fixedTarget && score[editedTeam] >= fixedTarget) return editedTeam;
 
   const opponent = otherTeam(editedTeam);
-  if (game.id === "matching-game") {
+  if (game.id === "da-seh-ich-dich") {
     if (game.tiebreak) return score[editedTeam] > score[opponent] ? editedTeam : null;
     const remainingPoints = remainingRegularRounds(game, MATCHING_GAME_ROUNDS.length) * 4;
     return score[editedTeam] > score[opponent] + remainingPoints ? editedTeam : null;
   }
 
-  if (game.id === "word-match-game") {
+  if (game.id === "begriffsmatch") {
     const remainingPoints = game.tiebreak
       ? game.tiebreak.claimedBy.filter((team) => !team).length
       : remainingRegularRounds(game, WORD_MATCH_CATEGORIES.length) * WORD_MATCH_TERM_COUNT;
@@ -86,7 +86,7 @@ export function getModeratorGameScore(game) {
   const config = GAME_SCORE_CONFIG[game?.id];
   if (!config) return null;
 
-  const scoreTarget = game.id === "word-match-game" && game.tiebreak?.scores
+  const scoreTarget = game.id === "begriffsmatch" && game.tiebreak?.scores
     ? game.tiebreak.scores
     : game[config.key];
   if (!scoreTarget || typeof scoreTarget !== "object") return null;

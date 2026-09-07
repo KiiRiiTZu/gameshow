@@ -2,26 +2,26 @@ import { burstConfetti, stopConfetti } from "./confetti.js";
 import { SHOW_WINNING_SCORE } from "./room.js";
 
 const GAME_PRESENTATIONS = {
-  "estimation-game": { number: 1, name: "Mittelwert" },
-  "matching-game": { number: 6, name: "Da seh ich dich" },
+  "mittelwert": { number: 1, name: "Mittelwert" },
+  "da-seh-ich-dich": { number: 6, name: "Da seh ich dich" },
   "kartenwissen": { number: 3, name: "Kartenwissen" },
-  "word-match-game": { number: 4, name: "Begriffsmatch" },
-  "ranking-game": { number: 5, name: "Einordnen" },
+  "begriffsmatch": { number: 4, name: "Begriffsmatch" },
+  "einordnen": { number: 5, name: "Einordnen" },
   "top-20": { number: 5, name: "Top 20" },
-  "guess-the-price": { number: 2, name: "Thrifty" },
-  buzzer: { number: 7, name: "Buzzer Quiz" }
+  "thrifty": { number: 2, name: "Thrifty" },
+  "buzzer-quiz": { number: 7, name: "Buzzer Quiz" }
 };
 
 // Reihenfolge der aktiven Spiele. Die Nummer auf Übergangskarte und
 // Punkteübersicht ergibt sich aus dieser Liste, nicht aus einer zweiten Tabelle.
 export const GAME_SEQUENCE = [
-  "estimation-game",
-  "guess-the-price",
+  "mittelwert",
+  "thrifty",
   "kartenwissen",
-  "word-match-game",
-  "ranking-game",
-  "matching-game",
-  "buzzer"
+  "begriffsmatch",
+  "einordnen",
+  "da-seh-ich-dich",
+  "buzzer-quiz"
 ];
 
 // Ablauf der Übergangskarte. Die Werte werden als CSS-Variablen gesetzt,
