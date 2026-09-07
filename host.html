@@ -88,18 +88,18 @@
       <p id="buzzer-next-game-error" class="error"></p>
     </section>
 
-    <section id="spotify-game-panel" class="card game-panel hidden">
+    <section id="top20-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
           <p class="eyebrow">SPIEL 5 · BEST OF 3</p>
           <h2 id="top20-title">Top 20</h2>
           <p id="top20-description" class="muted"></p>
         </div>
-        <span id="spotify-status" class="status-pill">Läuft</span>
+        <span id="top20-status" class="status-pill">Läuft</span>
       </div>
 
-      <div class="spotify-meta">
-        <div id="spotify-turn" class="turn-card blue">Team Blau ist dran</div>
+      <div class="top20-meta">
+        <div id="top20-turn" class="turn-card blue">Team Blau ist dran</div>
         <div class="strike-board">
           <span>Blau: <strong id="blue-strikes">—</strong></span>
           <span>Rot: <strong id="red-strikes">—</strong></span>
@@ -108,14 +108,14 @@
       <div id="top20-round-wins" class="round-wins">Rundensiege · Blau <strong id="top20-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="blue">0</strong> : <strong id="top20-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" data-score-scope="game" data-score-team="red">0</strong> Rot</div>
 
       <div class="top20-actions">
-        <button id="spotify-miss" class="button danger" type="button">✕ Nicht dabei</button>
+        <button id="top20-miss" class="button danger" type="button">✕ Nicht dabei</button>
       </div>
 
-      <p id="spotify-error" class="error"></p>
-      <div id="spotify-board" class="spotify-board"></div>
+      <p id="top20-error" class="error"></p>
+      <div id="top20-board" class="top20-board"></div>
 
-      <div id="spotify-finished" class="game-finished hidden">
-        <p id="spotify-winner-message"></p>
+      <div id="top20-finished" class="game-finished hidden">
+        <p id="top20-winner-message"></p>
         <button id="next-top20-round" class="button primary">Nächste Liste starten</button>
         <button id="start-buzzer-game-after-top20" class="button primary hidden">Buzzer Quiz starten</button>
       </div>
@@ -177,7 +177,7 @@
         <h3 id="map-question"></h3>
       </div>
 
-      <div id="host-germany-map" class="europe-map"></div>
+      <div id="host-europe-map" class="europe-map"></div>
 
       <div class="map-legend" aria-label="Kartenlegende">
         <span><i class="legend-dot blue"></i> Team Blau</span>

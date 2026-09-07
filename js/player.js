@@ -6,7 +6,7 @@ import {
 import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound, unlockBuzzerSound } from "./audio.js";
-import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
+import { EUROPE_MAP_QUESTIONS } from "./games/europe-map.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
 import { captureRankingMove, isRankingMotionPending, playRankingMove } from "./ranking-motion.js";
 import { createEuropeMap } from "./europe-map-view.js";
@@ -40,10 +40,10 @@ import { renderScoreOverview, showGameTransition, showGameWinner } from "./game-
 import { getModeratorGameScore } from "./moderator-score.js";
 import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
 
-const TOP_20_GAME_ID = "spotify-top-artists";
+const TOP_20_GAME_ID = "top-20";
 const RANKING_GAME_ID = "ranking-game";
 const TOP_20_SLOT_COUNT = 20;
-const GERMANY_MAP_GAME_ID = "germany-map";
+const EUROPE_MAP_GAME_ID = "europe-map";
 const MATCHING_GAME_ID = "matching-game";
 const PRICE_GAME_ID = "guess-the-price";
 const ESTIMATION_GAME_ID = "estimation-game";
@@ -198,11 +198,11 @@ async function initializePlayer() {
     showPlayerGame();
   }
 
-  playerMap = createEuropeMap($("player-germany-map"), {
+  playerMap = createEuropeMap($("player-europe-map"), {
     enableZoom: true,
     compactMarkers: true,
     async onPlacePin(position) {
-      if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
+      if (!player || roomState?.game?.id !== EUROPE_MAP_GAME_ID ||
           roomState.game.status !== "placing" || roomState.game.lockedTeams?.[player.team]) return;
 
       await realtime.send("map_pin", { playerId, position });
@@ -321,7 +321,7 @@ function teamChatIsWritable() {
   if (roomState.game.id === RANKING_GAME_ID) {
     return ["playing", "ready-to-reveal"].includes(roomState.game.status);
   }
-  if (roomState.game.id === GERMANY_MAP_GAME_ID) {
+  if (roomState.game.id === EUROPE_MAP_GAME_ID) {
     return roomState.game.status === "placing" && !roomState.game.lockedTeams?.[player.team];
   }
   if (roomState.game.id === PRICE_GAME_ID) {
@@ -393,7 +393,7 @@ document.addEventListener("submit", async (event) => {
 });
 
 $("lock-map-pin").addEventListener("click", async () => {
-  if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
+  if (!player || roomState?.game?.id !== EUROPE_MAP_GAME_ID ||
       roomState.game.status !== "placing" || !roomState.game.pins?.[player.team] ||
       roomState.game.lockedTeams?.[player.team]) return;
 
@@ -852,22 +852,22 @@ function render() {
     ? `🏆 ${getTeamName(showWinner)} gewinnt die Gameshow mit ${roomState.scores[showWinner]} Spielpunkten!`
     : "";
 
-  const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
+  const top20IsActive = roomState.game?.id === TOP_20_GAME_ID;
   const rankingIsActive = roomState.game?.id === RANKING_GAME_ID;
-  const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
+  const mapIsActive = roomState.game?.id === EUROPE_MAP_GAME_ID;
   const matchingIsActive = roomState.game?.id === MATCHING_GAME_ID;
   const priceIsActive = roomState.game?.id === PRICE_GAME_ID;
   const estimationIsActive = roomState.game?.id === ESTIMATION_GAME_ID;
   const wordMatchIsActive = roomState.game?.id === WORD_MATCH_GAME_ID;
   document.querySelector(".player-shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("player-buzzer-game").classList.toggle(
     "hidden",
-    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
-  $("player-spotify-game").classList.toggle("hidden", !spotifyIsActive);
+  $("player-top20-game").classList.toggle("hidden", !top20IsActive);
   $("player-ranking-game").classList.toggle("hidden", !rankingIsActive);
   $("player-map-game").classList.toggle("hidden", !mapIsActive);
   $("player-matching-game").classList.toggle("hidden", !matchingIsActive);
@@ -905,8 +905,8 @@ function render() {
     return;
   }
 
-  if (spotifyIsActive) {
-    renderSpotifyGame();
+  if (top20IsActive) {
+    renderTop20Game();
     return;
   }
 
@@ -998,7 +998,7 @@ function renderPlayerTeamChat(containerId, writable) {
   button.disabled = !writable || !teamChatDraft.trim();
 }
 
-function renderSpotifyGame() {
+function renderTop20Game() {
   const game = roomState.game;
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
@@ -1009,18 +1009,18 @@ function renderSpotifyGame() {
   $("player-top20-description").textContent = game.listDescription || "";
   $("player-top20-round-wins").textContent =
     `Rundensiege · Blau ${game.roundWins.blue} : ${game.roundWins.red} Rot`;
-  $("player-spotify-turn").textContent = isFinished
+  $("player-top20-turn").textContent = isFinished
     ? `${getTeamName(game.winningTeam)} gewinnt das Spiel!`
     : isRoundFinished
       ? `${getTeamName(game.roundWinner)} gewinnt Runde ${roundNumber}!`
     : `${getTeamName(game.currentTeam)} ist dran`;
-  $("player-spotify-turn").className = `turn-card ${displayTeam}`;
+  $("player-top20-turn").className = `turn-card ${displayTeam}`;
   $("player-blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("player-red-strikes").textContent = renderStrikes(game.strikes?.red);
-  $("player-spotify-board").innerHTML = renderSpotifySlots(game.revealed);
+  $("player-top20-board").innerHTML = renderTop20Slots(game.revealed);
   renderPlayerTeamChat("player-top20-chat", teamChatIsWritable());
-  $("player-spotify-result").classList.toggle("hidden", !isFinished && !isRoundFinished);
-  $("player-spotify-result").textContent = isFinished
+  $("player-top20-result").classList.toggle("hidden", !isFinished && !isRoundFinished);
+  $("player-top20-result").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20!`
     : isRoundFinished
       ? `Liste ${roundNumber} ist beendet. Wartet auf die nächste Liste.`
@@ -1146,7 +1146,7 @@ function renderPersonalNoteFields(containerId, notes = {}, ownEditable = true) {
   }
 }
 
-function renderSpotifySlots(revealed = []) {
+function renderTop20Slots(revealed = []) {
   return Array.from({ length: TOP_20_SLOT_COUNT }, (_, index) => {
     const slot = revealed[index];
     const teamClass = slot?.team || "empty";
@@ -1156,7 +1156,7 @@ function renderSpotifySlots(revealed = []) {
       : "";
 
     return `
-      <div class="spotify-slot ${teamClass}">
+      <div class="top20-slot ${teamClass}">
         <span class="rank">${index + 1}</span>
         <span class="artist">${answer}${value}</span>
       </div>
@@ -1166,7 +1166,7 @@ function renderSpotifySlots(revealed = []) {
 
 function renderMapGame() {
   const game = roomState.game;
-  const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
+  const question = EUROPE_MAP_QUESTIONS[game.roundIndex];
   const isPending = game.status === "round-pending";
   const isFinished = game.status === "finished";
   const hasRoundResult = Number.isFinite(game.distances?.blue) && Number.isFinite(game.distances?.red);
@@ -1176,7 +1176,7 @@ function renderMapGame() {
   const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
 
   $("player-map-question-number").textContent =
-    `FRAGE ${game.roundIndex + 1} VON ${GERMANY_MAP_QUESTIONS.length}`;
+    `FRAGE ${game.roundIndex + 1} VON ${EUROPE_MAP_QUESTIONS.length}`;
   $("player-map-question").textContent = isPending ? "" : question.prompt;
   $("player-map-question-number").closest(".map-question-card").classList.toggle("hidden", isPending);
   $("player-map-blue-score").textContent = game.roundScores.blue;

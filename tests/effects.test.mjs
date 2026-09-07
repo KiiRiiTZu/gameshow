@@ -91,7 +91,7 @@ test("names every game of the active sequence for the transition card", () => {
   const sequence = [
     ["estimation-game", 1, "Mittelwert"],
     ["guess-the-price", 2, "Thrifty"],
-    ["germany-map", 3, "Kartenwissen"],
+    ["europe-map", 3, "Kartenwissen"],
     ["word-match-game", 4, "Begriffsmatch"],
     ["ranking-game", 5, "Einordnen"],
     ["matching-game", 6, "Da seh ich dich"],
@@ -115,14 +115,14 @@ test("lists the seven active games in playing order", () => {
   assert.deepEqual(GAME_SEQUENCE, [
     "estimation-game",
     "guess-the-price",
-    "germany-map",
+    "europe-map",
     "word-match-game",
     "ranking-game",
     "matching-game",
     "buzzer"
   ]);
   // Das Bankspiel Top 20 gehört nicht zur aktiven Reihenfolge.
-  assert.ok(!GAME_SEQUENCE.includes("spotify-top-artists"));
+  assert.ok(!GAME_SEQUENCE.includes("top-20"));
   assert.equal(new Set(GAME_SEQUENCE).size, GAME_SEQUENCE.length, "keine Dopplungen");
 });
 

@@ -4,7 +4,7 @@
     {
       "name": "gameshow",
       "runtimeExecutable": "node",
-      "runtimeArgs": [".claude/static-server.mjs", "8000"],
+      "runtimeArgs": ["scripts/dev-server.mjs", "8000"],
       "port": 8000
     }
   ]

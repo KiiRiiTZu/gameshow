@@ -338,7 +338,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .game-finished p { font-size: 1.25rem; font-weight: 900; }
 
-.spotify-meta {
+.top20-meta {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: stretch;
@@ -543,14 +543,14 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   min-height: 0;
 }
 
-.spotify-board {
+.top20-board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 18px;
 }
 
-.spotify-slot {
+.top20-slot {
   width: 100%;
   display: grid;
   grid-template-columns: 40px 1fr;
@@ -573,7 +573,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .top20-reveal:disabled { opacity: 1; }
 .top20-reveal.empty:disabled { cursor: not-allowed; }
 
-.spotify-slot .rank {
+.top20-slot .rank {
   display: grid;
   align-self: stretch;
   place-items: center;
@@ -582,12 +582,12 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   font-weight: 900;
 }
 
-.spotify-slot .artist { display: grid; gap: 3px; padding: 10px 12px; font-weight: 800; }
-.spotify-slot .value { color: #a8adbd; font-size: .78rem; font-weight: 650; }
-.spotify-slot.blue { border-color: rgba(90,114,246,.55); }
-.spotify-slot.red { border-color: rgba(210,55,80,.55); }
-.spotify-slot.empty .artist { color: #656b7d; font-weight: 600; }
-.spotify-board.compact { grid-template-columns: 1fr; max-height: 470px; overflow: auto; }
+.top20-slot .artist { display: grid; gap: 3px; padding: 10px 12px; font-weight: 800; }
+.top20-slot .value { color: #a8adbd; font-size: .78rem; font-weight: 650; }
+.top20-slot.blue { border-color: rgba(90,114,246,.55); }
+.top20-slot.red { border-color: rgba(210,55,80,.55); }
+.top20-slot.empty .artist { color: #656b7d; font-weight: 600; }
+.top20-board.compact { grid-template-columns: 1fr; max-height: 470px; overflow: auto; }
 .player-strikes { justify-content: center; margin: 10px 0 16px; }
 
 .ranking-meta {
@@ -1738,25 +1738,25 @@ button.ranking-candidate:disabled { opacity: .72; }
     width: min(1400px, calc(100% - 48px));
   }
 
-  .spotify-board,
-  .spotify-board.compact {
+  .top20-board,
+  .top20-board.compact {
     grid-template-columns: repeat(10, minmax(0, 1fr));
     max-height: none;
     overflow: visible;
   }
 
-  .spotify-slot {
+  .top20-slot {
     grid-template-columns: 1fr;
     grid-template-rows: 36px 1fr;
     min-height: 128px;
     text-align: center;
   }
 
-  .spotify-slot .rank {
+  .top20-slot .rank {
     min-height: 36px;
   }
 
-  .spotify-slot .artist {
+  .top20-slot .artist {
     align-content: center;
     padding: 9px 7px;
     font-size: clamp(.7rem, .85vw, .88rem);
@@ -1764,7 +1764,7 @@ button.ranking-candidate:disabled { opacity: .72; }
     overflow-wrap: anywhere;
   }
 
-  .spotify-slot .value {
+  .top20-slot .value {
     font-size: .7rem;
   }
 
@@ -1803,7 +1803,7 @@ button.ranking-candidate:disabled { opacity: .72; }
   .shell { padding-top: 24px; }
   .hero-card { padding: 27px; }
   .choice-grid, .scoreboard { grid-template-columns: 1fr; }
-  .spotify-meta, .spotify-board, .top20-team-notes, .estimation-submissions,
+  .top20-meta, .top20-board, .top20-team-notes, .estimation-submissions,
   .word-match-lists, .word-match-fields { grid-template-columns: 1fr; }
   .matching-board, .price-host-layout, .player-price-layout { grid-template-columns: 1fr; }
   .top20-actions { align-items: stretch; flex-direction: column; }

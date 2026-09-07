@@ -2,6 +2,22 @@ export const TEAM_CAPACITY = 2;
 export const SCORE_SYSTEM_VERSION = 2;
 export const SHOW_WINNING_SCORE = 4;
 
+/**
+ * Frühere Spiel-Ids, die noch in rooms.current_game und in gespeicherten
+ * Spielzuständen stehen können. Die Namen wurden angeglichen, weil sie nicht
+ * mehr zum Inhalt passten: "germany-map" fragt längst nach Barcelona, Rom und
+ * Istanbul, und "spotify-top-artists" spielt drei Listen, von denen nur eine
+ * von Spotify kommt.
+ */
+const LEGACY_GAME_IDS = {
+  "germany-map": "europe-map",
+  "spotify-top-artists": "top-20"
+};
+
+export function normalizeGameId(gameId) {
+  return LEGACY_GAME_IDS[gameId] || gameId;
+}
+
 export function getShowWinner(state) {
   if ((Number(state?.scores?.blue) || 0) >= SHOW_WINNING_SCORE) return "blue";
   if ((Number(state?.scores?.red) || 0) >= SHOW_WINNING_SCORE) return "red";
@@ -119,7 +135,8 @@ export function normalizeGameResults(value) {
   const seen = new Set();
   const results = [];
   for (const entry of value) {
-    const gameId = String(entry?.gameId || "");
+    // Historien aus der Zeit vor der Umbenennung tragen noch die alten Ids.
+    const gameId = normalizeGameId(String(entry?.gameId || ""));
     if (!gameId || seen.has(gameId)) continue;
     seen.add(gameId);
     results.push({
@@ -131,20 +148,22 @@ export function normalizeGameResults(value) {
 }
 
 export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
+  // Räume aus der Zeit vor der Umbenennung tragen noch die alten Spiel-Ids.
+  const currentGame = normalizeGameId(room.current_game);
   const persistedGame = room.game_state &&
     typeof room.game_state === "object" &&
-    room.game_state.id === room.current_game
-    ? room.game_state
+    normalizeGameId(room.game_state.id) === currentGame
+    ? { ...room.game_state, id: currentGame }
     : null;
 
   const legacyScores = normalizeTeamScores({
     blue: room.blue_score,
     red: room.red_score
   });
-  const fallbackGame = room.current_game === "estimation-game" || !room.current_game
+  const fallbackGame = currentGame === "estimation-game" || !currentGame
     ? { ...createInitialGame(), status: room.game_status || "not-started" }
     : {
-    id: room.current_game,
+    id: currentGame,
     status: room.game_status || "waiting",
     winner: room.buzzer_winner_id
       ? {

@@ -14,7 +14,7 @@ import {
   buzzerGame
 } from "../js/games/buzzer.js";
 import { BUZZER_QUESTIONS } from "../js/games/buzzer-questions.js";
-import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/spotify-top-artists.js";
+import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/top-20.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT } from "../js/games/top-20-lists.js";
 import {
   RANKING_MAX_STRIKES,
@@ -23,11 +23,11 @@ import {
 } from "../js/games/ranking-game.js";
 import { RANKING_LISTS } from "../js/games/ranking-lists.js";
 import {
-  GERMANY_MAP_QUESTIONS,
-  GERMANY_MAP_ROUNDS_TO_WIN,
+  EUROPE_MAP_QUESTIONS,
+  EUROPE_MAP_ROUNDS_TO_WIN,
   distanceInKilometers,
-  germanyMapGame
-} from "../js/games/germany-map.js";
+  europeMapGame
+} from "../js/games/europe-map.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
@@ -105,7 +105,7 @@ test("keeps session chat private per team and expires typing indicators", () => 
 });
 
 test("does not truncate a busy session chat after 100 messages", () => {
-  const chat = createTeamChat("spotify-top-artists");
+  const chat = createTeamChat("top-20");
   const player = { id: "b1", name: "Blau 1" };
   for (let index = 0; index < 150; index += 1) {
     addTeamChatMessage(chat, "blue", player, `Nachricht ${index + 1}`, `m${index + 1}`, index);
@@ -122,19 +122,19 @@ test("contains presentation cards for all seven games", () => {
   assert.deepEqual([
     "estimation-game",
     "guess-the-price",
-    "germany-map",
+    "europe-map",
     "word-match-game",
     "ranking-game",
     "matching-game",
     "buzzer"
   ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6, 7]);
   assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");
-  assert.equal(getGamePresentation("germany-map").name, "Kartenwissen");
+  assert.equal(getGamePresentation("europe-map").name, "Kartenwissen");
   assert.equal(getGamePresentation("matching-game").name, "Da seh ich dich");
   assert.equal(getGamePresentation("estimation-game").name, "Mittelwert");
   assert.equal(getGamePresentation("word-match-game").name, "Begriffsmatch");
   assert.equal(getGamePresentation("ranking-game").name, "Einordnen");
-  assert.equal(getGamePresentation("spotify-top-artists").name, "Top 20");
+  assert.equal(getGamePresentation("top-20").name, "Top 20");
 });
 
 test("contains the three prepared Einordnen lists and their anchors", () => {
@@ -244,9 +244,9 @@ test("finishes cumulative games once a manually entered lead is unreachable", ()
 test("maps every game to the score shown to the moderator", () => {
   const cases = [
     ["buzzer", "scores"],
-    ["spotify-top-artists", "roundWins"],
+    ["top-20", "roundWins"],
     ["ranking-game", "roundWins"],
-    ["germany-map", "roundScores"],
+    ["europe-map", "roundScores"],
     ["matching-game", "scores"],
     ["guess-the-price", "roundScores"],
     ["estimation-game", "roundScores"],
@@ -701,7 +701,7 @@ test("contains three complete prepared Top 20 lists", () => {
   ]);
 });
 
-test("normalizes a persisted single-round Spotify state", () => {
+test("normalizes a persisted single-round Top 20 state", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
     id: top20Game.id,
@@ -724,14 +724,14 @@ test("normalizes a persisted single-round Spotify state", () => {
 });
 
 test("contains seven prepared Europe map questions", () => {
-  assert.equal(GERMANY_MAP_QUESTIONS.length, 7);
-  assert.ok(GERMANY_MAP_QUESTIONS.every((question) =>
+  assert.equal(EUROPE_MAP_QUESTIONS.length, 7);
+  assert.ok(EUROPE_MAP_QUESTIONS.every((question) =>
     question.prompt && question.answer && Number.isFinite(question.target.lat) && Number.isFinite(question.target.lng)
   ));
 });
 
 test("uses the seven requested European destinations", () => {
-  const answers = GERMANY_MAP_QUESTIONS.map((question) => question.answer);
+  const answers = EUROPE_MAP_QUESTIONS.map((question) => question.answer);
   assert.deepEqual(answers, [
     "Sagrada Família · Barcelona, Spanien",
     "Kolosseum · Rom, Italien",
@@ -741,7 +741,7 @@ test("uses the seven requested European destinations", () => {
     "Stonehenge · nahe Amesbury/Salisbury, England",
     "Atomium · Brüssel, Belgien"
   ]);
-  assert.deepEqual(GERMANY_MAP_QUESTIONS.map((question) => question.location), [
+  assert.deepEqual(EUROPE_MAP_QUESTIONS.map((question) => question.location), [
     "Barcelona, Spanien",
     "Rom, Italien",
     "Warschau, Polen",
@@ -751,7 +751,7 @@ test("uses the seven requested European destinations", () => {
     "Brüssel, Belgien"
   ]);
   assert.equal(
-    GERMANY_MAP_QUESTIONS[4].prompt,
+    EUROPE_MAP_QUESTIONS[4].prompt,
     "Wo steht die Hagia Sophia, eine der historisch bedeutendsten Moscheen der Welt?"
   );
 });
@@ -781,18 +781,18 @@ test("calculates geographic distances in kilometers", () => {
 
 test("shares one map pin per team and awards the closer team", () => {
   const state = createInitialRoomState("TEST");
-  germanyMapGame.start(state);
+  europeMapGame.start(state);
   assert.equal(state.game.status, "round-pending");
-  assert.equal(germanyMapGame.startFirstRound(state), true);
-  const target = GERMANY_MAP_QUESTIONS[0].target;
+  assert.equal(europeMapGame.startFirstRound(state), true);
+  const target = EUROPE_MAP_QUESTIONS[0].target;
 
-  assert.equal(germanyMapGame.placePin(state, "blue", { lat: 53.5, lng: 10 }), true);
-  assert.equal(germanyMapGame.placePin(state, "blue", target), true);
+  assert.equal(europeMapGame.placePin(state, "blue", { lat: 53.5, lng: 10 }), true);
+  assert.equal(europeMapGame.placePin(state, "blue", target), true);
   assert.deepEqual(state.game.pins.blue, target);
-  assert.equal(germanyMapGame.placePin(state, "red", { lat: 52.52, lng: 13.405 }), true);
-  assert.equal(germanyMapGame.lockTeam(state, "blue"), true);
-  assert.equal(germanyMapGame.lockTeam(state, "red"), true);
-  assert.equal(germanyMapGame.revealRound(state), true);
+  assert.equal(europeMapGame.placePin(state, "red", { lat: 52.52, lng: 13.405 }), true);
+  assert.equal(europeMapGame.lockTeam(state, "blue"), true);
+  assert.equal(europeMapGame.lockTeam(state, "red"), true);
+  assert.equal(europeMapGame.revealRound(state), true);
   assert.equal(state.game.roundWinner, "blue");
   assert.deepEqual(state.game.roundScores, { blue: 1, red: 0 });
   assert.equal(state.game.distances.blue, 0);
@@ -800,23 +800,23 @@ test("shares one map pin per team and awards the closer team", () => {
 
 test("finishes the best of seven map game at four points", () => {
   const state = createInitialRoomState("TEST");
-  germanyMapGame.start(state);
-  germanyMapGame.startFirstRound(state);
-  state.game.roundScores.blue = GERMANY_MAP_ROUNDS_TO_WIN - 1;
-  const target = GERMANY_MAP_QUESTIONS[0].target;
+  europeMapGame.start(state);
+  europeMapGame.startFirstRound(state);
+  state.game.roundScores.blue = EUROPE_MAP_ROUNDS_TO_WIN - 1;
+  const target = EUROPE_MAP_QUESTIONS[0].target;
 
-  germanyMapGame.placePin(state, "blue", target);
-  germanyMapGame.placePin(state, "red", { lat: 53.5, lng: 10 });
-  germanyMapGame.lockTeam(state, "blue");
-  germanyMapGame.lockTeam(state, "red");
-  germanyMapGame.revealRound(state);
+  europeMapGame.placePin(state, "blue", target);
+  europeMapGame.placePin(state, "red", { lat: 53.5, lng: 10 });
+  europeMapGame.lockTeam(state, "blue");
+  europeMapGame.lockTeam(state, "red");
+  europeMapGame.revealRound(state);
 
   assert.equal(state.game.status, "revealed");
-  assert.equal(germanyMapGame.startNextRound(state), true);
+  assert.equal(europeMapGame.startNextRound(state), true);
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "blue");
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(germanyMapGame.startNextRound(state), false);
+  assert.equal(europeMapGame.startNextRound(state), false);
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
 });
 

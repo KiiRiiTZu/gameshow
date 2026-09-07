@@ -4,10 +4,10 @@ import { SHOW_WINNING_SCORE } from "./room.js";
 const GAME_PRESENTATIONS = {
   "estimation-game": { number: 1, name: "Mittelwert" },
   "matching-game": { number: 6, name: "Da seh ich dich" },
-  "germany-map": { number: 3, name: "Kartenwissen" },
+  "europe-map": { number: 3, name: "Kartenwissen" },
   "word-match-game": { number: 4, name: "Begriffsmatch" },
   "ranking-game": { number: 5, name: "Einordnen" },
-  "spotify-top-artists": { number: 5, name: "Top 20" },
+  "top-20": { number: 5, name: "Top 20" },
   "guess-the-price": { number: 2, name: "Thrifty" },
   buzzer: { number: 7, name: "Buzzer Quiz" }
 };
@@ -17,7 +17,7 @@ const GAME_PRESENTATIONS = {
 export const GAME_SEQUENCE = [
   "estimation-game",
   "guess-the-price",
-  "germany-map",
+  "europe-map",
   "word-match-game",
   "ranking-game",
   "matching-game",

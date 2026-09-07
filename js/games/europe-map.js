@@ -1,6 +1,6 @@
-export const GERMANY_MAP_ROUNDS_TO_WIN = 4;
+export const EUROPE_MAP_ROUNDS_TO_WIN = 4;
 
-export const GERMANY_MAP_QUESTIONS = [
+export const EUROPE_MAP_QUESTIONS = [
   {
     prompt: "Wo befindet sich die Sagrada Família?",
     answer: "Sagrada Família · Barcelona, Spanien",
@@ -70,8 +70,8 @@ export function distanceInKilometers(first, second) {
   return earthRadius * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
-export const germanyMapGame = {
-  id: "germany-map",
+export const europeMapGame = {
+  id: "europe-map",
   name: "Kartenwissen",
 
   start(state) {
@@ -100,7 +100,7 @@ export const germanyMapGame = {
     if (state.game.id !== this.id) return false;
     state.game.roundIndex = Math.min(
       Math.max(Number(state.game.roundIndex) || 0, 0),
-      GERMANY_MAP_QUESTIONS.length - 1
+      EUROPE_MAP_QUESTIONS.length - 1
     );
     state.game.roundScores = {
       blue: Number(state.game.roundScores?.blue) || 0,
@@ -144,7 +144,7 @@ export const germanyMapGame = {
     if (!state.game.pins.blue || !state.game.pins.red ||
         !state.game.lockedTeams.blue || !state.game.lockedTeams.red) return false;
 
-    const question = GERMANY_MAP_QUESTIONS[state.game.roundIndex];
+    const question = EUROPE_MAP_QUESTIONS[state.game.roundIndex];
     const blueDistance = distanceInKilometers(state.game.pins.blue, question.target);
     const redDistance = distanceInKilometers(state.game.pins.red, question.target);
     const winner = blueDistance <= redDistance ? "blue" : "red";
@@ -160,9 +160,9 @@ export const germanyMapGame = {
     if (state.game.id !== this.id || state.game.status !== "revealed") return false;
 
     const winner = ["blue", "red"].find(
-      (team) => state.game.roundScores[team] >= GERMANY_MAP_ROUNDS_TO_WIN
+      (team) => state.game.roundScores[team] >= EUROPE_MAP_ROUNDS_TO_WIN
     );
-    const lastQuestionPlayed = state.game.roundIndex >= GERMANY_MAP_QUESTIONS.length - 1;
+    const lastQuestionPlayed = state.game.roundIndex >= EUROPE_MAP_QUESTIONS.length - 1;
 
     if (winner || lastQuestionPlayed) {
       state.game.status = "finished";
