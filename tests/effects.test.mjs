@@ -1,0 +1,105 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+
+import {
+  CONFETTI_PARTICLE_COUNT,
+  advanceConfetti,
+  createConfettiParticles,
+  getConfettiPalette
+} from "../js/confetti.js";
+import { getGamePresentation, getTeamLabel } from "../js/game-effects.js";
+
+const VIEWPORT = { width: 1280, height: 720 };
+
+function newParticles(team = "blue") {
+  return createConfettiParticles(VIEWPORT.width, VIEWPORT.height, getConfettiPalette(team));
+}
+
+test("uses a distinct confetti palette per team", () => {
+  const blue = getConfettiPalette("blue");
+  const red = getConfettiPalette("red");
+
+  assert.ok(blue.includes("#5a72f6"), "Blau enthält die Teamfarbe");
+  assert.ok(red.includes("#e14c65"), "Rot enthält die Teamfarbe");
+  assert.notDeepEqual(blue, red);
+  // Unbekannte oder fehlende Teams bekommen eine neutrale Palette statt zu scheitern.
+  assert.ok(getConfettiPalette(null).length > 0);
+  assert.ok(getConfettiPalette("gruen").length > 0);
+});
+
+test("fires confetti from both lower corners toward the middle", () => {
+  const particles = newParticles();
+
+  assert.equal(particles.length, CONFETTI_PARTICLE_COUNT);
+  assert.ok(particles.every((item) => item.y > VIEWPORT.height * 0.9), "startet am unteren Rand");
+  assert.ok(particles.every((item) => item.vy < 0), "fliegt zuerst nach oben");
+
+  const fromLeft = particles.filter((item) => item.x < VIEWPORT.width / 2);
+  const fromRight = particles.filter((item) => item.x > VIEWPORT.width / 2);
+  assert.equal(fromLeft.length, CONFETTI_PARTICLE_COUNT / 2);
+  assert.equal(fromRight.length, CONFETTI_PARTICLE_COUNT / 2);
+  assert.ok(fromLeft.every((item) => item.vx > 0), "linke Kanone schießt nach rechts");
+  assert.ok(fromRight.every((item) => item.vx < 0), "rechte Kanone schießt nach links");
+});
+
+test("lets confetti rise before gravity pulls it down again", () => {
+  const particles = newParticles();
+  const startY = particles.map((item) => item.y);
+  // Der Scheitelpunkt liegt je nach Startgeschwindigkeit bei rund 55 Schritten,
+  // deshalb wird er über den ganzen Lauf gemessen statt zu einem festen Zeitpunkt.
+  const peakY = [...startY];
+
+  for (let step = 0; step < 400; step += 1) {
+    advanceConfetti(particles, VIEWPORT.height);
+    particles.forEach((item, index) => {
+      peakY[index] = Math.min(peakY[index], item.y);
+    });
+  }
+
+  assert.ok(
+    peakY.every((value, index) => value < startY[index] - 100),
+    "jede Flocke steigt deutlich über ihren Startpunkt"
+  );
+  assert.ok(
+    particles.every((item, index) => item.y > peakY[index]),
+    "und fällt anschließend wieder unter ihren Scheitelpunkt"
+  );
+});
+
+test("ends the confetti run once every flake left the viewport", () => {
+  const particles = newParticles();
+
+  let visible = CONFETTI_PARTICLE_COUNT;
+  let steps = 0;
+  while (visible > 0 && steps < 2000) {
+    visible = advanceConfetti(particles, VIEWPORT.height);
+    steps += 1;
+  }
+
+  assert.equal(visible, 0, "der Lauf endet von selbst");
+  assert.ok(steps < 2000, `braucht ${steps} Schritte und läuft nicht endlos`);
+});
+
+test("names every game of the active sequence for the transition card", () => {
+  const sequence = [
+    ["estimation-game", 1, "Mittelwert"],
+    ["guess-the-price", 2, "Thrifty"],
+    ["germany-map", 3, "Kartenwissen"],
+    ["word-match-game", 4, "Begriffsmatch"],
+    ["ranking-game", 5, "Einordnen"],
+    ["matching-game", 6, "Da seh ich dich"],
+    ["buzzer", 7, "Buzzer Quiz"]
+  ];
+
+  for (const [gameId, number, name] of sequence) {
+    assert.deepEqual(getGamePresentation(gameId), { number, name }, gameId);
+  }
+  // Unbekannte Spiele dürfen die Karte nicht sprengen.
+  assert.deepEqual(getGamePresentation("gibt-es-nicht"), { number: "?", name: "Nächstes Spiel" });
+});
+
+test("labels both teams and falls back on a draw", () => {
+  assert.equal(getTeamLabel("blue"), "Team Blau");
+  assert.equal(getTeamLabel("red"), "Team Rot");
+  assert.equal(getTeamLabel(null), "Kein Team");
+});

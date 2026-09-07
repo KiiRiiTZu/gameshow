@@ -54,8 +54,8 @@ import {
   exportMatchingPublicKey
 } from "./matching-crypto.js";
 import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
-import { showGameTransition } from "./game-effects.js";
-import { setModeratorScore } from "./moderator-score.js";
+import { showGameTransition, showGameWinner } from "./game-effects.js";
+import { getModeratorGameScore, setModeratorScore } from "./moderator-score.js";
 import {
   addTeamChatMessage,
   clearExpiredTeamChatTyping,
@@ -458,6 +458,12 @@ async function initializeHost() {
   render();
 }
 
+function gameWinnerDetail(game) {
+  const score = getModeratorGameScore(game);
+  if (!score) return "";
+  return `${score.label} ${score.scores.blue} : ${score.scores.red}`;
+}
+
 function renderGameEffects() {
   const gameId = state.game.id;
 
@@ -467,6 +473,11 @@ function renderGameEffects() {
       previousGameStatus === "not-started" &&
       state.game.status !== "not-started") {
     showGameTransition(gameId);
+  } else if (previousGameId === gameId && previousGameStatus &&
+      previousGameStatus !== "finished" && state.game.status === "finished") {
+    // Erst der Übergang von "läuft" auf "beendet" feiert — ein Reload in ein
+    // bereits beendetes Spiel startet kein Konfetti.
+    showGameWinner(gameId, state.game.winningTeam, gameWinnerDetail(state.game));
   }
 
   previousGameId = gameId;

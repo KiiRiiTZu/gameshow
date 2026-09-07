@@ -36,7 +36,8 @@ import {
   encryptPrivatePayload,
   exportEncryptionPublicKey
 } from "./private-channel-crypto.js";
-import { showGameTransition } from "./game-effects.js";
+import { showGameTransition, showGameWinner } from "./game-effects.js";
+import { getModeratorGameScore } from "./moderator-score.js";
 import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
 
 const TOP_20_GAME_ID = "spotify-top-artists";
@@ -783,6 +784,12 @@ async function handleEvent(event, payload) {
   }
 }
 
+function gameWinnerDetail(game) {
+  const score = getModeratorGameScore(game);
+  if (!score) return "";
+  return `${score.label} ${score.scores.blue} : ${score.scores.red}`;
+}
+
 function render() {
   if (!joined || !roomState) return;
 
@@ -793,6 +800,11 @@ function render() {
       previousGameStatus === "not-started" &&
       roomState.game.status !== "not-started") {
     showGameTransition(currentGameId);
+  } else if (previousGameId === currentGameId && previousGameStatus &&
+      previousGameStatus !== "finished" && roomState.game.status === "finished") {
+    // Erst der Übergang von "läuft" auf "beendet" feiert — wer in ein bereits
+    // beendetes Spiel hineinlädt, bekommt kein Konfetti.
+    showGameWinner(currentGameId, roomState.game.winningTeam, gameWinnerDetail(roomState.game));
   }
   previousGameId = currentGameId;
   previousGameStatus = roomState.game.status;
