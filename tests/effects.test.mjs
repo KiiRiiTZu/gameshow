@@ -7,7 +7,12 @@ import {
   createConfettiParticles,
   getConfettiPalette
 } from "../js/confetti.js";
-import { GAME_SEQUENCE, getGamePresentation, getTeamLabel } from "../js/game-effects.js";
+import {
+  GAME_SEQUENCE,
+  getGamePresentation,
+  getOverviewGameView,
+  getTeamLabel
+} from "../js/game-effects.js";
 
 const VIEWPORT = { width: 1280, height: 720 };
 
@@ -119,4 +124,42 @@ test("lists the seven active games in playing order", () => {
   // Das Bankspiel Top 20 gehört nicht zur aktiven Reihenfolge.
   assert.ok(!GAME_SEQUENCE.includes("spotify-top-artists"));
   assert.equal(new Set(GAME_SEQUENCE).size, GAME_SEQUENCE.length, "keine Dopplungen");
+});
+
+test("keeps the name of an unplayed game hidden from the overview", () => {
+  const results = [{ gameId: "estimation-game", team: "blue" }];
+
+  const gespielt = getOverviewGameView("estimation-game", 0, results);
+  assert.equal(gespielt.played, true);
+  assert.equal(gespielt.name, "Mittelwert", "gespielte Spiele zeigen ihren Namen");
+
+  // Kein Feld der noch offenen Spiele darf den Namen preisgeben.
+  const offen = GAME_SEQUENCE.slice(1).map((gameId, index) =>
+    getOverviewGameView(gameId, index + 1, results));
+  assert.ok(offen.every((view) => view.played === false));
+  assert.ok(offen.every((view) => view.name === null), "offene Spiele bleiben namenlos");
+  assert.ok(offen.every((view) => view.winner === null));
+});
+
+test("shows the name of a drawn game even though no team won it", () => {
+  const view = getOverviewGameView("guess-the-price", 1, [
+    { gameId: "guess-the-price", team: null }
+  ]);
+
+  assert.equal(view.played, true, "ein Unentschieden ist gespielt");
+  assert.equal(view.name, "Thrifty");
+  assert.equal(view.winner, null, "bleibt aber ohne Teamfarbe");
+  assert.equal(view.highlighted, false);
+});
+
+test("highlights only the game that was just won", () => {
+  const results = [
+    { gameId: "estimation-game", team: "blue" },
+    { gameId: "guess-the-price", team: "red" }
+  ];
+
+  assert.equal(getOverviewGameView("guess-the-price", 1, results, "guess-the-price").highlighted, true);
+  assert.equal(getOverviewGameView("estimation-game", 0, results, "guess-the-price").highlighted, false);
+  // Ein noch nicht gespieltes Spiel blinkt nicht, auch wenn es benannt wird.
+  assert.equal(getOverviewGameView("buzzer", 6, results, "buzzer").highlighted, false);
 });

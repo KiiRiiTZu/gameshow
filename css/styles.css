@@ -1546,6 +1546,14 @@ button.ranking-candidate:disabled { opacity: .72; }
   line-height: 1.25;
 }
 
+/* Platzhalter für ein noch nicht gespieltes Spiel: hält die Zeile, ohne den
+   Namen zu verraten. */
+.score-overview-unrevealed {
+  color: rgba(255,255,255,.3);
+  font-size: clamp(.72rem, 1.5vw, .84rem);
+  letter-spacing: .1em;
+}
+
 .score-overview-game.won.blue,
 .score-overview-game.claiming.blue { --claim: #5a72f6; --claim-edge: #8ca2ff; --claim-glow: rgba(90,114,246,.5); }
 .score-overview-game.won.red,

@@ -138,16 +138,37 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+/**
+ * Was ein Feld der Übersicht zeigen darf.
+ * Der Name eines Spiels bleibt verborgen, bis es gespielt wurde — sonst
+ * verrät die Übersicht den Spielern, was noch kommt. Als gespielt gilt jedes
+ * Spiel mit einem Ergebnis, auch ein unentschiedenes ohne Siegerteam.
+ */
+export function getOverviewGameView(gameId, index, results = [], highlightGameId = null) {
+  const result = results.find((entry) => entry.gameId === gameId);
+  const played = Boolean(result);
+  const winner = result?.team || null;
+  return {
+    number: index + 1,
+    played,
+    winner,
+    name: played ? getGamePresentation(gameId).name : null,
+    // Das gerade gewonnene Spiel startet neutral und blinkt sich in seine Farbe;
+    // alle übrigen sind sofort eingefärbt.
+    highlighted: gameId === highlightGameId && Boolean(winner)
+  };
+}
+
 function renderOverviewGame(gameId, index, results, highlightGameId) {
-  const presentation = getGamePresentation(gameId);
-  const winner = results.find((entry) => entry.gameId === gameId)?.team || null;
-  const isHighlight = gameId === highlightGameId && Boolean(winner);
-  // Das gerade gewonnene Spiel startet neutral und blinkt sich in seine Farbe;
-  // alle übrigen sind sofort eingefärbt.
-  const stateClass = isHighlight ? `claiming ${winner}` : winner ? `won ${winner}` : "open";
+  const view = getOverviewGameView(gameId, index, results, highlightGameId);
+  const stateClass = view.highlighted
+    ? `claiming ${view.winner}`
+    : view.winner ? `won ${view.winner}` : "open";
   return `<div class="score-overview-game ${stateClass}">
-    <strong>Spiel ${index + 1}</strong>
-    <span>${escapeHtml(presentation.name)}</span>
+    <strong>Spiel ${view.number}</strong>
+    ${view.name
+      ? `<span>${escapeHtml(view.name)}</span>`
+      : '<span class="score-overview-unrevealed" aria-label="Noch nicht gespielt">?</span>'}
   </div>`;
 }
 
