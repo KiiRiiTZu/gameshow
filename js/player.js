@@ -59,9 +59,32 @@ if (!roomCode) {
 
 $("room-code").textContent = roomCode;
 
-const storedId = sessionStorage.getItem(`gameshow-player-id-${roomCode}`);
-const playerId = storedId || crypto.randomUUID();
-sessionStorage.setItem(`gameshow-player-id-${roomCode}`, playerId);
+const PLAYER_ID_KEY = `gameshow-player-id-${roomCode}`;
+
+// Die Spieler-Id liegt in localStorage, damit ein geschlossener oder
+// abgestürzter Tab den Platz im Team nicht verliert. sessionStorage wird nur
+// noch gelesen, um eine bereits laufende Show aus der Zeit davor zu übernehmen.
+function readStoredPlayerId() {
+  try {
+    return localStorage.getItem(PLAYER_ID_KEY) || sessionStorage.getItem(PLAYER_ID_KEY) || null;
+  } catch (error) {
+    console.warn("Player id could not be read:", error);
+    return null;
+  }
+}
+
+function storePlayerId(id) {
+  try {
+    localStorage.setItem(PLAYER_ID_KEY, id);
+  } catch (error) {
+    // Privater Modus kann das Schreiben verbieten; die Sitzung läuft trotzdem,
+    // nur ohne Wiedererkennung nach einem Reload.
+    console.warn("Player id could not be stored:", error);
+  }
+}
+
+let playerId = readStoredPlayerId() || crypto.randomUUID();
+storePlayerId(playerId);
 
 let player = null;
 let roomState = null;
@@ -539,7 +562,16 @@ async function handleEvent(event, payload) {
     }
 
     player = payload.player || player;
+    // Der Moderator kann einen früheren Platz zurückgeben; dann übernimmt der
+    // Browser wieder dessen Id, damit alle laufenden Spiele den Spieler kennen.
+    if (player?.id && player.id !== playerId) {
+      playerId = player.id;
+      storePlayerId(playerId);
+    }
     showPlayerGame();
+    if (payload.reclaimed) {
+      $("player-message").textContent = "Willkommen zurück — dein Platz ist wieder da.";
+    }
     await registerPriceKey();
     render();
     return;

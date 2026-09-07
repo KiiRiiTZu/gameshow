@@ -5,10 +5,12 @@ import {
   addOrUpdatePlayer,
   createInitialRoomState,
   createRoomStateFromRecords,
+  findReclaimableSeat,
   getShowWinner,
   normalizeGameResults,
   recordGameResult,
-  SHOW_WINNING_SCORE
+  SHOW_WINNING_SCORE,
+  teamHasSpace
 } from "../js/room.js";
 
 test("ends the best-of-seven show at four game wins", () => {
@@ -161,4 +163,51 @@ test("drops damaged entries when restoring the game results", () => {
     { gameId: "guess-the-price", team: null }
   ]);
   assert.deepEqual(normalizeGameResults("kaputt"), []);
+});
+
+test("returns the old seat to a player who lost their id", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" });
+  addOrUpdatePlayer(state, { id: "andere", name: "Lena", team: "blue" });
+
+  // Team ist voll: ohne Rückgewinnung käme "Dieses Team ist bereits voll".
+  assert.equal(addOrUpdatePlayer(state, { id: "neu", name: "Max", team: "blue" }), false);
+
+  const seat = findReclaimableSeat(state, { id: "neu", name: "Max", team: "blue" });
+  assert.equal(seat?.id, "alt", "der frühere Platz wird zurückgegeben");
+});
+
+test("matches a reclaimed seat regardless of upper case and spacing", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "red" });
+
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "  max  ", team: "red" })?.id, "alt");
+});
+
+test("does not hand out a seat from the other team or another name", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" });
+
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "Max", team: "red" }), null);
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "Moritz", team: "blue" }), null);
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "", team: "blue" }), null);
+});
+
+test("leaves a player with an intact id on the normal join path", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" });
+
+  // Gleiche Id: kein Rückgewinnungsfall, der reguläre Beitritt aktualisiert den Eintrag.
+  assert.equal(findReclaimableSeat(state, { id: "alt", name: "Max", team: "blue" }), null);
+  assert.equal(addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" }), true);
+  assert.equal(state.players.length, 1);
+});
+
+test("prevents a second entry under the same name while the team still has room", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" });
+
+  // Ohne diese Prüfung entstünde neben der Karteileiche ein zweiter "Max".
+  assert.equal(teamHasSpace(state, "blue"), true);
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "Max", team: "blue" })?.id, "alt");
 });

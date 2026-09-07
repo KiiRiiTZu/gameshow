@@ -12,6 +12,7 @@ import {
   createRoomStateFromRecords,
   generateRoomCode,
   getShowWinner,
+  findReclaimableSeat,
   normalizeGameResults,
   recordGameResult
 } from "./room.js";
@@ -1590,6 +1591,20 @@ async function handlePlayerJoin(incomingPlayer) {
   };
 
   if (!player.name) return;
+
+  // Kehrt jemand ohne seine alte Id zurück, bekommt er seinen bisherigen Platz
+  // samt Id zurück, statt neben der eigenen Karteileiche zu landen. Am Raum
+  // ändert sich dabei nichts — der Spieler übernimmt einfach wieder seine Id.
+  const reclaimedSeat = findReclaimableSeat(state, player);
+  if (reclaimedSeat) {
+    await realtime.send("join_result", {
+      playerId: player.id,
+      accepted: true,
+      reclaimed: true,
+      player: reclaimedSeat
+    });
+    return;
+  }
 
   const previousPlayer = state.players.find((item) => item.id === player.id);
   const accepted = addOrUpdatePlayer(state, player);

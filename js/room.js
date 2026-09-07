@@ -189,6 +189,31 @@ export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
   return state;
 }
 
+function comparablePlayerName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+/**
+ * Sucht den Platz, den ein zurückkehrender Spieler wieder einnehmen darf.
+ *
+ * Verliert jemand seine Spieler-Id — anderes Gerät, gelöschte Browserdaten,
+ * privates Fenster —, bekäme er sonst entweder "Dieses Team ist bereits voll"
+ * oder, wenn im Team noch Platz ist, einen zweiten Eintrag unter demselben
+ * Namen neben seiner eigenen Karteileiche. Name und Team identifizieren den
+ * Platz; Namen sind ohnehin schon eindeutig, weil "Da seh ich dich" sie zur
+ * Zuordnung benutzt.
+ */
+export function findReclaimableSeat(state, incomingPlayer) {
+  const name = comparablePlayerName(incomingPlayer?.name);
+  if (!name || !["blue", "red"].includes(incomingPlayer?.team)) return null;
+
+  return state.players.find((player) =>
+    player.id !== incomingPlayer.id &&
+    player.team === incomingPlayer.team &&
+    comparablePlayerName(player.name) === name
+  ) || null;
+}
+
 export function countTeamPlayers(state, team) {
   return state.players.filter((player) => player.team === team).length;
 }
