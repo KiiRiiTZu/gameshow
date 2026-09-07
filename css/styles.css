@@ -310,7 +310,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .host-page #matching-game-panel { padding: 25px; }
 
 .host-page #map-game-panel .europe-map {
-  width: min(684px, 90%);
+  width: min(880px, 90%);
 }
 
 .host-page #matching-game-panel .matching-board {
@@ -1798,7 +1798,7 @@ button.ranking-candidate:disabled { opacity: .72; }
   }
 
   .player-map {
-    width: min(960px, 100%);
+    width: min(864px, 90%);
   }
 }
 
