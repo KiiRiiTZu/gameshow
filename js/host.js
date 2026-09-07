@@ -516,7 +516,7 @@ function renderGameEffects() {
   }
 
   const overviewVisible = Boolean(state.scoreOverviewVisible);
-  renderScoreOverview(state);
+  renderScoreOverview(state, { closable: true });
   $("toggle-score-overview").textContent = overviewVisible
     ? "Punktestand ausblenden"
     : "Punktestand zeigen";
@@ -2252,6 +2252,8 @@ document.addEventListener("focusin", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  // Ohne fokussiertes Element ist das Ziel das Document, das kein closest() hat.
+  if (!(event.target instanceof Element)) return;
   const score = event.target.closest(".editable-score[data-score-scope][data-score-team]");
   if (!score) return;
   if (event.key === "Enter") {
@@ -2280,12 +2282,33 @@ document.addEventListener("focusout", async (event) => {
   ));
 });
 
-$("toggle-score-overview").addEventListener("click", async () => {
-  // Reine Einblendung: sie muss nicht in die Datenbank, aber über room_state
-  // zu den Spielern, damit alle dasselbe sehen.
-  state.scoreOverviewVisible = !state.scoreOverviewVisible;
+// Reine Einblendung: sie muss nicht in die Datenbank, aber über room_state
+// zu den Spielern, damit alle dasselbe sehen.
+async function setScoreOverviewVisible(visible) {
+  // Der Schalter steht schon im Markup, bevor initializeHost den Raum geladen hat.
+  if (!state || !realtime) return;
+  if (Boolean(state.scoreOverviewVisible) === visible) return;
+  state.scoreOverviewVisible = visible;
   render();
   await broadcastState();
+}
+
+$("toggle-score-overview").addEventListener("click", async () => {
+  await setScoreOverviewVisible(!state.scoreOverviewVisible);
+});
+
+// Die Übersicht deckt die Kopfzeile ab, darum liegt das Schliessen zusätzlich
+// auf der Einblendung selbst und auf Escape.
+document.addEventListener("click", async (event) => {
+  if (!event.target.closest("[data-close-score-overview]")) return;
+  await setScoreOverviewVisible(false);
+});
+
+document.addEventListener("keydown", async (event) => {
+  if (event.key !== "Escape" || !state?.scoreOverviewVisible) return;
+  // Ohne fokussiertes Element ist das Ziel das Document, das kein closest() hat.
+  if (event.target instanceof Element && event.target.closest(".editable-score")) return;
+  await setScoreOverviewVisible(false);
 });
 
 $("open-buzzer").addEventListener("click", async () => {

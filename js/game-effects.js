@@ -170,9 +170,10 @@ export function showScoreOverview({
   results = [],
   scores = { blue: 0, red: 0 },
   highlightGameId = null,
-  winningScore = 4
+  winningScore = 4,
+  closable = false
 } = {}) {
-  const key = JSON.stringify({ results, scores, highlightGameId, winningScore });
+  const key = JSON.stringify({ results, scores, highlightGameId, winningScore, closable });
   const existing = document.querySelector(".score-overview-overlay");
   if (existing && key === renderedOverviewKey) return existing;
 
@@ -188,6 +189,8 @@ export function showScoreOverview({
   );
   overlay.style.setProperty("--overview-fade-out", `${OVERVIEW_FADE_OUT}ms`);
   overlay.innerHTML = `
+    ${closable ? `<button type="button" class="score-overview-close" data-close-score-overview
+      aria-label="Punktestand ausblenden" title="Punktestand ausblenden (Esc)">✕</button>` : ""}
     <div class="score-overview">
       <div class="score-overview-team blue">
         <span>Team Blau</span>
@@ -217,7 +220,7 @@ export function showScoreOverview({
  * scoreOverviewVisible, der Zustand geht per room_state an alle Spieler — so
  * sehen Moderator und Spieler dieselbe Einblendung.
  */
-export function renderScoreOverview(state) {
+export function renderScoreOverview(state, { closable = false } = {}) {
   if (!state?.scoreOverviewVisible) {
     hideScoreOverview();
     return;
@@ -229,7 +232,10 @@ export function renderScoreOverview(state) {
     // Nur ein gerade beendetes Spiel blinkt sich ein. Läuft bereits das nächste,
     // stehen alle gewonnenen Felder ruhig in ihrer Farbe.
     highlightGameId: state.game?.status === "finished" ? state.game.id : null,
-    winningScore: SHOW_WINNING_SCORE
+    winningScore: SHOW_WINNING_SCORE,
+    // Die deckende Übersicht verdeckt die Kopfzeile samt Schalter, deshalb
+    // bekommt der Moderator sein Schliessen-Kreuz auf der Einblendung selbst.
+    closable
   });
 }
 

@@ -1439,6 +1439,37 @@ button.ranking-candidate:disabled { opacity: .72; }
 
 .score-overview-overlay.leaving { animation: effect-fade-out var(--overview-fade-out, .52s) ease both; }
 
+/* Das Overlay selbst lässt Klicks durch; nur das Kreuz nimmt sie an. */
+.score-overview-close {
+  position: absolute;
+  top: clamp(14px, 2.4vw, 26px);
+  right: clamp(14px, 2.4vw, 26px);
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 50%;
+  background: rgba(255,255,255,.07);
+  color: #d4d8e5;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color .16s ease, background .16s ease, color .16s ease;
+}
+
+.score-overview-close:hover {
+  border-color: #8ca2ff;
+  background: rgba(90,114,246,.2);
+  color: white;
+}
+
+.score-overview-close:focus-visible { outline: 2px solid #8ca2ff; outline-offset: 3px; }
+
 .score-overview {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
