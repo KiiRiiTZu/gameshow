@@ -180,7 +180,7 @@ async function initializePlayer() {
     return;
   }
 
-  const players = await getPlayers(room.id);
+  const players = await getPlayers(room);
   roomState = createRoomStateFromRecords(roomCode, room, players);
   teamChatState = {
     gameId: supportsTeamChat(roomState.game?.id) ? roomState.game.id : null,
