@@ -771,6 +771,14 @@ test("keeps map distance lines visually constant while zooming", () => {
   assert.match(distanceLineRule, /vector-effect:\s*non-scaling-stroke/);
 });
 
+test("keeps the moderator map and its zoom controls inside the styled map frame", () => {
+  const hostMarkup = readFileSync(new URL("../host.html", import.meta.url), "utf8");
+  assert.match(
+    hostMarkup,
+    /id="host-kartenwissen-map"\s+class="europe-map"/
+  );
+});
+
 test("calculates geographic distances in kilometers", () => {
   const berlin = { lat: 52.5200, lng: 13.4050 };
   const hamburg = { lat: 53.5511, lng: 9.9937 };
