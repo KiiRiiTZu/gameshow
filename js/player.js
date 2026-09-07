@@ -1181,7 +1181,7 @@ function renderMapGame() {
   $("player-map-question-number").closest(".map-question-card").classList.toggle("hidden", isPending);
   $("player-map-blue-score").textContent = game.roundScores.blue;
   $("player-map-red-score").textContent = game.roundScores.red;
-  $("player-map-instruction").textContent = isPending
+  const mapInstruction = isPending
     ? "Wartet darauf, dass der Moderator die erste Runde startet."
     : isRevealed
     ? "Der Moderator hat das Ziel aufgedeckt."
@@ -1189,9 +1189,9 @@ function renderMapGame() {
       ? "Beide Antworten sind eingeloggt. Der Moderator deckt gleich die Distanz zum Ziel auf."
     : ownTeamLocked
       ? "Eure Antwort ist eingeloggt. Wartet auf das andere Team."
-    : ownPin
-      ? "Euer Team-Pin ist gesetzt. Ihr könnt ihn noch verschieben oder einloggen."
-      : "Tippt auf die Europakarte, um euren gemeinsamen Team-Pin zu setzen.";
+    : "";
+  $("player-map-instruction").textContent = mapInstruction;
+  $("player-map-instruction").classList.toggle("hidden", !mapInstruction);
 
   $("lock-map-pin").classList.toggle("hidden", isPending);
   $("lock-map-pin").disabled = isPending || isRevealed || ownTeamLocked || !ownPin;
@@ -1501,8 +1501,7 @@ function renderEstimationGame() {
   const resultElement = $("player-estimation-result");
   resultElement.classList.remove("hidden");
 
-  $("player-estimation-eyebrow").classList.toggle("hidden", isGameNotStarted);
-  $("player-estimation-title").classList.toggle("hidden", isGameNotStarted);
+  $("player-estimation-title-line").classList.toggle("hidden", isGameNotStarted);
   $("player-estimation-round").classList.toggle("hidden", isGameNotStarted);
   $("player-estimation-score").classList.toggle("hidden", isGameNotStarted);
   $("player-estimation-round").textContent =

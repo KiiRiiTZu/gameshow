@@ -25,7 +25,6 @@
     <section class="scoreboard">
       <article class="team-card blue">
         <p class="team-label">Team Blau</p>
-        <p class="score-caption">Gewonnene Spiele</p>
         <div id="blue-score" class="score editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="Gewonnene Spiele von Team Blau" data-score-scope="show" data-score-team="blue">0</div>
         <div id="blue-players" class="player-list"></div>
       </article>
@@ -34,7 +33,6 @@
 
       <article class="team-card red">
         <p class="team-label">Team Rot</p>
-        <p class="score-caption">Gewonnene Spiele</p>
         <div id="red-score" class="score editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="Gewonnene Spiele von Team Rot" data-score-scope="show" data-score-team="red">0</div>
         <div id="red-players" class="player-list"></div>
       </article>
@@ -45,8 +43,9 @@
     <section id="buzzer-game-panel" class="card game-panel">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 7</p>
-          <h2>Buzzer Quiz</h2>
+          <div class="game-title-line">
+            <h2>Buzzer Quiz</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 7 · FIRST TO 40</p>
+          </div>
         </div>
         <span id="buzzer-status" class="status-pill closed">Buzzer geschlossen</span>
       </div>
@@ -91,8 +90,9 @@
     <section id="top20-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 5 · BEST OF 3</p>
-          <h2 id="top20-title">Top 20</h2>
+          <div class="game-title-line">
+            <h2 id="top20-title">Top 20</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 5 · BEST OF 3</p>
+          </div>
           <p id="top20-description" class="muted"></p>
         </div>
         <span id="top20-status" class="status-pill">Läuft</span>
@@ -124,8 +124,9 @@
     <section id="ranking-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 5 · BEST OF 3</p>
-          <h2>Einordnen</h2>
+          <div class="game-title-line">
+            <h2>Einordnen</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 5 · BEST OF 3</p>
+          </div>
           <p id="ranking-round-label" class="muted">Liste 1 von 3</p>
         </div>
         <span id="ranking-status" class="status-pill open">Läuft</span>
@@ -141,7 +142,6 @@
       </div>
       <div id="ranking-board" class="ranking-board"></div>
       <div class="ranking-pool-wrap">
-        <strong>Noch verfügbare Begriffe</strong>
         <div id="ranking-pool" class="ranking-pool"></div>
       </div>
       <div id="ranking-result" class="map-result hidden"></div>
@@ -156,11 +156,12 @@
       </div>
     </section>
 
-    <section id="map-game-panel" class="card game-panel hidden">
+    <section id="map-game-panel" class="card game-panel host-panel-scale-90 hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 3 · BEST OF 7</p>
-          <h2>Kartenwissen</h2>
+          <div class="game-title-line">
+            <h2>Kartenwissen</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 3 · BEST OF 7</p>
+          </div>
           <p id="map-round-label" class="muted">Frage 1 von 7</p>
         </div>
         <span id="map-status" class="status-pill open">Pins setzen</span>
@@ -179,9 +180,7 @@
 
       <div id="host-kartenwissen-map" class="kartenwissen"></div>
 
-      <div class="map-legend" aria-label="Kartenlegende">
-        <span><i class="legend-dot blue"></i> Team Blau</span>
-        <span><i class="legend-dot red"></i> Team Rot</span>
+      <div id="map-legend" class="map-legend hidden" aria-label="Kartenlegende">
         <span id="target-legend" class="hidden"><i class="legend-dot target"></i> Ziel</span>
       </div>
 
@@ -197,11 +196,12 @@
       <p id="map-next-game-error" class="error"></p>
     </section>
 
-    <section id="matching-game-panel" class="card game-panel hidden">
+    <section id="matching-game-panel" class="card game-panel host-panel-scale-90 hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 6 · 4 RUNDEN</p>
-          <h2>Da seh ich dich</h2>
+          <div class="game-title-line">
+            <h2>Da seh ich dich</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 6 · 4 RUNDEN</p>
+          </div>
           <p id="matching-round-label" class="muted">Runde 1 von 4</p>
         </div>
         <span id="matching-status" class="status-pill open">Zuordnen</span>
@@ -233,8 +233,9 @@
     <section id="price-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 2 · BEST OF 7</p>
-          <h2>Thrifty</h2>
+          <div class="game-title-line">
+            <h2>Thrifty</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 2 · BEST OF 7</p>
+          </div>
           <p id="price-round-label" class="muted">Produkt 1 von 7</p>
         </div>
         <span id="price-status" class="status-pill open">Teams beraten sich</span>
@@ -286,8 +287,9 @@
     <section id="estimation-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 1 · FIRST TO 5</p>
-          <h2>Mittelwert</h2>
+          <div class="game-title-line">
+            <h2>Mittelwert</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 1 · FIRST TO 5</p>
+          </div>
           <p id="estimation-round-label" class="muted">Frage 1 von 15</p>
         </div>
         <span id="estimation-status" class="status-pill closed">Frage noch nicht gestartet</span>
@@ -323,8 +325,9 @@
     <section id="word-match-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
-          <p class="eyebrow">SPIEL 4 · 4 RUNDEN</p>
-          <h2>Begriffsmatch</h2>
+          <div class="game-title-line">
+            <h2>Begriffsmatch</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 4 · 4 RUNDEN</p>
+          </div>
           <p id="word-match-round-label" class="muted">Runde 1 von 4</p>
         </div>
         <span id="word-match-status" class="status-pill closed">Runde bereit</span>

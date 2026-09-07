@@ -48,7 +48,9 @@
       <div id="player-show-winner-banner" class="show-winner-banner hidden"></div>
 
       <div id="player-buzzer-game">
-        <p class="eyebrow">SPIEL 7</p>
+        <div class="game-title-line">
+          <h2>Buzzer Quiz</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 7 · FIRST TO 40</p>
+        </div>
         <div class="round-score" aria-label="Punktestand im Buzzer Quiz">
           <span>Blau <strong id="player-buzzer-blue-score">0</strong></span>
           <span>Quizpunkte</span>
@@ -64,8 +66,9 @@
       </div>
 
       <div id="player-top20-game" class="hidden">
-        <p class="eyebrow">SPIEL 5 · BEST OF 3</p>
-        <h2 id="player-top20-title">Top 20</h2>
+        <div class="game-title-line">
+          <h2 id="player-top20-title">Top 20</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 5 · BEST OF 3</p>
+        </div>
         <p id="player-top20-description" class="muted"></p>
         <div id="player-top20-turn" class="turn-card blue">Team Blau ist dran</div>
         <div id="player-top20-round-wins" class="round-wins">Rundensiege · Blau 0 : 0 Rot</div>
@@ -79,8 +82,9 @@
       </div>
 
       <div id="player-ranking-game" class="hidden">
-        <p class="eyebrow">SPIEL 5 · BEST OF 3</p>
-        <h2>Einordnen</h2>
+        <div class="game-title-line">
+          <h2>Einordnen</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 5 · BEST OF 3</p>
+        </div>
         <div id="player-ranking-waiting" class="player-message hidden">Wartet darauf, dass der Moderator die erste Liste startet.</div>
         <div id="player-ranking-content">
           <p id="player-ranking-round" class="muted">Liste 1 von 3</p>
@@ -95,7 +99,6 @@
           </div>
           <div id="player-ranking-board" class="ranking-board"></div>
           <div class="ranking-pool-wrap">
-            <strong>Noch verfügbare Begriffe</strong>
             <div id="player-ranking-pool" class="ranking-pool"></div>
           </div>
           <div id="player-ranking-chat"></div>
@@ -104,8 +107,9 @@
       </div>
 
       <div id="player-map-game" class="hidden">
-        <p class="eyebrow">SPIEL 3 · BEST OF 7</p>
-        <h2>Kartenwissen</h2>
+        <div class="game-title-line">
+          <h2>Kartenwissen</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 3 · BEST OF 7</p>
+        </div>
         <div class="round-score" aria-label="Punktestand im Kartenspiel">
           <span>Blau <strong id="player-map-blue-score">0</strong></span>
           <span>Kartenpunkte</span>
@@ -115,7 +119,7 @@
           <span id="player-map-question-number" class="eyebrow">FRAGE 1</span>
           <h3 id="player-map-question"></h3>
         </div>
-        <p id="player-map-instruction" class="muted">Tippt auf die Europakarte, um euren gemeinsamen Team-Pin zu setzen.</p>
+        <p id="player-map-instruction" class="muted hidden"></p>
         <div id="player-kartenwissen-map" class="europe-map player-map"></div>
         <button id="lock-map-pin" class="button primary full">Antwort einloggen</button>
         <div id="player-map-result" class="player-message"></div>
@@ -123,8 +127,9 @@
       </div>
 
       <div id="player-matching-game" class="hidden">
-        <p class="eyebrow">SPIEL 6 · 4 RUNDEN</p>
-        <h2>Da seh ich dich</h2>
+        <div class="game-title-line">
+          <h2>Da seh ich dich</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 6 · 4 RUNDEN</p>
+        </div>
         <p id="player-matching-round" class="muted"></p>
         <div class="round-score" aria-label="Punktestand im Zuordnungsspiel">
           <span>Blau <strong id="player-matching-blue-score">0</strong></span>
@@ -139,8 +144,9 @@
       </div>
 
       <div id="player-price-game" class="hidden">
-        <p class="eyebrow">SPIEL 2 · BEST OF 7</p>
-        <h2>Thrifty</h2>
+        <div class="game-title-line">
+          <h2>Thrifty</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 2 · BEST OF 7</p>
+        </div>
         <p id="player-price-round" class="muted">Produkt 1 von 7</p>
         <div class="round-score" aria-label="Punktestand im Preisratespiel">
           <span>Blau <strong id="player-price-blue-score">0</strong></span>
@@ -174,8 +180,9 @@
       </div>
 
       <div id="player-estimation-game" class="hidden">
-        <p id="player-estimation-eyebrow" class="eyebrow hidden">SPIEL 1 · FIRST TO 5</p>
-        <h2 id="player-estimation-title" class="hidden">Mittelwert</h2>
+        <div id="player-estimation-title-line" class="game-title-line hidden">
+          <h2 id="player-estimation-title">Mittelwert</h2><span aria-hidden="true">|</span><p id="player-estimation-eyebrow" class="eyebrow">SPIEL 1 · FIRST TO 5</p>
+        </div>
         <p id="player-estimation-round" class="muted hidden">Frage 1 von 15</p>
         <div id="player-estimation-score" class="round-score hidden" aria-label="Punktestand bei Mittelwert">
           <span>Blau <strong id="player-estimation-blue-score">0</strong></span>
@@ -200,8 +207,9 @@
       </div>
 
       <div id="player-word-match-game" class="hidden">
-        <p class="eyebrow">SPIEL 4 · 4 RUNDEN</p>
-        <h2>Begriffsmatch</h2>
+        <div class="game-title-line">
+          <h2>Begriffsmatch</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 4 · 4 RUNDEN</p>
+        </div>
         <p id="player-word-match-round" class="muted">Runde 1 von 4</p>
         <div class="round-score" aria-label="Punktestand bei Begriffsmatch">
           <span>Blau <strong id="player-word-match-blue-score">0</strong></span>
