@@ -8,7 +8,7 @@ import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
-import { captureRankingMove, playRankingMove } from "./ranking-motion.js";
+import { captureRankingMove, isRankingMotionPending, playRankingMove } from "./ranking-motion.js";
 import { createEuropeMap } from "./europe-map-view.js";
 import {
   MATCHING_ASSIGNERS,
@@ -984,7 +984,7 @@ function renderPlayerRankingBoard(game, list, rankingMove = null) {
   for (let index = 0; index <= game.placedIds.length; index += 1) {
     if (proposalIndex === index) {
       const proposed = getRankingEntry(list, game.proposal.itemId);
-      const awaitingMove = rankingMove?.direction === "into-list" && rankingMove.itemId === proposed?.id;
+      const awaitingMove = isRankingMotionPending(proposed?.id, "into-list", rankingMove);
       rows.push(`<div class="ranking-row proposed ${game.proposal.team}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-proposal="${escapeHtml(proposed?.id || "")}">
         <span>${index + 1}</span><strong>${escapeHtml(proposed?.label || "")}</strong><small>vorgemerkt</small>
       </div>`);
@@ -993,7 +993,7 @@ function renderPlayerRankingBoard(game, list, rankingMove = null) {
       const entry = getRankingEntry(list, game.placedIds[index]);
       const isAnchor = entry?.id === list.anchorId;
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
-      const awaitingMove = rankingMove?.direction === "cleanup-into-list" && rankingMove.itemId === entry?.id;
+      const awaitingMove = isRankingMotionPending(entry?.id, "cleanup-into-list", rankingMove);
       rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
         <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
@@ -1032,7 +1032,7 @@ function renderRankingGame() {
   $("player-ranking-board").innerHTML = renderPlayerRankingBoard(game, list, rankingMove);
   $("player-ranking-pool").innerHTML = game.remainingIds.filter((id) => id !== game.proposal?.itemId).map((id) => {
     const entry = getRankingEntry(list, id);
-    const awaitingMove = rankingMove?.direction === "wrong-back-to-pool" && rankingMove.itemId === id;
+    const awaitingMove = isRankingMotionPending(id, "wrong-back-to-pool", rankingMove);
     return `<span class="ranking-candidate${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-item="${escapeHtml(id)}">${escapeHtml(entry?.label || "")}</span>`;
   }).join("");
   playRankingMove(rankingMove, $("player-ranking-pool"), $("player-ranking-board"));

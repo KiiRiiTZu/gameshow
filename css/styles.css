@@ -636,6 +636,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .ranking-row.proposed.red { border-color: #e14c65; background: rgba(151,44,65,.2); }
 .ranking-feedback-correct { animation: ranking-correct-flash 720ms ease-out; }
 .ranking-feedback-wrong { animation: ranking-wrong-flash 720ms ease-out; }
+.ranking-feedback-land { animation: ranking-land-pop 460ms cubic-bezier(.3,1.4,.4,1); }
 .ranking-awaiting-motion { visibility: hidden; }
 
 @keyframes ranking-correct-flash {
@@ -646,6 +647,13 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 @keyframes ranking-wrong-flash {
   0%, 100% { border-color: rgba(255,255,255,.1); background: #202532; }
   28% { border-color: #ef536b; background: rgba(210,55,80,.38); box-shadow: 0 0 28px rgba(210,55,80,.3); }
+}
+
+/* Kurzes Einrasten, wenn der fliegende Begriff seine Zeile erreicht hat. */
+@keyframes ranking-land-pop {
+  0% { transform: scale(.97); box-shadow: 0 0 0 rgba(140,162,255,0); }
+  40% { transform: scale(1.018); box-shadow: 0 0 26px rgba(140,162,255,.28); }
+  100% { transform: scale(1); box-shadow: 0 0 0 rgba(140,162,255,0); }
 }
 
 .ranking-insert {
@@ -707,14 +715,36 @@ button.ranking-candidate:disabled { opacity: .72; }
   border-radius: 11px;
   background: #303a59;
   color: white;
-  box-shadow: 0 16px 40px rgba(0,0,0,.42);
+  box-shadow: 0 18px 44px rgba(0,0,0,.5), 0 0 22px rgba(140,162,255,.22);
   font-size: .86rem;
   font-weight: 800;
   text-align: center;
   pointer-events: none;
+  will-change: transform;
 }
 
-.ranking-moving-token.red { border-color: #e14c65; background: #542535; }
+.ranking-moving-token.red {
+  border-color: #e14c65;
+  background: #542535;
+  box-shadow: 0 18px 44px rgba(0,0,0,.5), 0 0 22px rgba(225,76,101,.22);
+}
+
+.ranking-moving-token.returning {
+  border-color: #ef536b;
+  background: #4a2130;
+  box-shadow: 0 18px 44px rgba(0,0,0,.5), 0 0 26px rgba(210,55,80,.34);
+}
+
+/* Eigenes Textelement: hält die Zeilenhöhe stabil und kürzt lange Begriffe,
+   statt den Token in die Höhe zu ziehen. */
+.ranking-moving-token-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
 
 @media (max-width: 720px) {
   .ranking-meta { grid-template-columns: 1fr; }

@@ -17,7 +17,7 @@ import { top20Game } from "./games/spotify-top-artists.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
 import { rankingGame } from "./games/ranking-game.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
-import { captureRankingMove, playRankingMove } from "./ranking-motion.js";
+import { captureRankingMove, isRankingMotionPending, playRankingMove, resetRankingMotion } from "./ranking-motion.js";
 import { GERMANY_MAP_QUESTIONS, GERMANY_MAP_ROUNDS_TO_WIN, germanyMapGame } from "./games/germany-map.js";
 import { createEuropeMap } from "./europe-map-view.js";
 import {
@@ -895,7 +895,7 @@ function renderRankingBoard(game, list, interactive = false, rankingMove = null)
     }
     if (proposalIndex === index) {
       const proposed = getRankingEntry(list, game.proposal.itemId);
-      const awaitingMove = rankingMove?.direction === "into-list" && rankingMove.itemId === proposed?.id;
+      const awaitingMove = isRankingMotionPending(proposed?.id, "into-list", rankingMove);
       rows.push(`<div class="ranking-row proposed ${game.proposal.team}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-proposal="${escapeHtml(proposed?.id || "")}">
         <span>${index + 1}</span><strong>${escapeHtml(proposed?.label || "")}</strong><small>vorgemerkt</small>
       </div>`);
@@ -904,7 +904,7 @@ function renderRankingBoard(game, list, interactive = false, rankingMove = null)
       const entry = getRankingEntry(list, game.placedIds[index]);
       const isAnchor = entry?.id === list.anchorId;
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
-      const awaitingMove = rankingMove?.direction === "cleanup-into-list" && rankingMove.itemId === entry?.id;
+      const awaitingMove = isRankingMotionPending(entry?.id, "cleanup-into-list", rankingMove);
       rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
         <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
@@ -948,7 +948,7 @@ function renderRankingGame() {
   $("ranking-board").innerHTML = renderRankingBoard(game, list, true, rankingMove);
   $("ranking-pool").innerHTML = game.remainingIds.filter((id) => id !== game.proposal?.itemId).map((id) => {
     const entry = getRankingEntry(list, id);
-    const awaitingMove = rankingMove?.direction === "wrong-back-to-pool" && rankingMove.itemId === id;
+    const awaitingMove = isRankingMotionPending(id, "wrong-back-to-pool", rankingMove);
     return `<button type="button" class="ranking-candidate${rankingSelection.itemId === id ? " selected" : ""}${awaitingMove ? " ranking-awaiting-motion" : ""}"
       data-ranking-item="${escapeHtml(id)}"${game.status !== "playing" ? " disabled" : ""}>${escapeHtml(entry?.label || "")}</button>`;
   }).join("");
@@ -2329,6 +2329,7 @@ $("start-first-ranking-round").addEventListener("click", async () => {
 
 $("next-ranking-round").addEventListener("click", async () => {
   rankingSelection = { itemId: null, position: null };
+  resetRankingMotion($("ranking-pool"), $("ranking-board"));
   await runModeratorAction(() => rankingGame.startNextRound(state));
 });
 
