@@ -1,4 +1,5 @@
 import { burstConfetti, stopConfetti } from "./confetti.js";
+import { SHOW_WINNING_SCORE } from "./room.js";
 
 const GAME_PRESENTATIONS = {
   "estimation-game": { number: 1, name: "Mittelwert" },
@@ -31,8 +32,7 @@ const TRANSITION_FADE_OUT = 450;
 const WINNER_DURATION = 3200;
 const WINNER_FADE_OUT = 480;
 
-// Die Übersicht schliesst direkt an die Siegerehrung an.
-const OVERVIEW_DURATION = 5600;
+// Die Übersicht wird vom Moderator geschaltet und blendet sich nicht selbst aus.
 const OVERVIEW_FADE_OUT = 520;
 
 const TEAM_LABELS = { blue: "Team Blau", red: "Team Rot" };
@@ -101,10 +101,9 @@ export function showGameTransition(gameId) {
  * Siegerehrung nach einem beendeten Spiel: Banner in Teamfarbe plus Konfetti.
  * Bei einem Unentschieden (team === null) bleibt es beim Banner ohne Konfetti.
  */
-export function showGameWinner(gameId, team, detail = "", overview = null) {
+export function showGameWinner(gameId, team, detail = "") {
   const presentation = getGamePresentation(gameId);
   replaceOverlay(".game-winner-overlay");
-  replaceOverlay(".score-overview-overlay");
 
   const isDraw = !["blue", "red"].includes(team);
   const headline = isDraw
@@ -128,13 +127,6 @@ export function showGameWinner(gameId, team, detail = "", overview = null) {
   document.body.append(overlay);
   if (!isDraw) burstConfetti(team);
   scheduleTeardown(overlay, WINNER_DURATION - WINNER_FADE_OUT, WINNER_FADE_OUT);
-
-  if (!overview) return;
-  // Die Übersicht übernimmt, sobald das Banner ausgeblendet ist.
-  const chain = setTimeout(() => {
-    showScoreOverview({ ...overview, highlightGameId: gameId });
-  }, WINNER_DURATION);
-  overlay.addEventListener("effect-cancelled", () => clearTimeout(chain), { once: true });
 }
 
 function escapeHtml(value) {
@@ -159,9 +151,20 @@ function renderOverviewGame(gameId, index, results, highlightGameId) {
   </div>`;
 }
 
+// Signatur der zuletzt gezeichneten Übersicht. Der Moderator hält sie offen,
+// also läuft der Renderpfad mehrfach darüber — ohne diesen Vergleich würde die
+// Blink-Animation bei jedem Render neu starten.
+let renderedOverviewKey = null;
+
+export function hideScoreOverview() {
+  replaceOverlay(".score-overview-overlay");
+  renderedOverviewKey = null;
+}
+
 /**
  * Punkteübersicht der ganzen Show: beide Teamstände und ein Feld je Spiel.
  * highlightGameId blinkt dreimal auf und bleibt dann in der Siegerfarbe stehen.
+ * Die Übersicht blendet sich nicht selbst aus — sie wird vom Moderator geschaltet.
  */
 export function showScoreOverview({
   results = [],
@@ -169,7 +172,12 @@ export function showScoreOverview({
   highlightGameId = null,
   winningScore = 4
 } = {}) {
+  const key = JSON.stringify({ results, scores, highlightGameId, winningScore });
+  const existing = document.querySelector(".score-overview-overlay");
+  if (existing && key === renderedOverviewKey) return existing;
+
   replaceOverlay(".score-overview-overlay");
+  renderedOverviewKey = key;
 
   const overlay = document.createElement("div");
   overlay.className = "score-overview-overlay";
@@ -201,14 +209,34 @@ export function showScoreOverview({
     </div>
   `;
   document.body.append(overlay);
-  scheduleTeardown(overlay, OVERVIEW_DURATION - OVERVIEW_FADE_OUT, OVERVIEW_FADE_OUT);
   return overlay;
+}
+
+/**
+ * Bringt die Übersicht mit dem Raumzustand in Deckung. Der Moderator schaltet
+ * scoreOverviewVisible, der Zustand geht per room_state an alle Spieler — so
+ * sehen Moderator und Spieler dieselbe Einblendung.
+ */
+export function renderScoreOverview(state) {
+  if (!state?.scoreOverviewVisible) {
+    hideScoreOverview();
+    return;
+  }
+
+  showScoreOverview({
+    results: state.gameResults || [],
+    scores: state.scores || { blue: 0, red: 0 },
+    // Nur ein gerade beendetes Spiel blinkt sich ein. Läuft bereits das nächste,
+    // stehen alle gewonnenen Felder ruhig in ihrer Farbe.
+    highlightGameId: state.game?.status === "finished" ? state.game.id : null,
+    winningScore: SHOW_WINNING_SCORE
+  });
 }
 
 /** Räumt laufende Effekte ab, z. B. wenn ein Spiel neu geladen wird. */
 export function clearGameEffects() {
   stopConfetti();
   replaceOverlay(".game-winner-overlay");
-  replaceOverlay(".score-overview-overlay");
+  hideScoreOverview();
   removeEffect(".game-transition-overlay");
 }

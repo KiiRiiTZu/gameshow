@@ -13,8 +13,7 @@ import {
   generateRoomCode,
   getShowWinner,
   normalizeGameResults,
-  recordGameResult,
-  SHOW_WINNING_SCORE
+  recordGameResult
 } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
@@ -62,7 +61,7 @@ import {
   exportMatchingPublicKey
 } from "./matching-crypto.js";
 import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
-import { showGameTransition, showGameWinner } from "./game-effects.js";
+import { renderScoreOverview, showGameTransition, showGameWinner } from "./game-effects.js";
 import { getModeratorGameScore, setModeratorScore } from "./moderator-score.js";
 import {
   addTeamChatMessage,
@@ -513,12 +512,15 @@ function renderGameEffects() {
       previousGameStatus !== "finished" && state.game.status === "finished") {
     // Erst der Übergang von "läuft" auf "beendet" feiert — ein Reload in ein
     // bereits beendetes Spiel startet kein Konfetti.
-    showGameWinner(gameId, state.game.winningTeam, gameWinnerDetail(state.game), {
-      results: state.gameResults || [],
-      scores: state.scores,
-      winningScore: SHOW_WINNING_SCORE
-    });
+    showGameWinner(gameId, state.game.winningTeam, gameWinnerDetail(state.game));
   }
+
+  const overviewVisible = Boolean(state.scoreOverviewVisible);
+  renderScoreOverview(state);
+  $("toggle-score-overview").textContent = overviewVisible
+    ? "Punktestand ausblenden"
+    : "Punktestand zeigen";
+  $("toggle-score-overview").setAttribute("aria-pressed", String(overviewVisible));
 
   previousGameId = gameId;
   previousGameStatus = state.game.status;
@@ -1567,6 +1569,8 @@ async function runModeratorAction(action) {
     if (!action()) return false;
     if (state.game.id !== previousActionGameId) {
       teamChat = createTeamChat(supportsTeamChat(state.game.id) ? state.game.id : null);
+      // Beim Start des nächsten Spiels soll die Übersicht nicht offen stehen bleiben.
+      state.scoreOverviewVisible = false;
     }
     await persistRenderAndBroadcast();
     return true;
@@ -2274,6 +2278,14 @@ document.addEventListener("focusout", async (event) => {
     score.dataset.scoreTeam,
     score.textContent
   ));
+});
+
+$("toggle-score-overview").addEventListener("click", async () => {
+  // Reine Einblendung: sie muss nicht in die Datenbank, aber über room_state
+  // zu den Spielern, damit alle dasselbe sehen.
+  state.scoreOverviewVisible = !state.scoreOverviewVisible;
+  render();
+  await broadcastState();
 });
 
 $("open-buzzer").addEventListener("click", async () => {

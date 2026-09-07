@@ -144,6 +144,17 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .topbar h1 { margin-bottom: 0; font-size: clamp(2rem, 5vw, 3.2rem); }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.button.small { padding: 9px 14px; border-radius: 11px; font-size: .82rem; }
+
+/* Solange die Übersicht offen ist, zeigt der Schalter das aktiv an. */
+.button[aria-pressed="true"] { background: #5a72f6; color: white; }
+
 .connection {
   display: flex;
   gap: 8px;
@@ -1420,8 +1431,9 @@ button.ranking-candidate:disabled { opacity: .72; }
   padding: 24px;
   overflow: auto;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 45%, rgba(30,38,72,.72) 0%, rgba(7,9,15,.94) 66%);
-  backdrop-filter: blur(10px);
+  /* Vollständig deckend: die Spielansicht dahinter soll nicht durchscheinen,
+     damit die Übersicht auch im Stream ruhig zu lesen ist. */
+  background: radial-gradient(circle at 50% 45%, #171f3c 0%, #0a0c13 68%);
   animation: effect-fade-in .34s ease both;
 }
 

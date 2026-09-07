@@ -3,7 +3,7 @@ import {
   getPlayers
 } from "./database.js";
 
-import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode, SHOW_WINNING_SCORE } from "./room.js";
+import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound } from "./audio.js";
 import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
@@ -36,7 +36,7 @@ import {
   encryptPrivatePayload,
   exportEncryptionPublicKey
 } from "./private-channel-crypto.js";
-import { showGameTransition, showGameWinner } from "./game-effects.js";
+import { renderScoreOverview, showGameTransition, showGameWinner } from "./game-effects.js";
 import { getModeratorGameScore } from "./moderator-score.js";
 import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
 
@@ -804,12 +804,9 @@ function render() {
       previousGameStatus !== "finished" && roomState.game.status === "finished") {
     // Erst der Übergang von "läuft" auf "beendet" feiert — wer in ein bereits
     // beendetes Spiel hineinlädt, bekommt kein Konfetti.
-    showGameWinner(currentGameId, roomState.game.winningTeam, gameWinnerDetail(roomState.game), {
-      results: roomState.gameResults || [],
-      scores: roomState.scores,
-      winningScore: SHOW_WINNING_SCORE
-    });
+    showGameWinner(currentGameId, roomState.game.winningTeam, gameWinnerDetail(roomState.game));
   }
+  renderScoreOverview(roomState);
   previousGameId = currentGameId;
   previousGameStatus = roomState.game.status;
 
