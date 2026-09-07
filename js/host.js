@@ -1132,6 +1132,7 @@ function renderMapGame() {
   });
 
   $("target-legend").classList.toggle("hidden", !isRevealed);
+  $("map-legend").classList.toggle("hidden", !isRevealed);
   $("map-pin-status").innerHTML = isPending ? "Wartet auf den Start der ersten Runde." : `
     <span class="${game.lockedTeams?.blue ? "ready" : ""}">Blau: ${game.lockedTeams?.blue ? "eingeloggt ✓" : game.pins?.blue ? "Pin gesetzt" : "wartet…"}</span>
     <span class="${game.lockedTeams?.red ? "ready" : ""}">Rot: ${game.lockedTeams?.red ? "eingeloggt ✓" : game.pins?.red ? "Pin gesetzt" : "wartet…"}</span>
