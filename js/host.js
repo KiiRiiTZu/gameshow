@@ -27,7 +27,7 @@ import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-li
 import { rankingGame } from "./games/ranking-game.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
 import { captureRankingMove, isRankingMotionPending, playRankingMove, resetRankingMotion } from "./ranking-motion.js";
-import { EUROPE_MAP_QUESTIONS, EUROPE_MAP_ROUNDS_TO_WIN, europeMapGame } from "./games/europe-map.js";
+import { KARTENWISSEN_QUESTIONS, KARTENWISSEN_ROUNDS_TO_WIN, kartenwissenGame } from "./games/kartenwissen.js";
 import { createEuropeMap } from "./europe-map-view.js";
 import {
   MATCHING_ASSIGNERS,
@@ -77,7 +77,7 @@ import {
 registerGame(buzzerGame);
 registerGame(top20Game);
 registerGame(rankingGame);
-registerGame(europeMapGame);
+registerGame(kartenwissenGame);
 registerGame(matchingGame);
 registerGame(guessThePriceGame);
 registerGame(estimationGame);
@@ -461,8 +461,8 @@ async function initializeHost() {
     top20Game.normalize(state);
     restoreTop20Notes();
   }
-  if (state.game.id === europeMapGame.id) {
-    europeMapGame.normalize(state);
+  if (state.game.id === kartenwissenGame.id) {
+    kartenwissenGame.normalize(state);
     restoreMapNotes();
   }
   if (state.game.id === rankingGame.id) rankingGame.normalize(state);
@@ -488,7 +488,7 @@ async function initializeHost() {
   }
 
   $("room-code").textContent = roomCode;
-  hostMap = createEuropeMap($("host-europe-map"), {
+  hostMap = createEuropeMap($("host-kartenwissen-map"), {
     enableZoom: true
   });
   matchingKeyPair = await createMatchingKeyPair();
@@ -555,7 +555,7 @@ function render() {
 
   const top20IsActive = state.game.id === top20Game.id;
   const rankingIsActive = state.game.id === rankingGame.id;
-  const mapIsActive = state.game.id === europeMapGame.id;
+  const mapIsActive = state.game.id === kartenwissenGame.id;
   const matchingIsActive = state.game.id === matchingGame.id;
   const priceIsActive = state.game.id === guessThePriceGame.id;
   const estimationIsActive = state.game.id === estimationGame.id;
@@ -1160,7 +1160,7 @@ function renderTop20Game() {
 
 function renderMapGame() {
   const game = state.game;
-  const question = EUROPE_MAP_QUESTIONS[game.roundIndex];
+  const question = KARTENWISSEN_QUESTIONS[game.roundIndex];
   const isPending = game.status === "round-pending";
   const isFinished = game.status === "finished";
   const hasRoundResult = Number.isFinite(game.distances?.blue) && Number.isFinite(game.distances?.red);
@@ -1169,7 +1169,7 @@ function renderMapGame() {
   const bothPinsReady = Boolean(game.pins?.blue && game.pins?.red);
   const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
 
-  $("map-round-label").textContent = `Frage ${game.roundIndex + 1} von ${EUROPE_MAP_QUESTIONS.length}`;
+  $("map-round-label").textContent = `Frage ${game.roundIndex + 1} von ${KARTENWISSEN_QUESTIONS.length}`;
   $("map-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
   $("map-question").textContent = isPending ? "" : question.prompt;
   $("map-question-number").closest(".map-question-card").classList.toggle("hidden", isPending);
@@ -1203,7 +1203,7 @@ function renderMapGame() {
   $("next-map-round").disabled = moderatorActionPending;
   $("start-word-match-game").classList.toggle("hidden", !isFinished || showIsFinished);
   $("start-word-match-game").disabled = moderatorActionPending || state.players.length !== 4;
-  $("next-map-round").textContent = game.roundScores[game.roundWinner] >= EUROPE_MAP_ROUNDS_TO_WIN
+  $("next-map-round").textContent = game.roundScores[game.roundWinner] >= KARTENWISSEN_ROUNDS_TO_WIN
     ? "Spiel abschließen"
     : "Nächste Frage";
   $("map-result").classList.toggle("hidden", !isRevealed && !isFinished);
@@ -1883,7 +1883,7 @@ function teamChatIsWritable(team) {
   if (state.game.id === rankingGame.id) {
     return ["playing", "ready-to-reveal"].includes(state.game.status);
   }
-  if (state.game.id === europeMapGame.id) {
+  if (state.game.id === kartenwissenGame.id) {
     return state.game.status === "placing" && !state.game.lockedTeams?.[team];
   }
   if (state.game.id === guessThePriceGame.id) {
@@ -2118,7 +2118,7 @@ async function handleEstimationSubmission(payload) {
 }
 
 async function sendMapPrivateState(playerId) {
-  if (state.game.id !== europeMapGame.id) return false;
+  if (state.game.id !== kartenwissenGame.id) return false;
   const roomPlayer = state.players.find((item) => item.id === playerId);
   const publicKey = pricePlayerKeys.get(playerId);
   if (!roomPlayer || !publicKey) return false;
@@ -2146,7 +2146,7 @@ async function syncAllMapTeams() {
 }
 
 async function handleMapSubmission(payload) {
-  if (state.game.id !== europeMapGame.id || state.game.status !== "placing" ||
+  if (state.game.id !== kartenwissenGame.id || state.game.status !== "placing" ||
       !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
   const player = state.players.find((item) => item.id === payload.playerId);
   if (!player) return;
@@ -2264,14 +2264,14 @@ async function handleEvent(event, payload) {
 
   if (event === "map_pin") {
     const player = state.players.find((item) => item.id === payload.playerId);
-    if (!player || !europeMapGame.placePin(state, player.team, payload.position)) return;
+    if (!player || !kartenwissenGame.placePin(state, player.team, payload.position)) return;
     await persistRenderAndBroadcast();
     return;
   }
 
   if (event === "map_lock") {
     const player = state.players.find((item) => item.id === payload.playerId);
-    if (!player || !europeMapGame.lockTeam(state, player.team)) return;
+    if (!player || !kartenwissenGame.lockTeam(state, player.team)) return;
     await persistRenderAndBroadcast();
     return;
   }
@@ -2520,7 +2520,7 @@ $("start-buzzer-game-after-top20").addEventListener("click", async () => {
 $("start-map-after-price").addEventListener("click", async () => {
   const accepted = await runModeratorAction(() => {
     if (getShowWinner(state) || state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
-    if (!europeMapGame.start(state)) return false;
+    if (!kartenwissenGame.start(state)) return false;
     mapNotes = emptyMapNotes(0);
     saveMapNotes();
     return true;
@@ -2529,13 +2529,13 @@ $("start-map-after-price").addEventListener("click", async () => {
 });
 
 $("reveal-map-round").addEventListener("click", async () => {
-  await runModeratorAction(() => europeMapGame.revealRound(state));
+  await runModeratorAction(() => kartenwissenGame.revealRound(state));
 });
 
 $("next-map-round").addEventListener("click", async () => {
   const nextRoundIndex = state.game.roundIndex + 1;
   const accepted = await runModeratorAction(() => {
-    if (!europeMapGame.startNextRound(state)) return false;
+    if (!kartenwissenGame.startNextRound(state)) return false;
     mapNotes = emptyMapNotes(nextRoundIndex);
     saveMapNotes();
     return true;
@@ -2544,7 +2544,7 @@ $("next-map-round").addEventListener("click", async () => {
 });
 
 $("start-first-map-round").addEventListener("click", async () => {
-  await runModeratorAction(() => europeMapGame.startFirstRound(state));
+  await runModeratorAction(() => kartenwissenGame.startFirstRound(state));
 });
 
 $("start-price-after-estimation").addEventListener("click", async () => {
@@ -2740,7 +2740,7 @@ $("start-word-match-game").addEventListener("click", async () => {
     return;
   }
   const accepted = await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== europeMapGame.id || state.game.status !== "finished") return false;
+    if (getShowWinner(state) || state.game.id !== kartenwissenGame.id || state.game.status !== "finished") return false;
     if (!wordMatchGame.start(state, state.players)) return false;
     wordMatchDrafts = emptyWordMatchDrafts(0);
     saveWordMatchDrafts();

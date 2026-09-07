@@ -130,8 +130,8 @@ test("records which team won which game and keeps the playing order", () => {
 test("does not record the same game twice when the host renders again", () => {
   const state = createInitialRoomState("TEST");
 
-  assert.equal(recordGameResult(state, "europe-map", "red"), true);
-  assert.equal(recordGameResult(state, "europe-map", "red"), false);
+  assert.equal(recordGameResult(state, "kartenwissen", "red"), true);
+  assert.equal(recordGameResult(state, "kartenwissen", "red"), false);
   assert.equal(state.gameResults.length, 1);
 });
 
@@ -214,10 +214,11 @@ test("prevents a second entry under the same name while the team still has room"
 });
 
 test("translates renamed game ids so existing rooms keep working", () => {
-  assert.equal(normalizeGameId("germany-map"), "europe-map");
+  assert.equal(normalizeGameId("germany-map"), "kartenwissen");
+  assert.equal(normalizeGameId("europe-map"), "kartenwissen");
   assert.equal(normalizeGameId("spotify-top-artists"), "top-20");
   // Aktuelle und unbekannte Ids bleiben unberührt.
-  assert.equal(normalizeGameId("europe-map"), "europe-map");
+  assert.equal(normalizeGameId("kartenwissen"), "kartenwissen");
   assert.equal(normalizeGameId("buzzer"), "buzzer");
   assert.equal(normalizeGameId(undefined), undefined);
 });
@@ -239,7 +240,7 @@ test("restores a room that still holds the old map game id", () => {
 
   const state = createRoomStateFromRecords("TEST", room);
 
-  assert.equal(state.game.id, "europe-map", "der gespeicherte Zustand wird übernommen");
+  assert.equal(state.game.id, "kartenwissen", "der gespeicherte Zustand wird übernommen");
   assert.equal(state.game.roundIndex, 3, "und nicht verworfen");
   assert.deepEqual(state.game.roundScores, { blue: 2, red: 1 });
 });
@@ -266,7 +267,7 @@ test("translates old game ids in a stored result history", () => {
   ]);
 
   assert.deepEqual(restored, [
-    { gameId: "europe-map", team: "blue" },
+    { gameId: "kartenwissen", team: "blue" },
     { gameId: "top-20", team: "red" }
   ]);
 });

@@ -23,11 +23,11 @@ import {
 } from "../js/games/ranking-game.js";
 import { RANKING_LISTS } from "../js/games/ranking-lists.js";
 import {
-  EUROPE_MAP_QUESTIONS,
-  EUROPE_MAP_ROUNDS_TO_WIN,
+  KARTENWISSEN_QUESTIONS,
+  KARTENWISSEN_ROUNDS_TO_WIN,
   distanceInKilometers,
-  europeMapGame
-} from "../js/games/europe-map.js";
+  kartenwissenGame
+} from "../js/games/kartenwissen.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
@@ -122,14 +122,14 @@ test("contains presentation cards for all seven games", () => {
   assert.deepEqual([
     "estimation-game",
     "guess-the-price",
-    "europe-map",
+    "kartenwissen",
     "word-match-game",
     "ranking-game",
     "matching-game",
     "buzzer"
   ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6, 7]);
   assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");
-  assert.equal(getGamePresentation("europe-map").name, "Kartenwissen");
+  assert.equal(getGamePresentation("kartenwissen").name, "Kartenwissen");
   assert.equal(getGamePresentation("matching-game").name, "Da seh ich dich");
   assert.equal(getGamePresentation("estimation-game").name, "Mittelwert");
   assert.equal(getGamePresentation("word-match-game").name, "Begriffsmatch");
@@ -246,7 +246,7 @@ test("maps every game to the score shown to the moderator", () => {
     ["buzzer", "scores"],
     ["top-20", "roundWins"],
     ["ranking-game", "roundWins"],
-    ["europe-map", "roundScores"],
+    ["kartenwissen", "roundScores"],
     ["matching-game", "scores"],
     ["guess-the-price", "roundScores"],
     ["estimation-game", "roundScores"],
@@ -724,14 +724,14 @@ test("normalizes a persisted single-round Top 20 state", () => {
 });
 
 test("contains seven prepared Europe map questions", () => {
-  assert.equal(EUROPE_MAP_QUESTIONS.length, 7);
-  assert.ok(EUROPE_MAP_QUESTIONS.every((question) =>
+  assert.equal(KARTENWISSEN_QUESTIONS.length, 7);
+  assert.ok(KARTENWISSEN_QUESTIONS.every((question) =>
     question.prompt && question.answer && Number.isFinite(question.target.lat) && Number.isFinite(question.target.lng)
   ));
 });
 
 test("uses the seven requested European destinations", () => {
-  const answers = EUROPE_MAP_QUESTIONS.map((question) => question.answer);
+  const answers = KARTENWISSEN_QUESTIONS.map((question) => question.answer);
   assert.deepEqual(answers, [
     "Sagrada Família · Barcelona, Spanien",
     "Kolosseum · Rom, Italien",
@@ -741,7 +741,7 @@ test("uses the seven requested European destinations", () => {
     "Stonehenge · nahe Amesbury/Salisbury, England",
     "Atomium · Brüssel, Belgien"
   ]);
-  assert.deepEqual(EUROPE_MAP_QUESTIONS.map((question) => question.location), [
+  assert.deepEqual(KARTENWISSEN_QUESTIONS.map((question) => question.location), [
     "Barcelona, Spanien",
     "Rom, Italien",
     "Warschau, Polen",
@@ -751,7 +751,7 @@ test("uses the seven requested European destinations", () => {
     "Brüssel, Belgien"
   ]);
   assert.equal(
-    EUROPE_MAP_QUESTIONS[4].prompt,
+    KARTENWISSEN_QUESTIONS[4].prompt,
     "Wo steht die Hagia Sophia, eine der historisch bedeutendsten Moscheen der Welt?"
   );
 });
@@ -781,18 +781,18 @@ test("calculates geographic distances in kilometers", () => {
 
 test("shares one map pin per team and awards the closer team", () => {
   const state = createInitialRoomState("TEST");
-  europeMapGame.start(state);
+  kartenwissenGame.start(state);
   assert.equal(state.game.status, "round-pending");
-  assert.equal(europeMapGame.startFirstRound(state), true);
-  const target = EUROPE_MAP_QUESTIONS[0].target;
+  assert.equal(kartenwissenGame.startFirstRound(state), true);
+  const target = KARTENWISSEN_QUESTIONS[0].target;
 
-  assert.equal(europeMapGame.placePin(state, "blue", { lat: 53.5, lng: 10 }), true);
-  assert.equal(europeMapGame.placePin(state, "blue", target), true);
+  assert.equal(kartenwissenGame.placePin(state, "blue", { lat: 53.5, lng: 10 }), true);
+  assert.equal(kartenwissenGame.placePin(state, "blue", target), true);
   assert.deepEqual(state.game.pins.blue, target);
-  assert.equal(europeMapGame.placePin(state, "red", { lat: 52.52, lng: 13.405 }), true);
-  assert.equal(europeMapGame.lockTeam(state, "blue"), true);
-  assert.equal(europeMapGame.lockTeam(state, "red"), true);
-  assert.equal(europeMapGame.revealRound(state), true);
+  assert.equal(kartenwissenGame.placePin(state, "red", { lat: 52.52, lng: 13.405 }), true);
+  assert.equal(kartenwissenGame.lockTeam(state, "blue"), true);
+  assert.equal(kartenwissenGame.lockTeam(state, "red"), true);
+  assert.equal(kartenwissenGame.revealRound(state), true);
   assert.equal(state.game.roundWinner, "blue");
   assert.deepEqual(state.game.roundScores, { blue: 1, red: 0 });
   assert.equal(state.game.distances.blue, 0);
@@ -800,23 +800,23 @@ test("shares one map pin per team and awards the closer team", () => {
 
 test("finishes the best of seven map game at four points", () => {
   const state = createInitialRoomState("TEST");
-  europeMapGame.start(state);
-  europeMapGame.startFirstRound(state);
-  state.game.roundScores.blue = EUROPE_MAP_ROUNDS_TO_WIN - 1;
-  const target = EUROPE_MAP_QUESTIONS[0].target;
+  kartenwissenGame.start(state);
+  kartenwissenGame.startFirstRound(state);
+  state.game.roundScores.blue = KARTENWISSEN_ROUNDS_TO_WIN - 1;
+  const target = KARTENWISSEN_QUESTIONS[0].target;
 
-  europeMapGame.placePin(state, "blue", target);
-  europeMapGame.placePin(state, "red", { lat: 53.5, lng: 10 });
-  europeMapGame.lockTeam(state, "blue");
-  europeMapGame.lockTeam(state, "red");
-  europeMapGame.revealRound(state);
+  kartenwissenGame.placePin(state, "blue", target);
+  kartenwissenGame.placePin(state, "red", { lat: 53.5, lng: 10 });
+  kartenwissenGame.lockTeam(state, "blue");
+  kartenwissenGame.lockTeam(state, "red");
+  kartenwissenGame.revealRound(state);
 
   assert.equal(state.game.status, "revealed");
-  assert.equal(europeMapGame.startNextRound(state), true);
+  assert.equal(kartenwissenGame.startNextRound(state), true);
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "blue");
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(europeMapGame.startNextRound(state), false);
+  assert.equal(kartenwissenGame.startNextRound(state), false);
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
 });
 

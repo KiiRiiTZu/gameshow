@@ -4,7 +4,7 @@ import { SHOW_WINNING_SCORE } from "./room.js";
 const GAME_PRESENTATIONS = {
   "estimation-game": { number: 1, name: "Mittelwert" },
   "matching-game": { number: 6, name: "Da seh ich dich" },
-  "europe-map": { number: 3, name: "Kartenwissen" },
+  "kartenwissen": { number: 3, name: "Kartenwissen" },
   "word-match-game": { number: 4, name: "Begriffsmatch" },
   "ranking-game": { number: 5, name: "Einordnen" },
   "top-20": { number: 5, name: "Top 20" },
@@ -17,7 +17,7 @@ const GAME_PRESENTATIONS = {
 export const GAME_SEQUENCE = [
   "estimation-game",
   "guess-the-price",
-  "europe-map",
+  "kartenwissen",
   "word-match-game",
   "ranking-game",
   "matching-game",

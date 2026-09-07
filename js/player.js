@@ -6,7 +6,7 @@ import {
 import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound, unlockBuzzerSound } from "./audio.js";
-import { EUROPE_MAP_QUESTIONS } from "./games/europe-map.js";
+import { KARTENWISSEN_QUESTIONS } from "./games/kartenwissen.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
 import { captureRankingMove, isRankingMotionPending, playRankingMove } from "./ranking-motion.js";
 import { createEuropeMap } from "./europe-map-view.js";
@@ -43,7 +43,7 @@ import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
 const TOP_20_GAME_ID = "top-20";
 const RANKING_GAME_ID = "ranking-game";
 const TOP_20_SLOT_COUNT = 20;
-const EUROPE_MAP_GAME_ID = "europe-map";
+const KARTENWISSEN_GAME_ID = "kartenwissen";
 const MATCHING_GAME_ID = "matching-game";
 const PRICE_GAME_ID = "guess-the-price";
 const ESTIMATION_GAME_ID = "estimation-game";
@@ -198,11 +198,11 @@ async function initializePlayer() {
     showPlayerGame();
   }
 
-  playerMap = createEuropeMap($("player-europe-map"), {
+  playerMap = createEuropeMap($("player-kartenwissen-map"), {
     enableZoom: true,
     compactMarkers: true,
     async onPlacePin(position) {
-      if (!player || roomState?.game?.id !== EUROPE_MAP_GAME_ID ||
+      if (!player || roomState?.game?.id !== KARTENWISSEN_GAME_ID ||
           roomState.game.status !== "placing" || roomState.game.lockedTeams?.[player.team]) return;
 
       await realtime.send("map_pin", { playerId, position });
@@ -321,7 +321,7 @@ function teamChatIsWritable() {
   if (roomState.game.id === RANKING_GAME_ID) {
     return ["playing", "ready-to-reveal"].includes(roomState.game.status);
   }
-  if (roomState.game.id === EUROPE_MAP_GAME_ID) {
+  if (roomState.game.id === KARTENWISSEN_GAME_ID) {
     return roomState.game.status === "placing" && !roomState.game.lockedTeams?.[player.team];
   }
   if (roomState.game.id === PRICE_GAME_ID) {
@@ -393,7 +393,7 @@ document.addEventListener("submit", async (event) => {
 });
 
 $("lock-map-pin").addEventListener("click", async () => {
-  if (!player || roomState?.game?.id !== EUROPE_MAP_GAME_ID ||
+  if (!player || roomState?.game?.id !== KARTENWISSEN_GAME_ID ||
       roomState.game.status !== "placing" || !roomState.game.pins?.[player.team] ||
       roomState.game.lockedTeams?.[player.team]) return;
 
@@ -854,7 +854,7 @@ function render() {
 
   const top20IsActive = roomState.game?.id === TOP_20_GAME_ID;
   const rankingIsActive = roomState.game?.id === RANKING_GAME_ID;
-  const mapIsActive = roomState.game?.id === EUROPE_MAP_GAME_ID;
+  const mapIsActive = roomState.game?.id === KARTENWISSEN_GAME_ID;
   const matchingIsActive = roomState.game?.id === MATCHING_GAME_ID;
   const priceIsActive = roomState.game?.id === PRICE_GAME_ID;
   const estimationIsActive = roomState.game?.id === ESTIMATION_GAME_ID;
@@ -1166,7 +1166,7 @@ function renderTop20Slots(revealed = []) {
 
 function renderMapGame() {
   const game = roomState.game;
-  const question = EUROPE_MAP_QUESTIONS[game.roundIndex];
+  const question = KARTENWISSEN_QUESTIONS[game.roundIndex];
   const isPending = game.status === "round-pending";
   const isFinished = game.status === "finished";
   const hasRoundResult = Number.isFinite(game.distances?.blue) && Number.isFinite(game.distances?.red);
@@ -1176,7 +1176,7 @@ function renderMapGame() {
   const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
 
   $("player-map-question-number").textContent =
-    `FRAGE ${game.roundIndex + 1} VON ${EUROPE_MAP_QUESTIONS.length}`;
+    `FRAGE ${game.roundIndex + 1} VON ${KARTENWISSEN_QUESTIONS.length}`;
   $("player-map-question").textContent = isPending ? "" : question.prompt;
   $("player-map-question-number").closest(".map-question-card").classList.toggle("hidden", isPending);
   $("player-map-blue-score").textContent = game.roundScores.blue;

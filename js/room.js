@@ -4,13 +4,14 @@ export const SHOW_WINNING_SCORE = 4;
 
 /**
  * Frühere Spiel-Ids, die noch in rooms.current_game und in gespeicherten
- * Spielzuständen stehen können. Die Namen wurden angeglichen, weil sie nicht
- * mehr zum Inhalt passten: "germany-map" fragt längst nach Barcelona, Rom und
- * Istanbul, und "spotify-top-artists" spielt drei Listen, von denen nur eine
- * von Spotify kommt.
+ * Spielzuständen stehen können. Die Ids heissen jetzt wie die Spiele:
+ * "germany-map" hiess so, fragte aber längst nach Barcelona, Rom und Istanbul,
+ * und "spotify-top-artists" spielt drei Listen, von denen nur eine von Spotify
+ * kommt. "europe-map" war ein Zwischenschritt auf dem Testbranch.
  */
 const LEGACY_GAME_IDS = {
-  "germany-map": "europe-map",
+  "germany-map": "kartenwissen",
+  "europe-map": "kartenwissen",
   "spotify-top-artists": "top-20"
 };
 

@@ -1,7 +1,7 @@
 import { BUZZER_WINNING_SCORE } from "./games/buzzer.js";
 import { TOP_20_ROUNDS_TO_WIN } from "./games/top-20.js";
 import { RANKING_ROUNDS_TO_WIN } from "./games/ranking-game.js";
-import { EUROPE_MAP_ROUNDS_TO_WIN } from "./games/europe-map.js";
+import { KARTENWISSEN_ROUNDS_TO_WIN } from "./games/kartenwissen.js";
 import { MATCHING_GAME_ROUNDS } from "./games/matching-game.js";
 import { PRICE_GAME_WINNING_SCORE } from "./games/guess-the-price.js";
 import { ESTIMATION_ROUNDS_TO_WIN } from "./games/estimation-game.js";
@@ -11,7 +11,7 @@ const GAME_SCORE_CONFIG = {
   buzzer: { key: "scores", label: "Quizpunkte" },
   "top-20": { key: "roundWins", label: "Rundensiege" },
   "ranking-game": { key: "roundWins", label: "Listensiege" },
-  "europe-map": { key: "roundScores", label: "Kartenpunkte" },
+  "kartenwissen": { key: "roundScores", label: "Kartenpunkte" },
   "matching-game": { key: "scores", label: "Übereinstimmungen" },
   "guess-the-price": { key: "roundScores", label: "Rundensiege" },
   "estimation-game": { key: "roundScores", label: "Rundensiege" },
@@ -22,7 +22,7 @@ const FIXED_WINNING_SCORES = {
   buzzer: BUZZER_WINNING_SCORE,
   "top-20": TOP_20_ROUNDS_TO_WIN,
   "ranking-game": RANKING_ROUNDS_TO_WIN,
-  "europe-map": EUROPE_MAP_ROUNDS_TO_WIN,
+  "kartenwissen": KARTENWISSEN_ROUNDS_TO_WIN,
   "guess-the-price": PRICE_GAME_WINNING_SCORE,
   "estimation-game": ESTIMATION_ROUNDS_TO_WIN
 };

@@ -91,7 +91,7 @@ test("names every game of the active sequence for the transition card", () => {
   const sequence = [
     ["estimation-game", 1, "Mittelwert"],
     ["guess-the-price", 2, "Thrifty"],
-    ["europe-map", 3, "Kartenwissen"],
+    ["kartenwissen", 3, "Kartenwissen"],
     ["word-match-game", 4, "Begriffsmatch"],
     ["ranking-game", 5, "Einordnen"],
     ["matching-game", 6, "Da seh ich dich"],
@@ -115,7 +115,7 @@ test("lists the seven active games in playing order", () => {
   assert.deepEqual(GAME_SEQUENCE, [
     "estimation-game",
     "guess-the-price",
-    "europe-map",
+    "kartenwissen",
     "word-match-game",
     "ranking-game",
     "matching-game",

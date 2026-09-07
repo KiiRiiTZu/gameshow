@@ -120,7 +120,7 @@ js/game-effects.js              Übergangskarte, Siegerehrung, Punkteübersicht
 js/moderator-score.js           Manuelle Punktekorrektur des Moderators
 js/team-chat.js                 Privater Teamchat
 js/private-channel-crypto.js    Verschlüsselte private Team-Payloads
-js/europe-map-view.js           Interaktive SVG-Europakarte
+js/europe-map-view.js           Interaktive SVG-Europakarte (von Kartenwissen genutzt)
 js/ranking-motion.js            Flug-Animation bei Einordnen
 js/games/game-engine.js         Registry der Minispiele
 js/games/*.js                   Regeln und Fragen der einzelnen Spiele
