@@ -1,5 +1,5 @@
 // Abhängigkeitsfreier Static-Server für die lokale Entwicklung.
-// Start: node .claude/static-server.mjs 8000
+// Start: node scripts/dev-server.mjs 8000
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";

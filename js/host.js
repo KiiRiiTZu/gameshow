@@ -4,6 +4,7 @@ import {
   getPlayers,
   savePlayer,
   updateRoom,
+  updateRoomGameResults,
   updateRoomGameState
 } from "./database.js";
 
@@ -88,6 +89,7 @@ let roomRecord;
 let state;
 let realtime;
 let supportsRemoteGameState = true;
+let supportsRemoteGameResults = true;
 let moderatorActionPending = false;
 let hostMap;
 let matchingAssignments = [];
@@ -428,6 +430,14 @@ async function persistRoomState() {
 
     if (!supportsRemoteGameState) {
       console.warn("Supabase game_state is not available yet; using local host recovery.");
+    }
+  }
+
+  if (supportsRemoteGameResults) {
+    supportsRemoteGameResults = await updateRoomGameResults(roomRecord.id, state.gameResults);
+
+    if (!supportsRemoteGameResults) {
+      console.warn("Supabase game_results is not available yet; using local host recovery.");
     }
   }
 }

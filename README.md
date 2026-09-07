@@ -100,9 +100,9 @@ Getestet werden die Spielregeln, der Raumzustand, die Verschlüsselung der priva
 
 Die Browser-Konfiguration befindet sich in `js/config.js`. Dort darf ausschließlich ein Publishable Key verwendet werden, niemals ein `service_role`- oder Secret-Key.
 
-Für die Persistenz variabler Spielzustände muss die Migration aus `supabase/migrations/202608120001_add_room_game_state.sql` einmal im SQL Editor ausgeführt werden. Ohne sie bleibt der Spielablauf funktionsfähig und der Moderator-Browser hält einen lokalen Recovery-Zustand; eine geräteübergreifende Wiederherstellung braucht jedoch die Migration.
+Für die geräteübergreifende Wiederherstellung müssen die beiden Migrationen aus `supabase/migrations/` einmal in ihrer Reihenfolge im SQL Editor ausgeführt werden. `game_state` speichert den Zustand des aktuellen Spiels; `game_results` hält fest, welches Team welches Spiel gewonnen hat und stellt damit die Punkteübersicht wieder her.
 
-Optional lässt sich `rooms.game_results jsonb` ergänzen. Diese Spalte hält fest, welches Team welches Spiel gewonnen hat — die Grundlage der Punkteübersicht. Ohne sie liegt die Historie nur im Moderator-Browser.
+Ohne eine der Spalten bleibt die laufende Show funktionsfähig und der Moderator-Browser hält den jeweiligen Zustand lokal. Ein Wechsel auf ein anderes Moderator-Gerät kann diesen lokalen Stand jedoch nicht übernehmen.
 
 ## Projektstruktur
 
