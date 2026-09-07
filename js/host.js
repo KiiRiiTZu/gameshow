@@ -4,21 +4,31 @@ import {
   getPlayers,
   savePlayer,
   updateRoom,
+  updateRoomGameResults,
   updateRoomGameState
 } from "./database.js";
 
-import { addOrUpdatePlayer, createRoomStateFromRecords, generateRoomCode, getShowWinner } from "./room.js";
+import {
+  addOrUpdatePlayer,
+  createRoomStateFromRecords,
+  generateRoomCode,
+  getShowWinner,
+  findReclaimableSeat,
+  normalizeGameId,
+  normalizeGameResults,
+  recordGameResult
+} from "./room.js";
 import { createRoomChannel } from "./realtime.js";
-import { playBuzzerSound } from "./audio.js";
+import { playBuzzerSound, unlockBuzzerSound } from "./audio.js";
 import { registerGame } from "./games/game-engine.js";
-import { BUZZER_WINNING_SCORE, buzzerGame } from "./games/buzzer.js";
+import { BUZZER_WINNING_SCORE, buzzerQuizGame } from "./games/buzzer-quiz.js";
 import { BUZZER_QUESTIONS, getBuzzerQuestion } from "./games/buzzer-questions.js";
-import { top20Game } from "./games/spotify-top-artists.js";
+import { top20Game } from "./games/top-20.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
-import { rankingGame } from "./games/ranking-game.js";
+import { einordnenGame } from "./games/einordnen.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
-import { captureRankingMove, playRankingMove } from "./ranking-motion.js";
-import { GERMANY_MAP_QUESTIONS, GERMANY_MAP_ROUNDS_TO_WIN, germanyMapGame } from "./games/germany-map.js";
+import { captureRankingMove, isRankingMotionPending, playRankingMove, resetRankingMotion } from "./ranking-motion.js";
+import { KARTENWISSEN_QUESTIONS, KARTENWISSEN_ROUNDS_TO_WIN, kartenwissenGame } from "./games/kartenwissen.js";
 import { createEuropeMap } from "./europe-map-view.js";
 import {
   MATCHING_ASSIGNERS,
@@ -28,16 +38,16 @@ import {
   areMatchingValuesUnique,
   getMatchingRoleRoundIndex,
   getMatchingTurn,
-  matchingGame
-} from "./games/matching-game.js";
+  daSehIchDichGame
+} from "./games/da-seh-ich-dich.js";
 import {
   formatEuroAmount,
   formatSignedEuroDifference,
-  guessThePriceGame,
+  thriftyGame,
   parseEuroAmount
-} from "./games/guess-the-price.js";
+} from "./games/thrifty.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
-import { estimationGame, parseEstimate } from "./games/estimation-game.js";
+import { mittelwertGame, parseEstimate } from "./games/mittelwert.js";
 import { ESTIMATION_QUESTIONS, getEstimationQuestion } from "./games/estimation-questions.js";
 import {
   WORD_MATCH_CATEGORIES,
@@ -47,15 +57,15 @@ import {
   WORD_MATCH_TIEBREAK_SECONDS,
   getWordMatchGuessOrder,
   getWordMatchRoles,
-  wordMatchGame
-} from "./games/word-match-game.js";
+  begriffsmatchGame
+} from "./games/begriffsmatch.js";
 import {
   createMatchingKeyPair,
   exportMatchingPublicKey
 } from "./matching-crypto.js";
 import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
-import { showGameTransition } from "./game-effects.js";
-import { setModeratorScore } from "./moderator-score.js";
+import { renderScoreOverview, showGameTransition, showGameWinner } from "./game-effects.js";
+import { getModeratorGameScore, setModeratorScore } from "./moderator-score.js";
 import {
   addTeamChatMessage,
   clearExpiredTeamChatTyping,
@@ -65,20 +75,21 @@ import {
   supportsTeamChat
 } from "./team-chat.js";
 
-registerGame(buzzerGame);
+registerGame(buzzerQuizGame);
 registerGame(top20Game);
-registerGame(rankingGame);
-registerGame(germanyMapGame);
-registerGame(matchingGame);
-registerGame(guessThePriceGame);
-registerGame(estimationGame);
-registerGame(wordMatchGame);
+registerGame(einordnenGame);
+registerGame(kartenwissenGame);
+registerGame(daSehIchDichGame);
+registerGame(thriftyGame);
+registerGame(mittelwertGame);
+registerGame(begriffsmatchGame);
 
 let roomCode;
 let roomRecord;
 let state;
 let realtime;
 let supportsRemoteGameState = true;
+let supportsRemoteGameResults = true;
 let moderatorActionPending = false;
 let hostMap;
 let matchingAssignments = [];
@@ -364,9 +375,40 @@ function restoreLocalGameState() {
 
   try {
     const savedGame = JSON.parse(localStorage.getItem(gameStorageKey()));
-    if (savedGame?.id === roomRecord.current_game) state.game = savedGame;
+    // Auch der lokale Stand kann noch eine alte Spiel-Id tragen.
+    const savedGameId = normalizeGameId(savedGame?.id);
+    if (savedGameId && savedGameId === normalizeGameId(roomRecord.current_game)) {
+      state.game = { ...savedGame, id: savedGameId };
+    }
   } catch (error) {
     console.warn("Local game state could not be restored:", error);
+  }
+}
+
+function gameResultsStorageKey() {
+  return `gameshow-game-results-${roomRecord.id}`;
+}
+
+function saveGameResults() {
+  try {
+    localStorage.setItem(gameResultsStorageKey(), JSON.stringify(state.gameResults));
+  } catch (error) {
+    console.warn("Game results could not be saved:", error);
+  }
+}
+
+function restoreGameResults() {
+  // Die Spalte rooms.game_results ist optional; ohne sie hält der Moderator-Browser
+  // die Historie lokal, genau wie beim Spielzustand.
+  if (state.gameResults?.length) return;
+
+  try {
+    state.gameResults = normalizeGameResults(
+      JSON.parse(localStorage.getItem(gameResultsStorageKey()))
+    );
+  } catch (error) {
+    console.warn("Game results could not be restored:", error);
+    state.gameResults = [];
   }
 }
 
@@ -378,9 +420,9 @@ async function persistRoomState() {
     red_score: state.scores.red,
     current_game: state.game.id,
     game_status: state.game.status,
-    buzzer_winner_id: state.game.id === "buzzer" ? state.game.winner?.playerId ?? null : null,
-    buzzer_winner_name: state.game.id === "buzzer" ? state.game.winner?.playerName ?? null : null,
-    buzzer_winner_team: state.game.id === "buzzer" ? state.game.winner?.team ?? null : null
+    buzzer_winner_id: state.game.id === "buzzer-quiz" ? state.game.winner?.playerId ?? null : null,
+    buzzer_winner_name: state.game.id === "buzzer-quiz" ? state.game.winner?.playerName ?? null : null,
+    buzzer_winner_team: state.game.id === "buzzer-quiz" ? state.game.winner?.team ?? null : null
   });
 
   if (supportsRemoteGameState) {
@@ -388,6 +430,14 @@ async function persistRoomState() {
 
     if (!supportsRemoteGameState) {
       console.warn("Supabase game_state is not available yet; using local host recovery.");
+    }
+  }
+
+  if (supportsRemoteGameResults) {
+    supportsRemoteGameResults = await updateRoomGameResults(roomRecord.id, state.gameResults);
+
+    if (!supportsRemoteGameResults) {
+      console.warn("Supabase game_results is not available yet; using local host recovery.");
     }
   }
 }
@@ -414,40 +464,41 @@ async function initializeHost() {
   const players = await getPlayers(roomRecord.id);
   state = createRoomStateFromRecords(roomCode, roomRecord, players);
   restoreLocalGameState();
+  restoreGameResults();
   teamChat = createTeamChat(supportsTeamChat(state.game.id) ? state.game.id : null);
 
   if (state.game.id === top20Game.id) {
     top20Game.normalize(state);
     restoreTop20Notes();
   }
-  if (state.game.id === germanyMapGame.id) {
-    germanyMapGame.normalize(state);
+  if (state.game.id === kartenwissenGame.id) {
+    kartenwissenGame.normalize(state);
     restoreMapNotes();
   }
-  if (state.game.id === rankingGame.id) rankingGame.normalize(state);
-  if (state.game.id === matchingGame.id) {
-    matchingGame.normalize(state);
+  if (state.game.id === einordnenGame.id) einordnenGame.normalize(state);
+  if (state.game.id === daSehIchDichGame.id) {
+    daSehIchDichGame.normalize(state);
     const assignmentsRestored = restoreMatchingAssignments();
     if (!assignmentsRestored && state.game.status === "assigning") {
       state.game.activeTurnIndex = 0;
       state.game.turnSubmitted = false;
     }
   }
-  if (state.game.id === guessThePriceGame.id) {
-    guessThePriceGame.normalize(state);
+  if (state.game.id === thriftyGame.id) {
+    thriftyGame.normalize(state);
     restorePriceDrafts();
   }
-  if (state.game.id === estimationGame.id) {
-    estimationGame.normalize(state);
+  if (state.game.id === mittelwertGame.id) {
+    mittelwertGame.normalize(state);
     restoreEstimationDrafts();
   }
-  if (state.game.id === wordMatchGame.id) {
-    wordMatchGame.normalize(state);
+  if (state.game.id === begriffsmatchGame.id) {
+    begriffsmatchGame.normalize(state);
     restoreWordMatchDrafts();
   }
 
   $("room-code").textContent = roomCode;
-  hostMap = createEuropeMap($("host-germany-map"), {
+  hostMap = createEuropeMap($("host-kartenwissen-map"), {
     enableZoom: true
   });
   matchingKeyPair = await createMatchingKeyPair();
@@ -458,16 +509,34 @@ async function initializeHost() {
   render();
 }
 
+function gameWinnerDetail(game) {
+  const score = getModeratorGameScore(game);
+  if (!score) return "";
+  return `${score.label} ${score.scores.blue} : ${score.scores.red}`;
+}
+
 function renderGameEffects() {
   const gameId = state.game.id;
 
   if (previousGameId && previousGameId !== gameId) {
     showGameTransition(gameId);
-  } else if ([buzzerGame.id, estimationGame.id].includes(gameId) &&
+  } else if ([buzzerQuizGame.id, mittelwertGame.id].includes(gameId) &&
       previousGameStatus === "not-started" &&
       state.game.status !== "not-started") {
     showGameTransition(gameId);
+  } else if (previousGameId === gameId && previousGameStatus &&
+      previousGameStatus !== "finished" && state.game.status === "finished") {
+    // Erst der Übergang von "läuft" auf "beendet" feiert — ein Reload in ein
+    // bereits beendetes Spiel startet kein Konfetti.
+    showGameWinner(gameId, state.game.winningTeam, gameWinnerDetail(state.game));
   }
+
+  const overviewVisible = Boolean(state.scoreOverviewVisible);
+  renderScoreOverview(state, { closable: true });
+  $("toggle-score-overview").textContent = overviewVisible
+    ? "Punktestand ausblenden"
+    : "Punktestand zeigen";
+  $("toggle-score-overview").setAttribute("aria-pressed", String(overviewVisible));
 
   previousGameId = gameId;
   previousGameStatus = state.game.status;
@@ -494,13 +563,13 @@ function render() {
   renderPlayers("blue");
   renderPlayers("red");
 
-  const spotifyIsActive = state.game.id === top20Game.id;
-  const rankingIsActive = state.game.id === rankingGame.id;
-  const mapIsActive = state.game.id === germanyMapGame.id;
-  const matchingIsActive = state.game.id === matchingGame.id;
-  const priceIsActive = state.game.id === guessThePriceGame.id;
-  const estimationIsActive = state.game.id === estimationGame.id;
-  const wordMatchIsActive = state.game.id === wordMatchGame.id;
+  const top20IsActive = state.game.id === top20Game.id;
+  const rankingIsActive = state.game.id === einordnenGame.id;
+  const mapIsActive = state.game.id === kartenwissenGame.id;
+  const matchingIsActive = state.game.id === daSehIchDichGame.id;
+  const priceIsActive = state.game.id === thriftyGame.id;
+  const estimationIsActive = state.game.id === mittelwertGame.id;
+  const wordMatchIsActive = state.game.id === begriffsmatchGame.id;
   const chatIsActive = supportsTeamChat(state.game.id);
   $("host-layout").classList.toggle("chat-active", chatIsActive);
   $("host-chat-blue").classList.toggle("hidden", !chatIsActive);
@@ -508,13 +577,13 @@ function render() {
   if (chatIsActive) renderHostTeamChats();
   document.querySelector(".shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("buzzer-game-panel").classList.toggle(
     "hidden",
-    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
-  $("spotify-game-panel").classList.toggle("hidden", !spotifyIsActive);
+  $("top20-game-panel").classList.toggle("hidden", !top20IsActive);
   $("ranking-game-panel").classList.toggle("hidden", !rankingIsActive);
   $("map-game-panel").classList.toggle("hidden", !mapIsActive);
   $("matching-game-panel").classList.toggle("hidden", !matchingIsActive);
@@ -528,7 +597,7 @@ function render() {
   else if (matchingIsActive) renderMatchingGame();
   else if (mapIsActive) renderMapGame();
   else if (rankingIsActive) renderRankingGame();
-  else if (spotifyIsActive) renderSpotifyGame();
+  else if (top20IsActive) renderTop20Game();
   else renderBuzzerGame();
 }
 
@@ -654,7 +723,7 @@ function formatCountdown(seconds) {
 }
 
 function updateHostWordMatchTimer() {
-  if (state?.game?.id !== wordMatchGame.id || !$("word-match-timer")) return;
+  if (state?.game?.id !== begriffsmatchGame.id || !$("word-match-timer")) return;
   $("word-match-timer").textContent = formatCountdown(wordMatchSecondsRemaining());
 }
 
@@ -895,7 +964,7 @@ function renderRankingBoard(game, list, interactive = false, rankingMove = null)
     }
     if (proposalIndex === index) {
       const proposed = getRankingEntry(list, game.proposal.itemId);
-      const awaitingMove = rankingMove?.direction === "into-list" && rankingMove.itemId === proposed?.id;
+      const awaitingMove = isRankingMotionPending(proposed?.id, "into-list", rankingMove);
       rows.push(`<div class="ranking-row proposed ${game.proposal.team}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-proposal="${escapeHtml(proposed?.id || "")}">
         <span>${index + 1}</span><strong>${escapeHtml(proposed?.label || "")}</strong><small>vorgemerkt</small>
       </div>`);
@@ -904,7 +973,7 @@ function renderRankingBoard(game, list, interactive = false, rankingMove = null)
       const entry = getRankingEntry(list, game.placedIds[index]);
       const isAnchor = entry?.id === list.anchorId;
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
-      const awaitingMove = rankingMove?.direction === "cleanup-into-list" && rankingMove.itemId === entry?.id;
+      const awaitingMove = isRankingMotionPending(entry?.id, "cleanup-into-list", rankingMove);
       rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
         <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
@@ -948,7 +1017,7 @@ function renderRankingGame() {
   $("ranking-board").innerHTML = renderRankingBoard(game, list, true, rankingMove);
   $("ranking-pool").innerHTML = game.remainingIds.filter((id) => id !== game.proposal?.itemId).map((id) => {
     const entry = getRankingEntry(list, id);
-    const awaitingMove = rankingMove?.direction === "wrong-back-to-pool" && rankingMove.itemId === id;
+    const awaitingMove = isRankingMotionPending(id, "wrong-back-to-pool", rankingMove);
     return `<button type="button" class="ranking-candidate${rankingSelection.itemId === id ? " selected" : ""}${awaitingMove ? " ranking-awaiting-motion" : ""}"
       data-ranking-item="${escapeHtml(id)}"${game.status !== "playing" ? " disabled" : ""}>${escapeHtml(entry?.label || "")}</button>`;
   }).join("");
@@ -1054,7 +1123,7 @@ function renderBuzzerGame() {
   }
 }
 
-function renderSpotifyGame() {
+function renderTop20Game() {
   const game = state.game;
   const isFinished = game.status === "finished";
   const showIsFinished = Boolean(getShowWinner(state));
@@ -1070,23 +1139,23 @@ function renderSpotifyGame() {
   $("top20-description").textContent = list.description;
   renderEditableScore("top20-blue-score", game.roundWins.blue);
   renderEditableScore("top20-red-score", game.roundWins.red);
-  $("spotify-status").textContent = isFinished
+  $("top20-status").textContent = isFinished
     ? "Spiel beendet"
     : isRoundFinished
       ? `Runde ${roundNumber} beendet`
       : `Runde ${roundNumber} von ${TOP_20_LISTS.length}`;
-  $("spotify-status").className = `status-pill ${interactionLocked ? "closed" : "open"}`;
-  $("spotify-turn").textContent = isFinished
+  $("top20-status").className = `status-pill ${interactionLocked ? "closed" : "open"}`;
+  $("top20-turn").textContent = isFinished
     ? `${getTeamName(game.winningTeam)} gewinnt das Spiel!`
     : isRoundFinished
       ? `${getTeamName(game.roundWinner)} gewinnt Runde ${roundNumber}!`
     : `${getTeamName(currentTeam)} ist dran`;
-  $("spotify-turn").className = `turn-card ${displayTeam}`;
+  $("top20-turn").className = `turn-card ${displayTeam}`;
   $("blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("red-strikes").textContent = renderStrikes(game.strikes?.red);
-  $("spotify-board").innerHTML = renderSpotifySlots(revealed, list, interactionLocked);
-  $("spotify-finished").classList.toggle("hidden", !interactionLocked);
-  $("spotify-winner-message").textContent = isFinished
+  $("top20-board").innerHTML = renderTop20Slots(revealed, list, interactionLocked);
+  $("top20-finished").classList.toggle("hidden", !interactionLocked);
+  $("top20-winner-message").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20 mit ${game.roundWins[game.winningTeam]} Rundensiegen!`
     : isRoundFinished
       ? `${getTeamName(game.roundWinner)} gewinnt Liste ${roundNumber}.`
@@ -1096,12 +1165,12 @@ function renderSpotifyGame() {
   $("next-top20-round").disabled = moderatorActionPending;
   $("start-buzzer-game-after-top20").disabled = moderatorActionPending;
 
-  $("spotify-miss").disabled = interactionLocked || moderatorActionPending;
+  $("top20-miss").disabled = interactionLocked || moderatorActionPending;
 }
 
 function renderMapGame() {
   const game = state.game;
-  const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
+  const question = KARTENWISSEN_QUESTIONS[game.roundIndex];
   const isPending = game.status === "round-pending";
   const isFinished = game.status === "finished";
   const hasRoundResult = Number.isFinite(game.distances?.blue) && Number.isFinite(game.distances?.red);
@@ -1110,7 +1179,7 @@ function renderMapGame() {
   const bothPinsReady = Boolean(game.pins?.blue && game.pins?.red);
   const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
 
-  $("map-round-label").textContent = `Frage ${game.roundIndex + 1} von ${GERMANY_MAP_QUESTIONS.length}`;
+  $("map-round-label").textContent = `Frage ${game.roundIndex + 1} von ${KARTENWISSEN_QUESTIONS.length}`;
   $("map-question-number").textContent = `FRAGE ${game.roundIndex + 1}`;
   $("map-question").textContent = isPending ? "" : question.prompt;
   $("map-question-number").closest(".map-question-card").classList.toggle("hidden", isPending);
@@ -1145,7 +1214,7 @@ function renderMapGame() {
   $("next-map-round").disabled = moderatorActionPending;
   $("start-word-match-game").classList.toggle("hidden", !isFinished || showIsFinished);
   $("start-word-match-game").disabled = moderatorActionPending || state.players.length !== 4;
-  $("next-map-round").textContent = game.roundScores[game.roundWinner] >= GERMANY_MAP_ROUNDS_TO_WIN
+  $("next-map-round").textContent = game.roundScores[game.roundWinner] >= KARTENWISSEN_ROUNDS_TO_WIN
     ? "Spiel abschließen"
     : "Nächste Frage";
   $("map-result").classList.toggle("hidden", !isRevealed && !isFinished);
@@ -1350,7 +1419,7 @@ function renderMatchingGame() {
   }
 }
 
-function renderSpotifySlots(revealed, list, interactionLocked) {
+function renderTop20Slots(revealed, list, interactionLocked) {
   return Array.from({ length: TOP_20_SLOT_COUNT }, (_, index) => {
     const slot = revealed[index];
     const teamClass = slot?.team || "empty";
@@ -1363,7 +1432,7 @@ function renderSpotifySlots(revealed, list, interactionLocked) {
     const label = slot ? `Rang ${rank}: ${slot.answer}` : `Rang ${rank} aufdecken`;
 
     return `
-      <button class="spotify-slot top20-reveal ${teamClass}" type="button" data-rank="${rank}" aria-label="${escapeHtml(label)}"${disabled}>
+      <button class="top20-slot top20-reveal ${teamClass}" type="button" data-rank="${rank}" aria-label="${escapeHtml(label)}"${disabled}>
         <span class="rank">${rank}</span>
         <span class="artist">${answer}${value}</span>
       </button>
@@ -1460,17 +1529,17 @@ async function broadcastState() {
   if (supportsTeamChat(state.game.id)) {
     publicState.teamChatSubmissionKey = matchingPublicKey;
   }
-  if (state.game.id === guessThePriceGame.id) {
+  if (state.game.id === thriftyGame.id) {
     publicState.priceSubmissionKey = matchingPublicKey;
   }
-  if (state.game.id === estimationGame.id) {
+  if (state.game.id === mittelwertGame.id) {
     publicState.estimationSubmissionKey = matchingPublicKey;
     if (state.game.status === "ready-to-reveal") publicState.game.averages = null;
   }
-  if (state.game.id === matchingGame.id) {
+  if (state.game.id === daSehIchDichGame.id) {
     publicState.matchingSubmissionKey = matchingPublicKey;
   }
-  if (state.game.id === wordMatchGame.id) {
+  if (state.game.id === begriffsmatchGame.id) {
     publicState.wordMatchSubmissionKey = matchingPublicKey;
     if (publicState.game.tiebreak) {
       publicState.game.tiebreak.terms = publicState.game.tiebreak.terms.map((term, index) =>
@@ -1492,10 +1561,64 @@ async function broadcastState() {
   await realtime.send("room_state", publicState);
 }
 
+// Jede Zustandsänderung läuft hier durch, also wird hier auch festgehalten,
+// welches Team welches Spiel gewonnen hat. recordGameResult überschreibt einen
+// vorhandenen Eintrag, damit eine Korrektur des Moderators nachgezogen wird.
+function syncGameResult() {
+  if (state.game.status !== "finished") return;
+  if (recordGameResult(state, state.game.id, state.game.winningTeam)) saveGameResults();
+}
+
+// Zwei Signale speisen dieselbe Anzeige: steht die Realtime-Verbindung, und
+// kommt der Spielstand in der Datenbank an?
+let realtimeOnline = false;
+let persistenceError = null;
+
+function renderConnectionStatus() {
+  const dot = $("connection-dot");
+  const text = $("connection-text");
+  if (!dot || !text) return;
+
+  dot.classList.toggle("online", realtimeOnline && !persistenceError);
+  dot.classList.toggle("warning", Boolean(persistenceError));
+  text.textContent = persistenceError
+    ? "Nicht gespeichert"
+    : realtimeOnline ? "Live verbunden" : "Verbinde…";
+  text.title = persistenceError
+    ? "Die Show läuft weiter, alle Spieler sind auf dem aktuellen Stand. " +
+      "Der Spielstand liegt aber nur lokal — bis das behoben ist, kein Gerätewechsel."
+    : "";
+}
+
+function setPersistenceError(error) {
+  const changed = Boolean(persistenceError) !== Boolean(error);
+  persistenceError = error || null;
+  if (changed) renderConnectionStatus();
+}
+
 async function persistRenderAndBroadcast() {
+  syncGameResult();
   render();
-  await persistRoomState();
-  await broadcastState();
+
+  // Reihenfolge und Fehlerbehandlung sind Absicht: der Broadcast trägt die
+  // laufende Show, die Datenbank nur die Wiederherstellung nach einem Reload.
+  // Scheitert das Speichern, dürfen Moderator und Spieler deshalb trotzdem
+  // nicht auseinanderlaufen — früher blieb der Broadcast bei einem
+  // Datenbankfehler stillschweigend aus.
+  try {
+    await persistRoomState();
+    setPersistenceError(null);
+  } catch (error) {
+    console.error("Room state could not be saved:", error);
+    setPersistenceError(error);
+  }
+
+  try {
+    await broadcastState();
+  } catch (error) {
+    // Bleibt der Broadcast aus, zeigt bereits die Verbindungsanzeige das Problem.
+    console.error("Room state could not be broadcast:", error);
+  }
 }
 
 async function runModeratorAction(action) {
@@ -1508,6 +1631,8 @@ async function runModeratorAction(action) {
     if (!action()) return false;
     if (state.game.id !== previousActionGameId) {
       teamChat = createTeamChat(supportsTeamChat(state.game.id) ? state.game.id : null);
+      // Beim Start des nächsten Spiels soll die Übersicht nicht offen stehen bleiben.
+      state.scoreOverviewVisible = false;
     }
     await persistRenderAndBroadcast();
     return true;
@@ -1527,6 +1652,20 @@ async function handlePlayerJoin(incomingPlayer) {
   };
 
   if (!player.name) return;
+
+  // Kehrt jemand ohne seine alte Id zurück, bekommt er seinen bisherigen Platz
+  // samt Id zurück, statt neben der eigenen Karteileiche zu landen. Am Raum
+  // ändert sich dabei nichts — der Spieler übernimmt einfach wieder seine Id.
+  const reclaimedSeat = findReclaimableSeat(state, player);
+  if (reclaimedSeat) {
+    await realtime.send("join_result", {
+      playerId: player.id,
+      accepted: true,
+      reclaimed: true,
+      player: reclaimedSeat
+    });
+    return;
+  }
 
   const previousPlayer = state.players.find((item) => item.id === player.id);
   const accepted = addOrUpdatePlayer(state, player);
@@ -1613,7 +1752,7 @@ async function handleTop20Submission(payload) {
 }
 
 async function sendPricePrivateState(playerId) {
-  if (state.game.id !== guessThePriceGame.id) return false;
+  if (state.game.id !== thriftyGame.id) return false;
   const roomPlayer = state.players.find((item) => item.id === playerId);
   const publicKey = pricePlayerKeys.get(playerId);
   if (!roomPlayer || !publicKey) return false;
@@ -1648,7 +1787,7 @@ function getMatchingSeederIndex(playerId) {
 }
 
 async function sendMatchingPrivateState(playerId) {
-  if (state.game.id !== matchingGame.id) return false;
+  if (state.game.id !== daSehIchDichGame.id) return false;
   const assignerIndex = getMatchingSeederIndex(playerId);
   const publicKey = pricePlayerKeys.get(playerId);
   if (assignerIndex < 0 || !publicKey) return false;
@@ -1687,7 +1826,7 @@ async function syncMatchingSeeders() {
 }
 
 async function handleMatchingSubmission(payload) {
-  if (state.game.id !== matchingGame.id || !matchingIsAssigning() ||
+  if (state.game.id !== daSehIchDichGame.id || !matchingIsAssigning() ||
       state.game.activeTurnIndex !== 0 || !payload?.playerId || !payload.encrypted ||
       !matchingKeyPair?.privateKey) return;
   const assignerIndex = getMatchingSeederIndex(payload.playerId);
@@ -1718,7 +1857,7 @@ async function handleMatchingSubmission(payload) {
     if (submission.type === "lock") {
       const complete = values.every(Boolean);
       const unique = state.game.tiebreak || areMatchingValuesUnique(values);
-      const accepted = complete && unique && matchingGame.submitTeam(state, team);
+      const accepted = complete && unique && daSehIchDichGame.submitTeam(state, team);
       await realtime.send("matching_lock_result", {
         playerId: player.id,
         accepted,
@@ -1744,21 +1883,21 @@ async function handlePriceKeyRegistration(payload) {
   const roomPlayer = state.players.find((item) => item.id === payload?.playerId);
   if (!roomPlayer || !payload?.publicKey || payload.publicKey.kty !== "RSA") return;
   pricePlayerKeys.set(roomPlayer.id, payload.publicKey);
-  if (state.game.id === guessThePriceGame.id) await sendPricePrivateState(roomPlayer.id);
-  if (state.game.id === estimationGame.id) await sendEstimationPrivateState(roomPlayer.id);
-  if (state.game.id === wordMatchGame.id) await sendWordMatchPrivateState(roomPlayer.id);
-  if (state.game.id === matchingGame.id) await sendMatchingPrivateState(roomPlayer.id);
+  if (state.game.id === thriftyGame.id) await sendPricePrivateState(roomPlayer.id);
+  if (state.game.id === mittelwertGame.id) await sendEstimationPrivateState(roomPlayer.id);
+  if (state.game.id === begriffsmatchGame.id) await sendWordMatchPrivateState(roomPlayer.id);
+  if (state.game.id === daSehIchDichGame.id) await sendMatchingPrivateState(roomPlayer.id);
 }
 
 function teamChatIsWritable(team) {
   if (state.game.id === top20Game.id) return state.game.status === "playing";
-  if (state.game.id === rankingGame.id) {
+  if (state.game.id === einordnenGame.id) {
     return ["playing", "ready-to-reveal"].includes(state.game.status);
   }
-  if (state.game.id === germanyMapGame.id) {
+  if (state.game.id === kartenwissenGame.id) {
     return state.game.status === "placing" && !state.game.lockedTeams?.[team];
   }
-  if (state.game.id === guessThePriceGame.id) {
+  if (state.game.id === thriftyGame.id) {
     return state.game.status === "guessing" && !state.game.lockedTeams?.[team];
   }
   return false;
@@ -1817,7 +1956,7 @@ async function handleTeamChatSubmission(payload) {
 }
 
 async function sendWordMatchPrivateState(playerId) {
-  if (state.game.id !== wordMatchGame.id) return false;
+  if (state.game.id !== begriffsmatchGame.id) return false;
   const participant = state.game.participants?.find((item) => item.id === playerId);
   const publicKey = pricePlayerKeys.get(playerId);
   if (!participant || !publicKey) return false;
@@ -1847,7 +1986,7 @@ async function syncWordMatchSeeders() {
 }
 
 async function handleWordMatchSubmission(payload) {
-  if (state.game.id !== wordMatchGame.id || state.game.status !== "seed-collecting" ||
+  if (state.game.id !== begriffsmatchGame.id || state.game.status !== "seed-collecting" ||
       !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
   const roles = getWordMatchRoles(state.game);
   const seeder = Object.values(roles.seeders).find((item) => item?.id === payload.playerId);
@@ -1865,7 +2004,7 @@ async function handleWordMatchSubmission(payload) {
     render();
 
     if (submission.type === "lock") {
-      const accepted = wordMatchGame.lockSeeder(state, seeder.id);
+      const accepted = begriffsmatchGame.lockSeeder(state, seeder.id);
       await realtime.send("word_match_lock_result", {
         playerId: seeder.id,
         accepted,
@@ -1884,7 +2023,7 @@ async function handleWordMatchSubmission(payload) {
 }
 
 async function sendEstimationPrivateState(playerId) {
-  if (state.game.id !== estimationGame.id) return false;
+  if (state.game.id !== mittelwertGame.id) return false;
   const participant = state.game.participants?.find((item) => item.id === playerId);
   const publicKey = pricePlayerKeys.get(playerId);
   if (!participant || !publicKey) return false;
@@ -1924,7 +2063,7 @@ async function syncAllEstimationPlayers() {
 }
 
 async function handleEstimationSubmission(payload) {
-  if (state.game.id !== estimationGame.id || state.game.status !== "guessing" ||
+  if (state.game.id !== mittelwertGame.id || state.game.status !== "guessing" ||
       !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
   const participant = state.game.participants.find((item) => item.id === payload.playerId);
   if (!participant || state.game.lockedPlayerIds.includes(participant.id)) return;
@@ -1950,7 +2089,7 @@ async function handleEstimationSubmission(payload) {
         await sendEstimationPrivateState(participant.id);
         return;
       }
-      const accepted = estimationGame.lockPlayer(state, participant.id);
+      const accepted = mittelwertGame.lockPlayer(state, participant.id);
       if (accepted && state.game.status === "ready-to-reveal") {
         const estimates = {};
         for (const item of state.game.participants) {
@@ -1968,7 +2107,7 @@ async function handleEstimationSubmission(payload) {
           }
           estimates[item.id] = estimate;
         }
-        estimationGame.prepareRound(state, estimates);
+        mittelwertGame.prepareRound(state, estimates);
       }
       await realtime.send("estimation_lock_result", {
         playerId: participant.id,
@@ -1990,7 +2129,7 @@ async function handleEstimationSubmission(payload) {
 }
 
 async function sendMapPrivateState(playerId) {
-  if (state.game.id !== germanyMapGame.id) return false;
+  if (state.game.id !== kartenwissenGame.id) return false;
   const roomPlayer = state.players.find((item) => item.id === playerId);
   const publicKey = pricePlayerKeys.get(playerId);
   if (!roomPlayer || !publicKey) return false;
@@ -2018,7 +2157,7 @@ async function syncAllMapTeams() {
 }
 
 async function handleMapSubmission(payload) {
-  if (state.game.id !== germanyMapGame.id || state.game.status !== "placing" ||
+  if (state.game.id !== kartenwissenGame.id || state.game.status !== "placing" ||
       !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
   const player = state.players.find((item) => item.id === payload.playerId);
   if (!player) return;
@@ -2036,7 +2175,7 @@ async function handleMapSubmission(payload) {
 }
 
 async function handlePriceSubmission(payload) {
-  if (state.game.id !== guessThePriceGame.id || state.game.status !== "guessing" ||
+  if (state.game.id !== thriftyGame.id || state.game.status !== "guessing" ||
       !payload?.playerId || !payload.encrypted || !matchingKeyPair?.privateKey) return;
 
   const player = state.players.find((item) => item.id === payload.playerId);
@@ -2073,7 +2212,7 @@ async function handlePriceSubmission(payload) {
         return;
       }
 
-      const accepted = guessThePriceGame.lockTeam(state, player.team);
+      const accepted = thriftyGame.lockTeam(state, player.team);
       await realtime.send("price_lock_result", {
         playerId: player.id,
         accepted,
@@ -2136,21 +2275,21 @@ async function handleEvent(event, payload) {
 
   if (event === "map_pin") {
     const player = state.players.find((item) => item.id === payload.playerId);
-    if (!player || !germanyMapGame.placePin(state, player.team, payload.position)) return;
+    if (!player || !kartenwissenGame.placePin(state, player.team, payload.position)) return;
     await persistRenderAndBroadcast();
     return;
   }
 
   if (event === "map_lock") {
     const player = state.players.find((item) => item.id === payload.playerId);
-    if (!player || !germanyMapGame.lockTeam(state, player.team)) return;
+    if (!player || !kartenwissenGame.lockTeam(state, player.team)) return;
     await persistRenderAndBroadcast();
     return;
   }
 
   if (event === "buzz") {
     const player = state.players.find((item) => item.id === payload.playerId);
-    if (!player || !buzzerGame.registerBuzz(state, player)) return;
+    if (!player || !buzzerQuizGame.registerBuzz(state, player)) return;
     await realtime.send("buzz_winner", {
       playerId: player.id,
       receivedAt: state.game.winner.receivedAt
@@ -2163,9 +2302,8 @@ function startRealtime() {
   realtime = createRoomChannel(roomCode, {
     onEvent: handleEvent,
     onStatus(status, error) {
-      const online = status === "SUBSCRIBED";
-      $("connection-dot").classList.toggle("online", online);
-      $("connection-text").textContent = online ? "Live verbunden" : "Verbinde…";
+      realtimeOnline = status === "SUBSCRIBED";
+      renderConnectionStatus();
       if (error) console.error("Realtime error:", error);
     }
   });
@@ -2189,6 +2327,8 @@ document.addEventListener("focusin", (event) => {
 });
 
 document.addEventListener("keydown", (event) => {
+  // Ohne fokussiertes Element ist das Ziel das Document, das kein closest() hat.
+  if (!(event.target instanceof Element)) return;
   const score = event.target.closest(".editable-score[data-score-scope][data-score-team]");
   if (!score) return;
   if (event.key === "Enter") {
@@ -2217,41 +2357,70 @@ document.addEventListener("focusout", async (event) => {
   ));
 });
 
+// Reine Einblendung: sie muss nicht in die Datenbank, aber über room_state
+// zu den Spielern, damit alle dasselbe sehen.
+async function setScoreOverviewVisible(visible) {
+  // Der Schalter steht schon im Markup, bevor initializeHost den Raum geladen hat.
+  if (!state || !realtime) return;
+  if (Boolean(state.scoreOverviewVisible) === visible) return;
+  state.scoreOverviewVisible = visible;
+  render();
+  await broadcastState();
+}
+
+$("toggle-score-overview").addEventListener("click", async () => {
+  await setScoreOverviewVisible(!state.scoreOverviewVisible);
+});
+
+// Die Übersicht deckt die Kopfzeile ab, darum liegt das Schliessen zusätzlich
+// auf der Einblendung selbst und auf Escape.
+document.addEventListener("click", async (event) => {
+  if (!event.target.closest("[data-close-score-overview]")) return;
+  await setScoreOverviewVisible(false);
+});
+
+document.addEventListener("keydown", async (event) => {
+  if (event.key !== "Escape" || !state?.scoreOverviewVisible) return;
+  // Ohne fokussiertes Element ist das Ziel das Document, das kein closest() hat.
+  if (event.target instanceof Element && event.target.closest(".editable-score")) return;
+  await setScoreOverviewVisible(false);
+});
+
 $("open-buzzer").addEventListener("click", async () => {
-  await runModeratorAction(() => buzzerGame.open(state));
+  await runModeratorAction(() => buzzerQuizGame.open(state));
 });
 
 $("reset-buzzer").addEventListener("click", async () => {
-  await runModeratorAction(() => buzzerGame.reset(state));
+  await runModeratorAction(() => buzzerQuizGame.reset(state));
 });
 
 $("skip-buzzer-question").addEventListener("click", async () => {
-  await runModeratorAction(() => buzzerGame.advanceQuestion(state));
+  await runModeratorAction(() => buzzerQuizGame.advanceQuestion(state));
 });
 
 $("correct-answer").addEventListener("click", async () => {
   await runModeratorAction(() => {
-    if (!buzzerGame.awardPoint(state)) return false;
-    if (state.game.status !== "finished") buzzerGame.advanceQuestion(state);
+    if (!buzzerQuizGame.awardPoint(state)) return false;
+    if (state.game.status !== "finished") buzzerQuizGame.advanceQuestion(state);
     return true;
   });
 });
 
 $("start-buzzer-game").addEventListener("click", async () => {
-  await runModeratorAction(() => buzzerGame.start(state));
+  await runModeratorAction(() => buzzerQuizGame.start(state));
 });
 
 $("wrong-answer").addEventListener("click", async () => {
   await runModeratorAction(() => {
-    return buzzerGame.awardOpponentPoint(state);
+    return buzzerQuizGame.awardOpponentPoint(state);
   });
 });
 
-$("spotify-board").addEventListener("click", async (event) => {
+$("top20-board").addEventListener("click", async (event) => {
   const slot = event.target.closest("[data-rank]");
   if (!slot || slot.disabled) return;
 
-  $("spotify-error").textContent = "";
+  $("top20-error").textContent = "";
 
   const accepted = await runModeratorAction(() => top20Game.reveal(
     state,
@@ -2259,17 +2428,17 @@ $("spotify-board").addEventListener("click", async (event) => {
   ));
 
   if (!accepted) {
-    $("spotify-error").textContent = "Diese Lösung kann gerade nicht aufgedeckt werden.";
+    $("top20-error").textContent = "Diese Lösung kann gerade nicht aufgedeckt werden.";
   }
 });
 
-$("spotify-miss").addEventListener("click", async () => {
-  $("spotify-error").textContent = "";
+$("top20-miss").addEventListener("click", async () => {
+  $("top20-error").textContent = "";
   await runModeratorAction(() => top20Game.recordMiss(state));
 });
 
 $("next-top20-round").addEventListener("click", async () => {
-  $("spotify-error").textContent = "";
+  $("top20-error").textContent = "";
   const nextRoundIndex = state.game.roundIndex + 1;
   const accepted = await runModeratorAction(() => {
     if (!top20Game.startNextRound(state)) return false;
@@ -2282,17 +2451,17 @@ $("next-top20-round").addEventListener("click", async () => {
 
 $("ranking-pool").addEventListener("click", (event) => {
   const item = event.target.closest("[data-ranking-item]");
-  if (!item || item.disabled || state.game.id !== rankingGame.id || state.game.status !== "playing") return;
+  if (!item || item.disabled || state.game.id !== einordnenGame.id || state.game.status !== "playing") return;
   rankingSelection.itemId = item.dataset.rankingItem;
   renderRankingGame();
 });
 
 $("ranking-board").addEventListener("click", (event) => {
   const position = event.target.closest("[data-ranking-position]");
-  if (!position || state.game.id !== rankingGame.id) return;
+  if (!position || state.game.id !== einordnenGame.id) return;
   if (state.game.status === "ready-to-reveal") {
     $("ranking-error").textContent = "";
-    void runModeratorAction(() => rankingGame.updateProposalPosition(
+    void runModeratorAction(() => einordnenGame.updateProposalPosition(
       state,
       Number(position.dataset.rankingPosition)
     ));
@@ -2305,7 +2474,7 @@ $("ranking-board").addEventListener("click", (event) => {
 
 $("confirm-ranking-placement").addEventListener("click", async () => {
   $("ranking-error").textContent = "";
-  const accepted = await runModeratorAction(() => rankingGame.proposePlacement(
+  const accepted = await runModeratorAction(() => einordnenGame.proposePlacement(
     state,
     rankingSelection.itemId,
     rankingSelection.position
@@ -2316,21 +2485,22 @@ $("confirm-ranking-placement").addEventListener("click", async () => {
 
 $("reveal-ranking-placement").addEventListener("click", async () => {
   $("ranking-error").textContent = "";
-  await runModeratorAction(() => rankingGame.revealPlacement(state));
+  await runModeratorAction(() => einordnenGame.revealPlacement(state));
 });
 
 $("reveal-next-ranking-entry").addEventListener("click", async () => {
   $("ranking-error").textContent = "";
-  await runModeratorAction(() => rankingGame.revealNextRemaining(state));
+  await runModeratorAction(() => einordnenGame.revealNextRemaining(state));
 });
 
 $("start-first-ranking-round").addEventListener("click", async () => {
-  await runModeratorAction(() => rankingGame.startFirstRound(state));
+  await runModeratorAction(() => einordnenGame.startFirstRound(state));
 });
 
 $("next-ranking-round").addEventListener("click", async () => {
   rankingSelection = { itemId: null, position: null };
-  await runModeratorAction(() => rankingGame.startNextRound(state));
+  resetRankingMotion($("ranking-pool"), $("ranking-board"));
+  await runModeratorAction(() => einordnenGame.startNextRound(state));
 });
 
 $("start-matching-after-ranking").addEventListener("click", async () => {
@@ -2342,8 +2512,8 @@ $("start-matching-after-ranking").addEventListener("click", async () => {
     return;
   }
   await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== rankingGame.id || state.game.status !== "finished") return false;
-    if (!matchingGame.start(state, assignerOrder)) return false;
+    if (getShowWinner(state) || state.game.id !== einordnenGame.id || state.game.status !== "finished") return false;
+    if (!daSehIchDichGame.start(state, assignerOrder)) return false;
     matchingAssignments = emptyMatchingAssignments();
     saveMatchingAssignments();
     return true;
@@ -2351,17 +2521,17 @@ $("start-matching-after-ranking").addEventListener("click", async () => {
 });
 
 $("start-buzzer-game-after-top20").addEventListener("click", async () => {
-  $("spotify-error").textContent = "";
+  $("top20-error").textContent = "";
   await runModeratorAction(() => {
     if (getShowWinner(state) || state.game.id !== top20Game.id || state.game.status !== "finished") return false;
-    return buzzerGame.start(state);
+    return buzzerQuizGame.start(state);
   });
 });
 
 $("start-map-after-price").addEventListener("click", async () => {
   const accepted = await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== guessThePriceGame.id || state.game.status !== "finished") return false;
-    if (!germanyMapGame.start(state)) return false;
+    if (getShowWinner(state) || state.game.id !== thriftyGame.id || state.game.status !== "finished") return false;
+    if (!kartenwissenGame.start(state)) return false;
     mapNotes = emptyMapNotes(0);
     saveMapNotes();
     return true;
@@ -2370,13 +2540,13 @@ $("start-map-after-price").addEventListener("click", async () => {
 });
 
 $("reveal-map-round").addEventListener("click", async () => {
-  await runModeratorAction(() => germanyMapGame.revealRound(state));
+  await runModeratorAction(() => kartenwissenGame.revealRound(state));
 });
 
 $("next-map-round").addEventListener("click", async () => {
   const nextRoundIndex = state.game.roundIndex + 1;
   const accepted = await runModeratorAction(() => {
-    if (!germanyMapGame.startNextRound(state)) return false;
+    if (!kartenwissenGame.startNextRound(state)) return false;
     mapNotes = emptyMapNotes(nextRoundIndex);
     saveMapNotes();
     return true;
@@ -2385,7 +2555,7 @@ $("next-map-round").addEventListener("click", async () => {
 });
 
 $("start-first-map-round").addEventListener("click", async () => {
-  await runModeratorAction(() => germanyMapGame.startFirstRound(state));
+  await runModeratorAction(() => kartenwissenGame.startFirstRound(state));
 });
 
 $("start-price-after-estimation").addEventListener("click", async () => {
@@ -2396,8 +2566,8 @@ $("start-price-after-estimation").addEventListener("click", async () => {
   }
 
   const accepted = await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== estimationGame.id || state.game.status !== "finished") return false;
-    if (!guessThePriceGame.start(state)) return false;
+    if (getShowWinner(state) || state.game.id !== mittelwertGame.id || state.game.status !== "finished") return false;
+    if (!thriftyGame.start(state)) return false;
     priceDrafts = emptyPriceDrafts(0);
     savePriceDrafts();
     return true;
@@ -2408,14 +2578,14 @@ $("start-price-after-estimation").addEventListener("click", async () => {
 $("start-first-matching-round").addEventListener("click", async () => {
   $("matching-error").textContent = "";
   const accepted = await runModeratorAction(() => state.game.tiebreak
-    ? matchingGame.startTiebreakRound(state)
-    : matchingGame.startFirstRound(state));
+    ? daSehIchDichGame.startTiebreakRound(state)
+    : daSehIchDichGame.startFirstRound(state));
   if (accepted) await syncMatchingSeeders();
 });
 
 $("matching-board").addEventListener("change", async (event) => {
   const select = event.target.closest("[data-matching-input][data-image-index]");
-  if (!select || select.disabled || state.game.id !== matchingGame.id ||
+  if (!select || select.disabled || state.game.id !== daSehIchDichGame.id ||
       !matchingIsAssigning()) return;
 
   const assignerIndex = Number(select.dataset.matchingInput);
@@ -2460,7 +2630,7 @@ $("save-matching-assignment").addEventListener("click", async () => {
   }
 
   await runModeratorAction(() => {
-    if (state.game.id !== matchingGame.id || !matchingIsAssigning() ||
+    if (state.game.id !== daSehIchDichGame.id || !matchingIsAssigning() ||
         state.game.activeTurnIndex !== turnIndex) return false;
 
     const roundAssignments = currentMatchingAssignments();
@@ -2470,7 +2640,7 @@ $("save-matching-assignment").addEventListener("click", async () => {
         roundAssignments[imageIndex][assignerIndex] = value;
       });
       const team = MATCHING_ASSIGNERS[assignerIndex].team;
-      submitted = matchingGame.submitTeam(state, team) || submitted;
+      submitted = daSehIchDichGame.submitTeam(state, team) || submitted;
     }
     if (!submitted) return false;
     saveMatchingAssignments();
@@ -2484,7 +2654,7 @@ $("complete-matching-turn").addEventListener("click", async () => {
   const shouldReveal = state.game.activeTurnIndex === MATCHING_TURNS.length - 1;
   const isTiebreak = Boolean(state.game.tiebreak);
   await runModeratorAction(() => {
-    if (!matchingGame.completeTurn(state)) return false;
+    if (!daSehIchDichGame.completeTurn(state)) return false;
     if (!shouldReveal) return true;
 
     const roundAssignments = currentMatchingAssignments();
@@ -2493,8 +2663,8 @@ $("complete-matching-turn").addEventListener("click", async () => {
       red: roundAssignments.map((values) => [values[1], values[3]])
     };
     return isTiebreak
-      ? matchingGame.revealTiebreak(state, { blue: assignments.blue[0], red: assignments.red[0] })
-      : matchingGame.revealAll(state, assignments);
+      ? daSehIchDichGame.revealTiebreak(state, { blue: assignments.blue[0], red: assignments.red[0] })
+      : daSehIchDichGame.revealAll(state, assignments);
   });
 });
 
@@ -2506,15 +2676,15 @@ $("reveal-matching-all").addEventListener("click", async () => {
     red: roundAssignments.map((values) => [values[1], values[3]])
   };
   await runModeratorAction(() => state.game.tiebreak
-    ? matchingGame.revealTiebreak(state, { blue: assignments.blue[0], red: assignments.red[0] })
-    : matchingGame.revealAll(state, assignments));
+    ? daSehIchDichGame.revealTiebreak(state, { blue: assignments.blue[0], red: assignments.red[0] })
+    : daSehIchDichGame.revealAll(state, assignments));
 });
 
 $("next-matching-round").addEventListener("click", async () => {
   $("matching-error").textContent = "";
   const accepted = await runModeratorAction(() => state.game.tiebreak
-    ? matchingGame.startNextTiebreakRound(state)
-    : matchingGame.startNextRound(state));
+    ? daSehIchDichGame.startNextTiebreakRound(state)
+    : daSehIchDichGame.startNextRound(state));
   if (accepted) await syncMatchingSeeders();
 });
 
@@ -2526,7 +2696,7 @@ $("start-estimation-question").addEventListener("click", async () => {
       return;
     }
     const gameStarted = await runModeratorAction(() => {
-      if (!estimationGame.start(state, state.players)) return false;
+      if (!mittelwertGame.start(state, state.players)) return false;
       estimationDrafts = emptyEstimationDrafts(0);
       saveEstimationDrafts();
       return true;
@@ -2536,7 +2706,7 @@ $("start-estimation-question").addEventListener("click", async () => {
   }
   const question = getEstimationQuestion(state.game.roundIndex);
   const accepted = await runModeratorAction(() =>
-    estimationGame.startQuestion(state, question.prompt)
+    mittelwertGame.startQuestion(state, question.prompt)
   );
   if (accepted) await syncAllEstimationPlayers();
 });
@@ -2553,7 +2723,7 @@ $("reveal-estimation-round").addEventListener("click", async () => {
     estimates[participant.id] = value;
   }
   const question = getEstimationQuestion(state.game.roundIndex);
-  await runModeratorAction(() => estimationGame.revealRound(
+  await runModeratorAction(() => mittelwertGame.revealRound(
     state,
     estimates,
     question.answer,
@@ -2566,7 +2736,7 @@ $("next-estimation-question").addEventListener("click", async () => {
   const nextRoundIndex = state.game.roundIndex + 1;
   const question = getEstimationQuestion(nextRoundIndex);
   const accepted = await runModeratorAction(() => {
-    if (!estimationGame.startNextQuestion(state, question.prompt)) return false;
+    if (!mittelwertGame.startNextQuestion(state, question.prompt)) return false;
     estimationDrafts = emptyEstimationDrafts(nextRoundIndex);
     saveEstimationDrafts();
     return true;
@@ -2581,8 +2751,8 @@ $("start-word-match-game").addEventListener("click", async () => {
     return;
   }
   const accepted = await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== germanyMapGame.id || state.game.status !== "finished") return false;
-    if (!wordMatchGame.start(state, state.players)) return false;
+    if (getShowWinner(state) || state.game.id !== kartenwissenGame.id || state.game.status !== "finished") return false;
+    if (!begriffsmatchGame.start(state, state.players)) return false;
     wordMatchDrafts = emptyWordMatchDrafts(0);
     saveWordMatchDrafts();
     return true;
@@ -2593,7 +2763,7 @@ $("start-word-match-game").addEventListener("click", async () => {
 $("start-word-seed-phase").addEventListener("click", async () => {
   $("word-match-error").textContent = "";
   const accepted = await runModeratorAction(() => {
-    if (!wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[state.game.roundIndex])) return false;
+    if (!begriffsmatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[state.game.roundIndex])) return false;
     wordMatchDrafts = emptyWordMatchDrafts(state.game.roundIndex);
     const roles = getWordMatchRoles(state.game);
     for (const seeder of Object.values(roles.seeders)) {
@@ -2606,32 +2776,32 @@ $("start-word-seed-phase").addEventListener("click", async () => {
 });
 
 $("finish-word-seed-phase").addEventListener("click", async () => {
-  const accepted = await runModeratorAction(() => wordMatchGame.finishSeedPhase(state));
+  const accepted = await runModeratorAction(() => begriffsmatchGame.finishSeedPhase(state));
   if (accepted) await syncWordMatchSeeders();
 });
 
 $("start-blue-guess-phase").addEventListener("click", async () => {
   clearTimeout(wordMatchEditTimer);
-  const accepted = await runModeratorAction(() => wordMatchGame.startGuessPhase(state, "blue"));
+  const accepted = await runModeratorAction(() => begriffsmatchGame.startGuessPhase(state, "blue"));
   if (accepted) await syncWordMatchSeeders();
 });
 
 $("finish-blue-guess-phase").addEventListener("click", async () => {
-  await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "blue"));
+  await runModeratorAction(() => begriffsmatchGame.finishGuessPhase(state, "blue"));
 });
 
 $("start-red-guess-phase").addEventListener("click", async () => {
   clearTimeout(wordMatchEditTimer);
-  const accepted = await runModeratorAction(() => wordMatchGame.startGuessPhase(state, "red"));
+  const accepted = await runModeratorAction(() => begriffsmatchGame.startGuessPhase(state, "red"));
   if (accepted) await syncWordMatchSeeders();
 });
 
 $("finish-red-guess-phase").addEventListener("click", async () => {
-  await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "red"));
+  await runModeratorAction(() => begriffsmatchGame.finishGuessPhase(state, "red"));
 });
 
 $("reveal-word-match-round").addEventListener("click", async () => {
-  await runModeratorAction(() => wordMatchGame.revealRound(state, getWordMatchLists()));
+  await runModeratorAction(() => begriffsmatchGame.revealRound(state, getWordMatchLists()));
 });
 
 $("word-match-lists").addEventListener("input", (event) => {
@@ -2651,7 +2821,7 @@ $("word-match-lists").addEventListener("input", (event) => {
 $("word-match-lists").addEventListener("click", async (event) => {
   const revealButton = event.target.closest("[data-word-tiebreak-reveal]");
   if (revealButton) {
-    await runModeratorAction(() => wordMatchGame.revealTiebreakTerm(
+    await runModeratorAction(() => begriffsmatchGame.revealTiebreakTerm(
       state,
       Number(revealButton.dataset.wordTiebreakReveal)
     ));
@@ -2659,7 +2829,7 @@ $("word-match-lists").addEventListener("click", async (event) => {
   }
   const tiebreakButton = event.target.closest("[data-word-tiebreak-index][data-word-tiebreak-team]");
   if (tiebreakButton) {
-    await runModeratorAction(() => wordMatchGame.claimTiebreakTerm(
+    await runModeratorAction(() => begriffsmatchGame.claimTiebreakTerm(
       state,
       Number(tiebreakButton.dataset.wordTiebreakIndex),
       tiebreakButton.dataset.wordTiebreakTeam
@@ -2668,7 +2838,7 @@ $("word-match-lists").addEventListener("click", async (event) => {
   }
   const button = event.target.closest("[data-word-team][data-word-index]");
   if (!button || button.disabled) return;
-  await runModeratorAction(() => wordMatchGame.toggleMatch(
+  await runModeratorAction(() => begriffsmatchGame.toggleMatch(
     state,
     button.dataset.wordTeam,
     Number(button.dataset.wordIndex)
@@ -2676,17 +2846,17 @@ $("word-match-lists").addEventListener("click", async (event) => {
 });
 
 $("start-word-tiebreak").addEventListener("click", async () => {
-  await runModeratorAction(() => wordMatchGame.startTiebreaker(state));
+  await runModeratorAction(() => begriffsmatchGame.startTiebreaker(state));
 });
 
 $("finish-word-tiebreak").addEventListener("click", async () => {
-  await runModeratorAction(() => wordMatchGame.finishTiebreaker(state));
+  await runModeratorAction(() => begriffsmatchGame.finishTiebreaker(state));
 });
 
 $("next-word-match-round").addEventListener("click", async () => {
   const nextRoundIndex = state.game.roundIndex + 1;
   const accepted = await runModeratorAction(() => {
-    if (!wordMatchGame.startNextRound(state)) return false;
+    if (!begriffsmatchGame.startNextRound(state)) return false;
     wordMatchDrafts = emptyWordMatchDrafts(nextRoundIndex);
     saveWordMatchDrafts();
     return true;
@@ -2695,7 +2865,7 @@ $("next-word-match-round").addEventListener("click", async () => {
 });
 
 async function tickWordMatchTimer() {
-  if (state?.game?.id !== wordMatchGame.id) return;
+  if (state?.game?.id !== begriffsmatchGame.id) return;
   updateHostWordMatchTimer();
   const status = state.game.status;
   if (!state.game.phaseEndsAt || wordTimerActionPending || moderatorActionPending) return;
@@ -2706,14 +2876,14 @@ async function tickWordMatchTimer() {
   try {
     let accepted = false;
     if (status === "seed-collecting") {
-      accepted = await runModeratorAction(() => wordMatchGame.finishSeedPhase(state));
+      accepted = await runModeratorAction(() => begriffsmatchGame.finishSeedPhase(state));
       if (accepted) await syncWordMatchSeeders();
     } else if (status === "blue-guessing") {
-      accepted = await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "blue"));
+      accepted = await runModeratorAction(() => begriffsmatchGame.finishGuessPhase(state, "blue"));
     } else if (status === "red-guessing") {
-      accepted = await runModeratorAction(() => wordMatchGame.finishGuessPhase(state, "red"));
+      accepted = await runModeratorAction(() => begriffsmatchGame.finishGuessPhase(state, "red"));
     } else if (status === "tiebreak-playing") {
-      accepted = await runModeratorAction(() => wordMatchGame.finishTiebreaker(state));
+      accepted = await runModeratorAction(() => begriffsmatchGame.finishTiebreaker(state));
     }
   } finally {
     wordTimerActionPending = false;
@@ -2740,22 +2910,22 @@ setInterval(() => {
 $("start-ranking-after-word").addEventListener("click", async () => {
   $("word-match-error").textContent = "";
   await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== wordMatchGame.id || state.game.status !== "finished") return false;
+    if (getShowWinner(state) || state.game.id !== begriffsmatchGame.id || state.game.status !== "finished") return false;
     rankingSelection = { itemId: null, position: null };
-    return rankingGame.start(state);
+    return einordnenGame.start(state);
   });
 });
 
 $("start-buzzer-after-matching").addEventListener("click", async () => {
   await runModeratorAction(() => {
-    if (getShowWinner(state) || state.game.id !== matchingGame.id || state.game.status !== "finished") return false;
-    return buzzerGame.start(state);
+    if (getShowWinner(state) || state.game.id !== daSehIchDichGame.id || state.game.status !== "finished") return false;
+    return buzzerQuizGame.start(state);
   });
 });
 
 $("start-first-price-round").addEventListener("click", async () => {
   $("price-error").textContent = "";
-  const accepted = await runModeratorAction(() => guessThePriceGame.startFirstRound(state));
+  const accepted = await runModeratorAction(() => thriftyGame.startFirstRound(state));
   if (accepted) await syncAllPriceTeams();
 });
 
@@ -2771,14 +2941,14 @@ $("reveal-price-round").addEventListener("click", async () => {
     return;
   }
 
-  await runModeratorAction(() => guessThePriceGame.revealRound(state, guesses));
+  await runModeratorAction(() => thriftyGame.revealRound(state, guesses));
 });
 
 $("next-price-round").addEventListener("click", async () => {
   $("price-error").textContent = "";
   const nextRoundIndex = state.game.roundIndex + 1;
   const accepted = await runModeratorAction(() => {
-    if (!guessThePriceGame.startNextRound(state)) return false;
+    if (!thriftyGame.startNextRound(state)) return false;
     priceDrafts = emptyPriceDrafts(nextRoundIndex);
     savePriceDrafts();
     return true;
@@ -2794,3 +2964,8 @@ initializeHost().catch((error) => {
   console.error(error);
   alert("Der Raum konnte nicht gestartet werden. Siehe Browser-Konsole.");
 });
+
+// Der Moderator hört den Buzzer über dasselbe Element. Der erste Klick im
+// Fenster schaltet die Wiedergabe frei, damit der Ton auch dann kommt, wenn der
+// erste Buzz vor der ersten eigenen Interaktion eintrifft.
+document.addEventListener("click", () => void unlockBuzzerSound());

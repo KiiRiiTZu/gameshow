@@ -5,8 +5,13 @@ import {
   addOrUpdatePlayer,
   createInitialRoomState,
   createRoomStateFromRecords,
+  findReclaimableSeat,
   getShowWinner,
-  SHOW_WINNING_SCORE
+  normalizeGameId,
+  normalizeGameResults,
+  recordGameResult,
+  SHOW_WINNING_SCORE,
+  teamHasSpace
 } from "../js/room.js";
 
 test("ends the best-of-seven show at four game wins", () => {
@@ -41,7 +46,7 @@ test("restores room, game and accepted players from database records", () => {
   const room = {
     blue_score: 2,
     red_score: 4,
-    current_game: "buzzer",
+    current_game: "buzzer-quiz",
     game_status: "locked",
     buzzer_winner_id: "2",
     buzzer_winner_name: "B",
@@ -65,7 +70,7 @@ test("restores room, game and accepted players from database records", () => {
 
 test("restores a persisted Top 20 game state", () => {
   const persistedGame = {
-    id: "spotify-top-artists",
+    id: "top-20",
     status: "playing",
     roundIndex: 1,
     roundWins: { blue: 1, red: 0 },
@@ -78,7 +83,7 @@ test("restores a persisted Top 20 game state", () => {
   const room = {
     blue_score: 5,
     red_score: 3,
-    current_game: "spotify-top-artists",
+    current_game: "top-20",
     game_status: "playing",
     game_state: persistedGame
   };
@@ -93,10 +98,10 @@ test("upgrades legacy buzzer points into separate quiz and match scores", () => 
   const room = {
     blue_score: 5,
     red_score: 3,
-    current_game: "buzzer",
+    current_game: "buzzer-quiz",
     game_status: "finished",
     game_state: {
-      id: "buzzer",
+      id: "buzzer-quiz",
       status: "finished",
       winner: null,
       winningTeam: "blue"
@@ -107,4 +112,176 @@ test("upgrades legacy buzzer points into separate quiz and match scores", () => 
 
   assert.deepEqual(state.game.scores, { blue: 5, red: 3 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
+});
+
+test("records which team won which game and keeps the playing order", () => {
+  const state = createInitialRoomState("TEST");
+
+  assert.deepEqual(state.gameResults, []);
+  assert.equal(recordGameResult(state, "mittelwert", "blue"), true);
+  assert.equal(recordGameResult(state, "thrifty", "red"), true);
+
+  assert.deepEqual(state.gameResults, [
+    { gameId: "mittelwert", team: "blue" },
+    { gameId: "thrifty", team: "red" }
+  ]);
+});
+
+test("does not record the same game twice when the host renders again", () => {
+  const state = createInitialRoomState("TEST");
+
+  assert.equal(recordGameResult(state, "kartenwissen", "red"), true);
+  assert.equal(recordGameResult(state, "kartenwissen", "red"), false);
+  assert.equal(state.gameResults.length, 1);
+});
+
+test("follows a corrected game winner instead of adding a second entry", () => {
+  const state = createInitialRoomState("TEST");
+
+  recordGameResult(state, "buzzer-quiz", "blue");
+  assert.equal(recordGameResult(state, "buzzer-quiz", "red"), true);
+  assert.deepEqual(state.gameResults, [{ gameId: "buzzer-quiz", team: "red" }]);
+});
+
+test("stores a drawn game without a winning team", () => {
+  const state = createInitialRoomState("TEST");
+
+  recordGameResult(state, "begriffsmatch", null);
+  assert.deepEqual(state.gameResults, [{ gameId: "begriffsmatch", team: null }]);
+});
+
+test("drops damaged entries when restoring the game results", () => {
+  const restored = normalizeGameResults([
+    { gameId: "mittelwert", team: "blue" },
+    { gameId: "mittelwert", team: "red" },
+    { gameId: "thrifty", team: "gruen" },
+    { gameId: "", team: "blue" },
+    null
+  ]);
+
+  assert.deepEqual(restored, [
+    { gameId: "mittelwert", team: "blue" },
+    { gameId: "thrifty", team: null }
+  ]);
+  assert.deepEqual(normalizeGameResults("kaputt"), []);
+});
+
+test("returns the old seat to a player who lost their id", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" });
+  addOrUpdatePlayer(state, { id: "andere", name: "Lena", team: "blue" });
+
+  // Team ist voll: ohne Rückgewinnung käme "Dieses Team ist bereits voll".
+  assert.equal(addOrUpdatePlayer(state, { id: "neu", name: "Max", team: "blue" }), false);
+
+  const seat = findReclaimableSeat(state, { id: "neu", name: "Max", team: "blue" });
+  assert.equal(seat?.id, "alt", "der frühere Platz wird zurückgegeben");
+});
+
+test("matches a reclaimed seat regardless of upper case and spacing", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "red" });
+
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "  max  ", team: "red" })?.id, "alt");
+});
+
+test("does not hand out a seat from the other team or another name", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" });
+
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "Max", team: "red" }), null);
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "Moritz", team: "blue" }), null);
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "", team: "blue" }), null);
+});
+
+test("leaves a player with an intact id on the normal join path", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" });
+
+  // Gleiche Id: kein Rückgewinnungsfall, der reguläre Beitritt aktualisiert den Eintrag.
+  assert.equal(findReclaimableSeat(state, { id: "alt", name: "Max", team: "blue" }), null);
+  assert.equal(addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" }), true);
+  assert.equal(state.players.length, 1);
+});
+
+test("prevents a second entry under the same name while the team still has room", () => {
+  const state = createInitialRoomState("TEST");
+  addOrUpdatePlayer(state, { id: "alt", name: "Max", team: "blue" });
+
+  // Ohne diese Prüfung entstünde neben der Karteileiche ein zweiter "Max".
+  assert.equal(teamHasSpace(state, "blue"), true);
+  assert.equal(findReclaimableSeat(state, { id: "neu", name: "Max", team: "blue" })?.id, "alt");
+});
+
+test("translates renamed game ids so existing rooms keep working", () => {
+  const alt = {
+    "estimation-game": "mittelwert",
+    "guess-the-price": "thrifty",
+    "germany-map": "kartenwissen",
+    "europe-map": "kartenwissen",
+    "word-match-game": "begriffsmatch",
+    "ranking-game": "einordnen",
+    "matching-game": "da-seh-ich-dich",
+    buzzer: "buzzer-quiz",
+    "spotify-top-artists": "top-20"
+  };
+  for (const [alteId, neueId] of Object.entries(alt)) {
+    assert.equal(normalizeGameId(alteId), neueId, alteId);
+  }
+
+  // Aktuelle und unbekannte Ids bleiben unberührt.
+  for (const neueId of Object.values(alt)) {
+    assert.equal(normalizeGameId(neueId), neueId, neueId);
+  }
+  assert.equal(normalizeGameId("gibt-es-nicht"), "gibt-es-nicht");
+  assert.equal(normalizeGameId(undefined), undefined);
+});
+
+test("restores a room that still holds the old map game id", () => {
+  const room = {
+    blue_score: 1,
+    red_score: 2,
+    current_game: "germany-map",
+    game_status: "placing",
+    game_state: {
+      id: "germany-map",
+      status: "placing",
+      roundIndex: 3,
+      roundScores: { blue: 2, red: 1 },
+      scoreSystemVersion: 2
+    }
+  };
+
+  const state = createRoomStateFromRecords("TEST", room);
+
+  assert.equal(state.game.id, "kartenwissen", "der gespeicherte Zustand wird übernommen");
+  assert.equal(state.game.roundIndex, 3, "und nicht verworfen");
+  assert.deepEqual(state.game.roundScores, { blue: 2, red: 1 });
+});
+
+test("restores a room that still holds the old Top 20 game id", () => {
+  const room = {
+    blue_score: 0,
+    red_score: 1,
+    current_game: "spotify-top-artists",
+    game_status: "playing",
+    game_state: { id: "spotify-top-artists", status: "playing", roundIndex: 1, scoreSystemVersion: 2 }
+  };
+
+  const state = createRoomStateFromRecords("TEST", room);
+
+  assert.equal(state.game.id, "top-20");
+  assert.equal(state.game.roundIndex, 1);
+});
+
+test("translates old game ids in a stored result history", () => {
+  const restored = normalizeGameResults([
+    { gameId: "germany-map", team: "blue" },
+    { gameId: "spotify-top-artists", team: "red" }
+  ]);
+
+  assert.deepEqual(restored, [
+    { gameId: "kartenwissen", team: "blue" },
+    { gameId: "top-20", team: "red" }
+  ]);
 });

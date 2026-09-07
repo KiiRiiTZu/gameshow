@@ -11,23 +11,23 @@ import {
   BUZZER_CORRECT_POINTS,
   BUZZER_WINNING_SCORE,
   BUZZER_WRONG_POINTS,
-  buzzerGame
-} from "../js/games/buzzer.js";
+  buzzerQuizGame
+} from "../js/games/buzzer-quiz.js";
 import { BUZZER_QUESTIONS } from "../js/games/buzzer-questions.js";
-import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/spotify-top-artists.js";
+import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/top-20.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT } from "../js/games/top-20-lists.js";
 import {
   RANKING_MAX_STRIKES,
   RANKING_ROUNDS_TO_WIN,
-  rankingGame
-} from "../js/games/ranking-game.js";
+  einordnenGame
+} from "../js/games/einordnen.js";
 import { RANKING_LISTS } from "../js/games/ranking-lists.js";
 import {
-  GERMANY_MAP_QUESTIONS,
-  GERMANY_MAP_ROUNDS_TO_WIN,
+  KARTENWISSEN_QUESTIONS,
+  KARTENWISSEN_ROUNDS_TO_WIN,
   distanceInKilometers,
-  germanyMapGame
-} from "../js/games/germany-map.js";
+  kartenwissenGame
+} from "../js/games/kartenwissen.js";
 import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
@@ -36,8 +36,8 @@ import {
   areMatchingValuesUnique,
   getMatchingRoleRoundIndex,
   getMatchingTurn,
-  matchingGame
-} from "../js/games/matching-game.js";
+  daSehIchDichGame
+} from "../js/games/da-seh-ich-dich.js";
 import {
   createMatchingKeyPair,
   decryptMatchingSubmission,
@@ -48,15 +48,15 @@ import {
   PRICE_GAME_WINNING_SCORE,
   formatEuroAmount,
   formatSignedEuroDifference,
-  guessThePriceGame,
+  thriftyGame,
   parseEuroAmount
-} from "../js/games/guess-the-price.js";
+} from "../js/games/thrifty.js";
 import { PRICE_PRODUCTS } from "../js/games/guess-the-price-products.js";
 import {
   ESTIMATION_ROUNDS_TO_WIN,
-  estimationGame,
+  mittelwertGame,
   parseEstimate
-} from "../js/games/estimation-game.js";
+} from "../js/games/mittelwert.js";
 import { ESTIMATION_QUESTIONS } from "../js/games/estimation-questions.js";
 import {
   WORD_MATCH_CATEGORIES,
@@ -67,8 +67,8 @@ import {
   WORD_MATCH_TIEBREAK_TERMS,
   getWordMatchGuessOrder,
   getWordMatchRoles,
-  wordMatchGame
-} from "../js/games/word-match-game.js";
+  begriffsmatchGame
+} from "../js/games/begriffsmatch.js";
 import {
   createEncryptionKeyPair,
   decryptPrivatePayload,
@@ -87,7 +87,7 @@ import {
 } from "../js/team-chat.js";
 
 test("keeps session chat private per team and expires typing indicators", () => {
-  const chat = createTeamChat("guess-the-price");
+  const chat = createTeamChat("thrifty");
   const bluePlayer = { id: "b1", name: "Blau 1" };
   const redPlayer = { id: "r1", name: "Rot 1" };
 
@@ -105,7 +105,7 @@ test("keeps session chat private per team and expires typing indicators", () => 
 });
 
 test("does not truncate a busy session chat after 100 messages", () => {
-  const chat = createTeamChat("spotify-top-artists");
+  const chat = createTeamChat("top-20");
   const player = { id: "b1", name: "Blau 1" };
   for (let index = 0; index < 150; index += 1) {
     addTeamChatMessage(chat, "blue", player, `Nachricht ${index + 1}`, `m${index + 1}`, index);
@@ -115,26 +115,26 @@ test("does not truncate a busy session chat after 100 messages", () => {
 });
 
 test("enables the private session chat for Einordnen", () => {
-  assert.equal(supportsTeamChat("ranking-game"), true);
+  assert.equal(supportsTeamChat("einordnen"), true);
 });
 
 test("contains presentation cards for all seven games", () => {
   assert.deepEqual([
-    "estimation-game",
-    "guess-the-price",
-    "germany-map",
-    "word-match-game",
-    "ranking-game",
-    "matching-game",
-    "buzzer"
+    "mittelwert",
+    "thrifty",
+    "kartenwissen",
+    "begriffsmatch",
+    "einordnen",
+    "da-seh-ich-dich",
+    "buzzer-quiz"
   ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6, 7]);
-  assert.equal(getGamePresentation("guess-the-price").name, "Thrifty");
-  assert.equal(getGamePresentation("germany-map").name, "Kartenwissen");
-  assert.equal(getGamePresentation("matching-game").name, "Da seh ich dich");
-  assert.equal(getGamePresentation("estimation-game").name, "Mittelwert");
-  assert.equal(getGamePresentation("word-match-game").name, "Begriffsmatch");
-  assert.equal(getGamePresentation("ranking-game").name, "Einordnen");
-  assert.equal(getGamePresentation("spotify-top-artists").name, "Top 20");
+  assert.equal(getGamePresentation("thrifty").name, "Thrifty");
+  assert.equal(getGamePresentation("kartenwissen").name, "Kartenwissen");
+  assert.equal(getGamePresentation("da-seh-ich-dich").name, "Da seh ich dich");
+  assert.equal(getGamePresentation("mittelwert").name, "Mittelwert");
+  assert.equal(getGamePresentation("begriffsmatch").name, "Begriffsmatch");
+  assert.equal(getGamePresentation("einordnen").name, "Einordnen");
+  assert.equal(getGamePresentation("top-20").name, "Top 20");
 });
 
 test("contains the three prepared Einordnen lists and their anchors", () => {
@@ -153,19 +153,19 @@ test("contains the three prepared Einordnen lists and their anchors", () => {
 
 test("Einordnen validates relative placements and alternates turns", () => {
   const state = createInitialRoomState("TEST");
-  rankingGame.start(state, "blue");
+  einordnenGame.start(state, "blue");
 
   assert.equal(state.game.status, "not-started");
-  assert.equal(rankingGame.startFirstRound(state), true);
+  assert.equal(einordnenGame.startFirstRound(state), true);
   assert.deepEqual(state.game.placedIds, ["iso"]);
-  assert.equal(rankingGame.proposePlacement(state, "sova", 1), true);
-  assert.equal(rankingGame.revealPlacement(state), true);
+  assert.equal(einordnenGame.proposePlacement(state, "sova", 1), true);
+  assert.equal(einordnenGame.revealPlacement(state), true);
   assert.equal(state.game.lastResult.correct, true);
   assert.deepEqual(state.game.placedIds, ["sova", "iso"]);
   assert.equal(state.game.currentTeam, "red");
 
-  assert.equal(rankingGame.proposePlacement(state, "harbor", 1), true);
-  assert.equal(rankingGame.revealPlacement(state), true);
+  assert.equal(einordnenGame.proposePlacement(state, "harbor", 1), true);
+  assert.equal(einordnenGame.revealPlacement(state), true);
   assert.equal(state.game.lastResult.correct, false);
   assert.equal(state.game.strikes.red, 1);
   assert.equal(state.game.remainingIds.includes("harbor"), true);
@@ -174,18 +174,18 @@ test("Einordnen validates relative placements and alternates turns", () => {
 
 test("Einordnen lets the moderator move a pending placement before revealing it", () => {
   const state = createInitialRoomState("TEST");
-  rankingGame.start(state, "blue");
-  rankingGame.startFirstRound(state);
+  einordnenGame.start(state, "blue");
+  einordnenGame.startFirstRound(state);
 
-  assert.equal(rankingGame.proposePlacement(state, "sova", 1), true);
+  assert.equal(einordnenGame.proposePlacement(state, "sova", 1), true);
   assert.equal(state.game.status, "ready-to-reveal");
   assert.equal(state.game.proposal.position, 1);
-  assert.equal(rankingGame.updateProposalPosition(state, 2), true);
+  assert.equal(einordnenGame.updateProposalPosition(state, 2), true);
   assert.equal(state.game.proposal.position, 2);
-  assert.equal(rankingGame.updateProposalPosition(state, 3), false);
+  assert.equal(einordnenGame.updateProposalPosition(state, 3), false);
 
-  assert.equal(rankingGame.revealPlacement(state), true);
-  assert.equal(rankingGame.updateProposalPosition(state, 1), false);
+  assert.equal(einordnenGame.revealPlacement(state), true);
+  assert.equal(einordnenGame.updateProposalPosition(state, 1), false);
 });
 
 test("lets the moderator correct overall and active game scores without going below zero", () => {
@@ -227,7 +227,7 @@ test("does not award the same manually selected game winner twice", () => {
 test("finishes cumulative games once a manually entered lead is unreachable", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
-    id: "matching-game",
+    id: "da-seh-ich-dich",
     status: "assigning",
     roundIndex: 2,
     scores: { blue: 5, red: 4 },
@@ -243,14 +243,14 @@ test("finishes cumulative games once a manually entered lead is unreachable", ()
 
 test("maps every game to the score shown to the moderator", () => {
   const cases = [
-    ["buzzer", "scores"],
-    ["spotify-top-artists", "roundWins"],
-    ["ranking-game", "roundWins"],
-    ["germany-map", "roundScores"],
-    ["matching-game", "scores"],
-    ["guess-the-price", "roundScores"],
-    ["estimation-game", "roundScores"],
-    ["word-match-game", "scores"]
+    ["buzzer-quiz", "scores"],
+    ["top-20", "roundWins"],
+    ["einordnen", "roundWins"],
+    ["kartenwissen", "roundScores"],
+    ["da-seh-ich-dich", "scores"],
+    ["thrifty", "roundScores"],
+    ["mittelwert", "roundScores"],
+    ["begriffsmatch", "scores"]
   ];
 
   for (const [id, key] of cases) {
@@ -259,7 +259,7 @@ test("maps every game to the score shown to the moderator", () => {
   }
 
   const tiebreak = {
-    id: "word-match-game",
+    id: "begriffsmatch",
     scores: { blue: 8, red: 8 },
     tiebreak: { scores: { blue: 1, red: 2 } }
   };
@@ -268,17 +268,17 @@ test("maps every game to the score shown to the moderator", () => {
 
 test("Einordnen ends a list on the second error and alternates its starting team", () => {
   const state = createInitialRoomState("TEST");
-  rankingGame.start(state, "blue");
-  rankingGame.startFirstRound(state);
+  einordnenGame.start(state, "blue");
+  einordnenGame.startFirstRound(state);
   assert.equal(RANKING_MAX_STRIKES, 2);
   assert.equal(RANKING_ROUNDS_TO_WIN, 2);
 
-  rankingGame.proposePlacement(state, "jett", 2);
-  rankingGame.revealPlacement(state);
-  rankingGame.proposePlacement(state, "harbor", 2);
-  rankingGame.revealPlacement(state);
-  rankingGame.proposePlacement(state, "reyna", 2);
-  rankingGame.revealPlacement(state);
+  einordnenGame.proposePlacement(state, "jett", 2);
+  einordnenGame.revealPlacement(state);
+  einordnenGame.proposePlacement(state, "harbor", 2);
+  einordnenGame.revealPlacement(state);
+  einordnenGame.proposePlacement(state, "reyna", 2);
+  einordnenGame.revealPlacement(state);
 
   assert.equal(state.game.status, "round-finished");
   assert.equal(state.game.roundWinner, "red");
@@ -286,18 +286,18 @@ test("Einordnen ends a list on the second error and alternates its starting team
   const nextRemainingId = RANKING_LISTS[0].entries.find((entry) =>
     state.game.remainingIds.includes(entry.id)
   ).id;
-  assert.equal(rankingGame.revealNextRemaining(state), true);
+  assert.equal(einordnenGame.revealNextRemaining(state), true);
   assert.equal(state.game.remainingIds.includes(nextRemainingId), false);
   assert.equal(state.game.lastResult.itemId, nextRemainingId);
   assert.equal(state.game.lastResult.cleanupReveal, true);
-  assert.equal(rankingGame.startNextRound(state), true);
+  assert.equal(einordnenGame.startNextRound(state), true);
   assert.equal(state.game.currentTeam, "red");
   assert.deepEqual(state.game.placedIds, ["banana"]);
 });
 
 test("starts a new show with Mittelwert waiting for the moderator", () => {
   const state = createInitialRoomState("TEST");
-  assert.equal(state.game.id, "estimation-game");
+  assert.equal(state.game.id, "mittelwert");
   assert.equal(state.game.status, "not-started");
 });
 
@@ -309,36 +309,36 @@ test("alternates Begriffsmatch roles with 120 seconds to write and 45 seconds to
     { id: "r1", name: "R1", team: "red" },
     { id: "r2", name: "R2", team: "red" }
   ];
-  wordMatchGame.start(state, participants);
+  begriffsmatchGame.start(state, participants);
   let roles = getWordMatchRoles(state.game);
   assert.equal(roles.seeders.blue.id, "b1");
   assert.equal(roles.guessers.blue.id, "b2");
-  assert.equal(wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[0], 1_000), true);
+  assert.equal(begriffsmatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[0], 1_000), true);
   assert.equal(state.game.phaseEndsAt, 1_000 + WORD_MATCH_SEED_SECONDS * 1000);
-  wordMatchGame.lockSeeder(state, "b1");
-  wordMatchGame.lockSeeder(state, "r1");
+  begriffsmatchGame.lockSeeder(state, "b1");
+  begriffsmatchGame.lockSeeder(state, "r1");
   assert.equal(state.game.status, "blue-guess-pending");
-  wordMatchGame.startGuessPhase(state, "blue", 2_000);
+  begriffsmatchGame.startGuessPhase(state, "blue", 2_000);
   assert.equal(state.game.phaseEndsAt, 2_000 + WORD_MATCH_PHASE_SECONDS * 1000);
-  wordMatchGame.finishGuessPhase(state, "blue");
-  wordMatchGame.startGuessPhase(state, "red", 3_000);
-  wordMatchGame.finishGuessPhase(state, "red");
+  begriffsmatchGame.finishGuessPhase(state, "blue");
+  begriffsmatchGame.startGuessPhase(state, "red", 3_000);
+  begriffsmatchGame.finishGuessPhase(state, "red");
   assert.equal(state.game.status, "results-pending");
   assert.equal(state.game.roundResults.length, 0);
   assert.deepEqual(state.game.scores, { blue: 0, red: 0 });
-  assert.equal(wordMatchGame.revealRound(state, { blue: ["A"], red: ["B"] }), true);
+  assert.equal(begriffsmatchGame.revealRound(state, { blue: ["A"], red: ["B"] }), true);
   assert.equal(state.game.revealedLists.blue[0], "A");
-  wordMatchGame.startNextRound(state);
+  begriffsmatchGame.startNextRound(state);
   roles = getWordMatchRoles(state.game);
   assert.equal(roles.seeders.blue.id, "b2");
   assert.equal(roles.guessers.blue.id, "b1");
   assert.deepEqual(getWordMatchGuessOrder(state.game), ["red", "blue"]);
-  wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[1]);
-  wordMatchGame.finishSeedPhase(state);
+  begriffsmatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[1]);
+  begriffsmatchGame.finishSeedPhase(state);
   assert.equal(state.game.status, "red-guess-pending");
-  assert.equal(wordMatchGame.startGuessPhase(state, "blue"), false);
-  assert.equal(wordMatchGame.startGuessPhase(state, "red"), true);
-  assert.equal(wordMatchGame.finishGuessPhase(state, "red"), true);
+  assert.equal(begriffsmatchGame.startGuessPhase(state, "blue"), false);
+  assert.equal(begriffsmatchGame.startGuessPhase(state, "red"), true);
+  assert.equal(begriffsmatchGame.finishGuessPhase(state, "red"), true);
   assert.equal(state.game.status, "blue-guess-pending");
 });
 
@@ -350,32 +350,32 @@ test("starts the Begriffsmatch Kino tiebreak after four tied rounds", () => {
     { id: "r1", name: "R1", team: "red" },
     { id: "r2", name: "R2", team: "red" }
   ];
-  wordMatchGame.start(state, participants);
+  begriffsmatchGame.start(state, participants);
 
   for (let round = 0; round < WORD_MATCH_CATEGORIES.length; round += 1) {
-    wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[round]);
-    wordMatchGame.finishSeedPhase(state);
+    begriffsmatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[round]);
+    begriffsmatchGame.finishSeedPhase(state);
     for (const team of getWordMatchGuessOrder(state.game)) {
-      wordMatchGame.startGuessPhase(state, team);
-      wordMatchGame.finishGuessPhase(state, team);
+      begriffsmatchGame.startGuessPhase(state, team);
+      begriffsmatchGame.finishGuessPhase(state, team);
     }
-    wordMatchGame.revealRound(state, { blue: [], red: [] });
-    if (round < WORD_MATCH_CATEGORIES.length - 1) wordMatchGame.startNextRound(state);
+    begriffsmatchGame.revealRound(state, { blue: [], red: [] });
+    if (round < WORD_MATCH_CATEGORIES.length - 1) begriffsmatchGame.startNextRound(state);
   }
 
   assert.equal(state.game.status, "tiebreak-pending");
   assert.deepEqual(state.game.tiebreak.terms, WORD_MATCH_TIEBREAK_TERMS);
-  assert.equal(wordMatchGame.startTiebreaker(state, 4_000), true);
+  assert.equal(begriffsmatchGame.startTiebreaker(state, 4_000), true);
   assert.equal(state.game.phaseEndsAt, 4_000 + WORD_MATCH_TIEBREAK_SECONDS * 1000);
-  assert.equal(wordMatchGame.claimTiebreakTerm(state, 0, "red"), true);
+  assert.equal(begriffsmatchGame.claimTiebreakTerm(state, 0, "red"), true);
   assert.equal(state.game.tiebreak.revealed[0], false);
-  assert.equal(wordMatchGame.claimTiebreakTerm(state, 1, "blue"), true);
-  assert.equal(wordMatchGame.claimTiebreakTerm(state, 3, "red"), true);
-  assert.equal(wordMatchGame.finishTiebreaker(state), true);
+  assert.equal(begriffsmatchGame.claimTiebreakTerm(state, 1, "blue"), true);
+  assert.equal(begriffsmatchGame.claimTiebreakTerm(state, 3, "red"), true);
+  assert.equal(begriffsmatchGame.finishTiebreaker(state), true);
   assert.equal(state.game.status, "tiebreak-reveal");
-  assert.equal(wordMatchGame.claimTiebreakTerm(state, 4, "blue"), false);
+  assert.equal(begriffsmatchGame.claimTiebreakTerm(state, 4, "blue"), false);
   for (let index = 0; index < WORD_MATCH_TIEBREAK_TERMS.length; index += 1) {
-    assert.equal(wordMatchGame.revealTiebreakTerm(state, index), true);
+    assert.equal(begriffsmatchGame.revealTiebreakTerm(state, index), true);
   }
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "red");
@@ -391,7 +391,7 @@ test("lets every Begriffsmatch player begin one guessing phase", () => {
     { id: "r1", name: "Jo", team: "red" },
     { id: "r2", name: "Ramsi", team: "red" }
   ];
-  wordMatchGame.start(state, participants);
+  begriffsmatchGame.start(state, participants);
 
   const firstGuessers = [];
   for (let roundIndex = 0; roundIndex < 4; roundIndex += 1) {
@@ -399,7 +399,7 @@ test("lets every Begriffsmatch player begin one guessing phase", () => {
     firstGuessers.push(getWordMatchRoles(state.game).guessers[firstTeam].name);
     if (roundIndex < 3) {
       state.game.status = "round-finished";
-      wordMatchGame.startNextRound(state);
+      begriffsmatchGame.startNextRound(state);
     }
   }
 
@@ -414,32 +414,32 @@ test("ends Begriffsmatch early when the trailing team cannot catch up", () => {
     { id: "r1", name: "R1", team: "red" },
     { id: "r2", name: "R2", team: "red" }
   ];
-  wordMatchGame.start(state, participants);
+  begriffsmatchGame.start(state, participants);
 
   for (let round = 0; round < 3; round += 1) {
-    wordMatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[round]);
-    wordMatchGame.finishSeedPhase(state);
+    begriffsmatchGame.startSeedPhase(state, WORD_MATCH_CATEGORIES[round]);
+    begriffsmatchGame.finishSeedPhase(state);
     const [firstTeam, secondTeam] = getWordMatchGuessOrder(state.game);
-    wordMatchGame.startGuessPhase(state, firstTeam);
+    begriffsmatchGame.startGuessPhase(state, firstTeam);
     if (firstTeam === "blue") {
       for (let index = 0; index < WORD_MATCH_TERM_COUNT; index += 1) {
-        wordMatchGame.toggleMatch(state, "blue", index);
+        begriffsmatchGame.toggleMatch(state, "blue", index);
       }
     }
-    wordMatchGame.finishGuessPhase(state, firstTeam);
-    wordMatchGame.startGuessPhase(state, secondTeam);
+    begriffsmatchGame.finishGuessPhase(state, firstTeam);
+    begriffsmatchGame.startGuessPhase(state, secondTeam);
     if (secondTeam === "blue") {
       for (let index = 0; index < WORD_MATCH_TERM_COUNT; index += 1) {
-        wordMatchGame.toggleMatch(state, "blue", index);
+        begriffsmatchGame.toggleMatch(state, "blue", index);
       }
     }
-    wordMatchGame.finishGuessPhase(state, secondTeam);
+    begriffsmatchGame.finishGuessPhase(state, secondTeam);
     assert.equal(state.game.status, "results-pending");
-    wordMatchGame.revealRound(state, {
+    begriffsmatchGame.revealRound(state, {
       blue: Array(WORD_MATCH_TERM_COUNT).fill("Blau"),
       red: Array(WORD_MATCH_TERM_COUNT).fill("Rot")
     });
-    if (round < 2) wordMatchGame.startNextRound(state);
+    if (round < 2) begriffsmatchGame.startNextRound(state);
   }
 
   assert.equal(state.game.status, "finished");
@@ -459,14 +459,14 @@ test("contains fifteen estimation questions and keeps the first question hidden 
   ];
 
   assert.equal(ESTIMATION_QUESTIONS.length, 15);
-  assert.equal(estimationGame.start(state, participants), true);
+  assert.equal(mittelwertGame.start(state, participants), true);
   assert.equal(state.game.status, "question-pending");
   assert.equal(
     ESTIMATION_QUESTIONS[1].moderatorHint,
     "Vor März 2022 war er noch kürzer; die neue Antenne erhöhte ihn um 6 Meter."
   );
   assert.equal(state.game.questionPrompt, "");
-  assert.equal(estimationGame.startQuestion(state, ESTIMATION_QUESTIONS[0].prompt), true);
+  assert.equal(mittelwertGame.startQuestion(state, ESTIMATION_QUESTIONS[0].prompt), true);
   assert.equal(state.game.status, "guessing");
   assert.equal(state.game.questionPrompt, ESTIMATION_QUESTIONS[0].prompt);
 });
@@ -489,17 +489,17 @@ test("continues Mittelwert after a tied question without awarding a point", () =
     { id: "r2", name: "R2", team: "red" }
   ];
 
-  estimationGame.start(state, participants);
-  estimationGame.startQuestion(state, "Testfrage");
-  participants.forEach((item) => estimationGame.lockPlayer(state, item.id));
+  mittelwertGame.start(state, participants);
+  mittelwertGame.startQuestion(state, "Testfrage");
+  participants.forEach((item) => mittelwertGame.lockPlayer(state, item.id));
   const estimates = { b1: 90, b2: 110, r1: 80, r2: 120 };
-  estimationGame.prepareRound(state, estimates);
-  estimationGame.revealRound(state, estimates, 100, "100");
+  mittelwertGame.prepareRound(state, estimates);
+  mittelwertGame.revealRound(state, estimates, 100, "100");
 
   assert.equal(state.game.revealed.roundWinner, null);
   assert.deepEqual(state.game.roundScores, { blue: 0, red: 0 });
   assert.equal(state.game.status, "revealed");
-  assert.equal(estimationGame.startNextQuestion(state, "Nächste Frage"), true);
+  assert.equal(mittelwertGame.startNextQuestion(state, "Nächste Frage"), true);
 });
 
 test("scores estimation rounds from both team averages and finishes at five points", () => {
@@ -510,19 +510,19 @@ test("scores estimation rounds from both team averages and finishes at five poin
     { id: "r1", name: "R1", team: "red" },
     { id: "r2", name: "R2", team: "red" }
   ];
-  estimationGame.start(state, participants);
+  mittelwertGame.start(state, participants);
 
   for (let round = 0; round < ESTIMATION_ROUNDS_TO_WIN; round += 1) {
-    if (round === 0) estimationGame.startQuestion(state, `Frage ${round + 1}`);
-    else estimationGame.startNextQuestion(state, `Frage ${round + 1}`);
-    participants.forEach((item) => estimationGame.lockPlayer(state, item.id));
+    if (round === 0) mittelwertGame.startQuestion(state, `Frage ${round + 1}`);
+    else mittelwertGame.startNextQuestion(state, `Frage ${round + 1}`);
+    participants.forEach((item) => mittelwertGame.lockPlayer(state, item.id));
     assert.equal(state.game.status, "ready-to-reveal");
     assert.equal(
-      estimationGame.prepareRound(state, { b1: 90, b2: 110, r1: 0, r2: 40 }),
+      mittelwertGame.prepareRound(state, { b1: 90, b2: 110, r1: 0, r2: 40 }),
       true
     );
     assert.deepEqual(state.game.averages, { blue: 100, red: 20 });
-    estimationGame.revealRound(state, { b1: 90, b2: 110, r1: 0, r2: 40 }, 100, "100");
+    mittelwertGame.revealRound(state, { b1: 90, b2: 110, r1: 0, r2: 40 }, 100, "100");
     assert.equal(state.game.revealed.averages.blue, 100);
     assert.equal(state.game.revealed.averages.red, 20);
     assert.deepEqual(state.game.revealed.guesses, { b1: 90, b2: 110, r1: 0, r2: 40 });
@@ -537,7 +537,7 @@ test("scores estimation rounds from both team averages and finishes at five poin
 test("finishes the buzzer game at 40 points with four points per correct answer", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
-    id: "buzzer",
+    id: "buzzer-quiz",
     status: "locked",
     winner: { playerId: "1", playerName: "A", team: "blue" },
     winningTeam: null,
@@ -547,42 +547,42 @@ test("finishes the buzzer game at 40 points with four points per correct answer"
   assert.equal(BUZZER_WINNING_SCORE, 40);
   assert.equal(BUZZER_CORRECT_POINTS, 4);
   assert.equal(BUZZER_WRONG_POINTS, 1);
-  assert.equal(buzzerGame.awardPoint(state), true);
+  assert.equal(buzzerQuizGame.awardPoint(state), true);
   assert.equal(state.game.scores.blue, BUZZER_WINNING_SCORE);
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "blue");
-  assert.equal(buzzerGame.awardPoint(state), false);
+  assert.equal(buzzerQuizGame.awardPoint(state), false);
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(buzzerGame.reset(state), false);
+  assert.equal(buzzerQuizGame.reset(state), false);
 });
 
 test("keeps buzzer quiz points when the next question starts", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
-    id: "buzzer",
+    id: "buzzer-quiz",
     status: "not-started",
     scores: { blue: 2, red: 1 },
     questionIndex: 0
   };
 
   assert.equal(state.game.status, "not-started");
-  assert.equal(buzzerGame.start(state), true);
+  assert.equal(buzzerQuizGame.start(state), true);
   assert.equal(state.game.status, "waiting");
-  assert.equal(buzzerGame.open(state), true);
+  assert.equal(buzzerQuizGame.open(state), true);
   assert.deepEqual(state.game.scores, { blue: 2, red: 1 });
-  assert.equal(buzzerGame.reset(state), true);
+  assert.equal(buzzerQuizGame.reset(state), true);
   assert.deepEqual(state.game.scores, { blue: 2, red: 1 });
 });
 
 test("skips an unanswered buzzer question without awarding points", () => {
   const state = createInitialRoomState("TEST");
-  buzzerGame.start(state);
-  buzzerGame.open(state);
-  buzzerGame.registerBuzz(state, { id: "1", name: "A", team: "blue" });
+  buzzerQuizGame.start(state);
+  buzzerQuizGame.open(state);
+  buzzerQuizGame.registerBuzz(state, { id: "1", name: "A", team: "blue" });
   const scoresBefore = structuredClone(state.game.scores);
 
-  assert.equal(buzzerGame.advanceQuestion(state), true);
+  assert.equal(buzzerQuizGame.advanceQuestion(state), true);
   assert.equal(state.game.questionIndex, 1);
   assert.equal(state.game.status, "waiting");
   assert.equal(state.game.winner, null);
@@ -593,14 +593,14 @@ test("skips an unanswered buzzer question without awarding points", () => {
 test("awards a quiz point to the opposing team after a wrong answer", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
-    id: "buzzer",
+    id: "buzzer-quiz",
     status: "locked",
     winner: { playerId: "1", playerName: "A", team: "blue" },
     winningTeam: null,
     scores: { blue: 2, red: 3 }
   };
 
-  assert.equal(buzzerGame.awardOpponentPoint(state), true);
+  assert.equal(buzzerQuizGame.awardOpponentPoint(state), true);
   assert.deepEqual(state.game.scores, { blue: 2, red: 4 });
   assert.equal(state.game.status, "open");
   assert.equal(state.game.winner, null);
@@ -610,14 +610,14 @@ test("awards a quiz point to the opposing team after a wrong answer", () => {
 test("lets the opposing team win the buzzer game from a wrong answer", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
-    id: "buzzer",
+    id: "buzzer-quiz",
     status: "locked",
     winner: { playerId: "1", playerName: "A", team: "blue" },
     winningTeam: null,
     scores: { blue: 2, red: BUZZER_WINNING_SCORE - 1 }
   };
 
-  assert.equal(buzzerGame.awardOpponentPoint(state), true);
+  assert.equal(buzzerQuizGame.awardOpponentPoint(state), true);
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "red");
   assert.deepEqual(state.scores, { blue: 0, red: 1 });
@@ -701,7 +701,7 @@ test("contains three complete prepared Top 20 lists", () => {
   ]);
 });
 
-test("normalizes a persisted single-round Spotify state", () => {
+test("normalizes a persisted single-round Top 20 state", () => {
   const state = createInitialRoomState("TEST");
   state.game = {
     id: top20Game.id,
@@ -724,14 +724,14 @@ test("normalizes a persisted single-round Spotify state", () => {
 });
 
 test("contains seven prepared Europe map questions", () => {
-  assert.equal(GERMANY_MAP_QUESTIONS.length, 7);
-  assert.ok(GERMANY_MAP_QUESTIONS.every((question) =>
+  assert.equal(KARTENWISSEN_QUESTIONS.length, 7);
+  assert.ok(KARTENWISSEN_QUESTIONS.every((question) =>
     question.prompt && question.answer && Number.isFinite(question.target.lat) && Number.isFinite(question.target.lng)
   ));
 });
 
 test("uses the seven requested European destinations", () => {
-  const answers = GERMANY_MAP_QUESTIONS.map((question) => question.answer);
+  const answers = KARTENWISSEN_QUESTIONS.map((question) => question.answer);
   assert.deepEqual(answers, [
     "Sagrada Família · Barcelona, Spanien",
     "Kolosseum · Rom, Italien",
@@ -741,7 +741,7 @@ test("uses the seven requested European destinations", () => {
     "Stonehenge · nahe Amesbury/Salisbury, England",
     "Atomium · Brüssel, Belgien"
   ]);
-  assert.deepEqual(GERMANY_MAP_QUESTIONS.map((question) => question.location), [
+  assert.deepEqual(KARTENWISSEN_QUESTIONS.map((question) => question.location), [
     "Barcelona, Spanien",
     "Rom, Italien",
     "Warschau, Polen",
@@ -751,7 +751,7 @@ test("uses the seven requested European destinations", () => {
     "Brüssel, Belgien"
   ]);
   assert.equal(
-    GERMANY_MAP_QUESTIONS[4].prompt,
+    KARTENWISSEN_QUESTIONS[4].prompt,
     "Wo steht die Hagia Sophia, eine der historisch bedeutendsten Moscheen der Welt?"
   );
 });
@@ -771,6 +771,14 @@ test("keeps map distance lines visually constant while zooming", () => {
   assert.match(distanceLineRule, /vector-effect:\s*non-scaling-stroke/);
 });
 
+test("keeps the moderator map and its zoom controls inside the styled map frame", () => {
+  const hostMarkup = readFileSync(new URL("../host.html", import.meta.url), "utf8");
+  assert.match(
+    hostMarkup,
+    /id="host-kartenwissen-map"\s+class="europe-map"/
+  );
+});
+
 test("calculates geographic distances in kilometers", () => {
   const berlin = { lat: 52.5200, lng: 13.4050 };
   const hamburg = { lat: 53.5511, lng: 9.9937 };
@@ -781,18 +789,18 @@ test("calculates geographic distances in kilometers", () => {
 
 test("shares one map pin per team and awards the closer team", () => {
   const state = createInitialRoomState("TEST");
-  germanyMapGame.start(state);
+  kartenwissenGame.start(state);
   assert.equal(state.game.status, "round-pending");
-  assert.equal(germanyMapGame.startFirstRound(state), true);
-  const target = GERMANY_MAP_QUESTIONS[0].target;
+  assert.equal(kartenwissenGame.startFirstRound(state), true);
+  const target = KARTENWISSEN_QUESTIONS[0].target;
 
-  assert.equal(germanyMapGame.placePin(state, "blue", { lat: 53.5, lng: 10 }), true);
-  assert.equal(germanyMapGame.placePin(state, "blue", target), true);
+  assert.equal(kartenwissenGame.placePin(state, "blue", { lat: 53.5, lng: 10 }), true);
+  assert.equal(kartenwissenGame.placePin(state, "blue", target), true);
   assert.deepEqual(state.game.pins.blue, target);
-  assert.equal(germanyMapGame.placePin(state, "red", { lat: 52.52, lng: 13.405 }), true);
-  assert.equal(germanyMapGame.lockTeam(state, "blue"), true);
-  assert.equal(germanyMapGame.lockTeam(state, "red"), true);
-  assert.equal(germanyMapGame.revealRound(state), true);
+  assert.equal(kartenwissenGame.placePin(state, "red", { lat: 52.52, lng: 13.405 }), true);
+  assert.equal(kartenwissenGame.lockTeam(state, "blue"), true);
+  assert.equal(kartenwissenGame.lockTeam(state, "red"), true);
+  assert.equal(kartenwissenGame.revealRound(state), true);
   assert.equal(state.game.roundWinner, "blue");
   assert.deepEqual(state.game.roundScores, { blue: 1, red: 0 });
   assert.equal(state.game.distances.blue, 0);
@@ -800,23 +808,23 @@ test("shares one map pin per team and awards the closer team", () => {
 
 test("finishes the best of seven map game at four points", () => {
   const state = createInitialRoomState("TEST");
-  germanyMapGame.start(state);
-  germanyMapGame.startFirstRound(state);
-  state.game.roundScores.blue = GERMANY_MAP_ROUNDS_TO_WIN - 1;
-  const target = GERMANY_MAP_QUESTIONS[0].target;
+  kartenwissenGame.start(state);
+  kartenwissenGame.startFirstRound(state);
+  state.game.roundScores.blue = KARTENWISSEN_ROUNDS_TO_WIN - 1;
+  const target = KARTENWISSEN_QUESTIONS[0].target;
 
-  germanyMapGame.placePin(state, "blue", target);
-  germanyMapGame.placePin(state, "red", { lat: 53.5, lng: 10 });
-  germanyMapGame.lockTeam(state, "blue");
-  germanyMapGame.lockTeam(state, "red");
-  germanyMapGame.revealRound(state);
+  kartenwissenGame.placePin(state, "blue", target);
+  kartenwissenGame.placePin(state, "red", { lat: 53.5, lng: 10 });
+  kartenwissenGame.lockTeam(state, "blue");
+  kartenwissenGame.lockTeam(state, "red");
+  kartenwissenGame.revealRound(state);
 
   assert.equal(state.game.status, "revealed");
-  assert.equal(germanyMapGame.startNextRound(state), true);
+  assert.equal(kartenwissenGame.startNextRound(state), true);
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "blue");
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(germanyMapGame.startNextRound(state), false);
+  assert.equal(kartenwissenGame.startNextRound(state), false);
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
 });
 
@@ -838,26 +846,26 @@ test("collects both first players before the blue and red matching turns", () =>
     { id: "b2", name: "Tom", team: "blue" },
     { id: "r2", name: "Mia", team: "red" }
   ];
-  assert.equal(matchingGame.start(state, players), true);
+  assert.equal(daSehIchDichGame.start(state, players), true);
   assert.equal(state.game.status, "round-pending");
-  assert.equal(matchingGame.submitTeam(state, "blue"), false);
-  assert.equal(matchingGame.startFirstRound(state), true);
+  assert.equal(daSehIchDichGame.submitTeam(state, "blue"), false);
+  assert.equal(daSehIchDichGame.startFirstRound(state), true);
   assert.equal("assignments" in state.game, false);
   assert.equal(MATCHING_TURNS.length, 3);
-  assert.equal(matchingGame.submitTeam(state, "blue"), true);
-  assert.equal(matchingGame.completeTurn(state), false);
-  assert.equal(matchingGame.submitTeam(state, "red"), true);
-  assert.equal(matchingGame.completeTurn(state), true);
+  assert.equal(daSehIchDichGame.submitTeam(state, "blue"), true);
+  assert.equal(daSehIchDichGame.completeTurn(state), false);
+  assert.equal(daSehIchDichGame.submitTeam(state, "red"), true);
+  assert.equal(daSehIchDichGame.completeTurn(state), true);
   assert.equal(state.game.activeTurnIndex, 1);
   assert.equal(state.game.turnSubmitted, false);
 
-  assert.equal(matchingGame.submitTeam(state, "red"), false);
-  assert.equal(matchingGame.submitTeam(state, "blue"), true);
-  assert.equal(matchingGame.completeTurn(state), true);
+  assert.equal(daSehIchDichGame.submitTeam(state, "red"), false);
+  assert.equal(daSehIchDichGame.submitTeam(state, "blue"), true);
+  assert.equal(daSehIchDichGame.completeTurn(state), true);
   assert.equal(state.game.activeTurnIndex, 2);
-  assert.equal(matchingGame.submitTeam(state, "blue"), false);
-  assert.equal(matchingGame.submitTeam(state, "red"), true);
-  assert.equal(matchingGame.completeTurn(state), true);
+  assert.equal(daSehIchDichGame.submitTeam(state, "blue"), false);
+  assert.equal(daSehIchDichGame.submitTeam(state, "red"), true);
+  assert.equal(daSehIchDichGame.completeTurn(state), true);
   assert.equal(state.game.status, "ready-to-reveal");
   assert.equal("assignments" in state.game, false);
 });
@@ -885,11 +893,11 @@ test("reveals and scores both teams on the same four images", () => {
   }));
   const blueAssignments = [["Max", "Max"], ["Tom", "Lisa"], ["Lisa", "Tom"], ["Mia", "Mia"]];
   const redAssignments = [["Max", "Max"], ["Tom", "Lisa"], ["Lisa", "Tom"], ["Mia", "Mia"]];
-  matchingGame.start(state, players);
+  daSehIchDichGame.start(state, players);
   state.game.status = "ready-to-reveal";
 
-  assert.equal(matchingGame.revealAll(state, { blue: blueAssignments }), false);
-  assert.equal(matchingGame.revealAll(state, { blue: blueAssignments, red: redAssignments }), true);
+  assert.equal(daSehIchDichGame.revealAll(state, { blue: blueAssignments }), false);
+  assert.equal(daSehIchDichGame.revealAll(state, { blue: blueAssignments, red: redAssignments }), true);
   assert.equal(state.game.status, "round-finished");
   assert.deepEqual(state.game.revealedTeams, { blue: true, red: true });
   assert.deepEqual(state.game.scores, { blue: 2, red: 2 });
@@ -902,23 +910,23 @@ test("ends matching early when the trailing team cannot catch up", () => {
     name: `Spieler ${index + 1}`,
     team: assigner.team
   }));
-  matchingGame.start(state, players);
-  matchingGame.startFirstRound(state);
+  daSehIchDichGame.start(state, players);
+  daSehIchDichGame.startFirstRound(state);
 
   const perfect = [["Max", "Max"], ["Tom", "Tom"], ["Lisa", "Lisa"], ["Mia", "Mia"]];
   const noMatches = [["Max", "Tom"], ["Tom", "Lisa"], ["Lisa", "Mia"], ["Mia", "Max"]];
 
   for (let roundIndex = 0; roundIndex < MATCHING_GAME_ROUNDS.length; roundIndex += 1) {
-    matchingGame.submitTeam(state, "blue");
-    matchingGame.submitTeam(state, "red");
-    matchingGame.completeTurn(state);
-    matchingGame.submitTeam(state, "blue");
-    matchingGame.completeTurn(state);
-    matchingGame.submitTeam(state, "red");
-    matchingGame.completeTurn(state);
-    matchingGame.revealAll(state, { blue: perfect, red: noMatches });
+    daSehIchDichGame.submitTeam(state, "blue");
+    daSehIchDichGame.submitTeam(state, "red");
+    daSehIchDichGame.completeTurn(state);
+    daSehIchDichGame.submitTeam(state, "blue");
+    daSehIchDichGame.completeTurn(state);
+    daSehIchDichGame.submitTeam(state, "red");
+    daSehIchDichGame.completeTurn(state);
+    daSehIchDichGame.revealAll(state, { blue: perfect, red: noMatches });
     if (state.game.status === "finished") break;
-    matchingGame.startNextRound(state);
+    daSehIchDichGame.startNextRound(state);
   }
 
   assert.equal(state.game.status, "finished");
@@ -926,7 +934,7 @@ test("ends matching early when the trailing team cannot catch up", () => {
   assert.equal(state.game.roundIndex, 2);
   assert.deepEqual(state.game.scores, { blue: 12, red: 0 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(matchingGame.revealAll(state, { blue: perfect, red: perfect }), false);
+  assert.equal(daSehIchDichGame.revealAll(state, { blue: perfect, red: perfect }), false);
 });
 
 test("starts Golden Image after a draw and alternates the assigning players", () => {
@@ -936,13 +944,13 @@ test("starts Golden Image after a draw and alternates the assigning players", ()
     name: `Spieler ${index + 1}`,
     team: assigner.team
   }));
-  matchingGame.start(state, players);
+  daSehIchDichGame.start(state, players);
   state.game.roundIndex = MATCHING_GAME_ROUNDS.length - 1;
   state.game.status = "ready-to-reveal";
   state.game.scores = { blue: 4, red: 4 };
   const equalAssignments = [["Max", "Max"], ["Tom", "Tom"], ["Lisa", "Lisa"], ["Mia", "Mia"]];
 
-  assert.equal(matchingGame.revealAll(state, {
+  assert.equal(daSehIchDichGame.revealAll(state, {
     blue: equalAssignments,
     red: equalAssignments
   }), true);
@@ -951,33 +959,33 @@ test("starts Golden Image after a draw and alternates the assigning players", ()
   assert.deepEqual(state.scores, { blue: 0, red: 0 });
 
   assert.equal(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).playerIndex, 0);
-  assert.equal(matchingGame.startTiebreakRound(state), true);
-  matchingGame.submitTeam(state, "blue");
-  matchingGame.submitTeam(state, "red");
-  matchingGame.completeTurn(state);
-  matchingGame.submitTeam(state, "blue");
-  matchingGame.completeTurn(state);
-  matchingGame.submitTeam(state, "red");
-  matchingGame.completeTurn(state);
+  assert.equal(daSehIchDichGame.startTiebreakRound(state), true);
+  daSehIchDichGame.submitTeam(state, "blue");
+  daSehIchDichGame.submitTeam(state, "red");
+  daSehIchDichGame.completeTurn(state);
+  daSehIchDichGame.submitTeam(state, "blue");
+  daSehIchDichGame.completeTurn(state);
+  daSehIchDichGame.submitTeam(state, "red");
+  daSehIchDichGame.completeTurn(state);
   assert.equal(state.game.status, "tiebreak-ready-to-reveal");
-  assert.equal(matchingGame.revealTiebreak(state, {
+  assert.equal(daSehIchDichGame.revealTiebreak(state, {
     blue: ["Max", "Max"],
     red: ["Lisa", "Lisa"]
   }), true);
   assert.equal(state.game.status, "tiebreak-round-finished");
-  assert.equal(matchingGame.startNextTiebreakRound(state), true);
+  assert.equal(daSehIchDichGame.startNextTiebreakRound(state), true);
   assert.equal(state.game.tiebreak.imageIndex, 1);
   assert.equal(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).playerIndex, 1);
 
-  matchingGame.startTiebreakRound(state);
-  matchingGame.submitTeam(state, "blue");
-  matchingGame.submitTeam(state, "red");
-  matchingGame.completeTurn(state);
-  matchingGame.submitTeam(state, "blue");
-  matchingGame.completeTurn(state);
-  matchingGame.submitTeam(state, "red");
-  matchingGame.completeTurn(state);
-  assert.equal(matchingGame.revealTiebreak(state, {
+  daSehIchDichGame.startTiebreakRound(state);
+  daSehIchDichGame.submitTeam(state, "blue");
+  daSehIchDichGame.submitTeam(state, "red");
+  daSehIchDichGame.completeTurn(state);
+  daSehIchDichGame.submitTeam(state, "blue");
+  daSehIchDichGame.completeTurn(state);
+  daSehIchDichGame.submitTeam(state, "red");
+  daSehIchDichGame.completeTurn(state);
+  assert.equal(daSehIchDichGame.revealTiebreak(state, {
     blue: ["Max", "Max"],
     red: ["Lisa", "Mia"]
   }), true);
@@ -1053,17 +1061,17 @@ test("parses German and common Euro inputs", () => {
 
 test("locks both teams and awards the closer price guess", () => {
   const state = createInitialRoomState("TEST");
-  guessThePriceGame.start(state);
+  thriftyGame.start(state);
 
   assert.equal(state.game.status, "product-pending");
-  assert.equal(guessThePriceGame.lockTeam(state, "blue"), false);
-  assert.equal(guessThePriceGame.startFirstRound(state), true);
-  assert.equal(guessThePriceGame.lockTeam(state, "blue"), true);
+  assert.equal(thriftyGame.lockTeam(state, "blue"), false);
+  assert.equal(thriftyGame.startFirstRound(state), true);
+  assert.equal(thriftyGame.lockTeam(state, "blue"), true);
   assert.equal(state.game.status, "guessing");
-  assert.equal(guessThePriceGame.lockTeam(state, "red"), true);
+  assert.equal(thriftyGame.lockTeam(state, "red"), true);
   assert.equal(state.game.status, "ready-to-reveal");
-  assert.equal(guessThePriceGame.revealRound(state, { blue: null, red: 40 }), false);
-  assert.equal(guessThePriceGame.revealRound(state, { blue: 80, red: 40 }), true);
+  assert.equal(thriftyGame.revealRound(state, { blue: null, red: 40 }), false);
+  assert.equal(thriftyGame.revealRound(state, { blue: 80, red: 40 }), true);
   assert.equal(state.game.revealed.actualPrice, 79.99);
   assert.equal(state.game.revealed.roundWinner, "blue");
   assert.deepEqual(state.game.roundScores, { blue: 1, red: 0 });
@@ -1072,35 +1080,35 @@ test("locks both teams and awards the closer price guess", () => {
 
 test("finishes the best of seven price game at four wins", () => {
   const state = createInitialRoomState("TEST");
-  guessThePriceGame.start(state);
-  guessThePriceGame.startFirstRound(state);
+  thriftyGame.start(state);
+  thriftyGame.startFirstRound(state);
 
   for (let round = 0; round < PRICE_GAME_WINNING_SCORE; round += 1) {
-    guessThePriceGame.lockTeam(state, "blue");
-    guessThePriceGame.lockTeam(state, "red");
-    guessThePriceGame.revealRound(state, { blue: 0, red: 10_000_000 });
-    if (round < PRICE_GAME_WINNING_SCORE - 1) guessThePriceGame.startNextRound(state);
+    thriftyGame.lockTeam(state, "blue");
+    thriftyGame.lockTeam(state, "red");
+    thriftyGame.revealRound(state, { blue: 0, red: 10_000_000 });
+    if (round < PRICE_GAME_WINNING_SCORE - 1) thriftyGame.startNextRound(state);
   }
 
   assert.equal(state.game.status, "finished");
   assert.equal(state.game.winningTeam, "blue");
   assert.deepEqual(state.game.roundScores, { blue: 4, red: 0 });
   assert.deepEqual(state.scores, { blue: 1, red: 0 });
-  assert.equal(guessThePriceGame.startNextRound(state), false);
+  assert.equal(thriftyGame.startNextRound(state), false);
 });
 
 test("uses the requested product order with matching prices", () => {
   const state = createInitialRoomState("TEST");
   const expectedPrices = [79.99, 82_220, 11.54, 25.95, 51_800, 49.95, 149.90];
-  guessThePriceGame.start(state);
-  guessThePriceGame.startFirstRound(state);
+  thriftyGame.start(state);
+  thriftyGame.startFirstRound(state);
 
   expectedPrices.forEach((expectedPrice, index) => {
-    guessThePriceGame.lockTeam(state, "blue");
-    guessThePriceGame.lockTeam(state, "red");
-    guessThePriceGame.revealRound(state, { blue: 0, red: 0 });
+    thriftyGame.lockTeam(state, "blue");
+    thriftyGame.lockTeam(state, "red");
+    thriftyGame.revealRound(state, { blue: 0, red: 0 });
     assert.equal(state.game.revealed.actualPrice, expectedPrice);
-    if (index < expectedPrices.length - 1) guessThePriceGame.startNextRound(state);
+    if (index < expectedPrices.length - 1) thriftyGame.startNextRound(state);
   });
 
   assert.equal(state.game.status, "finished");

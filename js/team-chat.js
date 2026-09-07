@@ -1,4 +1,4 @@
-export const TEAM_CHAT_GAME_IDS = ["guess-the-price", "spotify-top-artists", "germany-map", "ranking-game"];
+export const TEAM_CHAT_GAME_IDS = ["thrifty", "top-20", "kartenwissen", "einordnen"];
 export const TEAM_CHAT_TEXT_LIMIT = 500;
 
 export function supportsTeamChat(gameId) {

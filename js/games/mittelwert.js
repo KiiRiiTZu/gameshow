@@ -26,8 +26,8 @@ function publicParticipants(participants) {
   return participants.map(({ id, name, team }) => ({ id, name, team }));
 }
 
-export const estimationGame = {
-  id: "estimation-game",
+export const mittelwertGame = {
+  id: "mittelwert",
   name: "Mittelwert",
 
   start(state, participants) {

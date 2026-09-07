@@ -17,7 +17,7 @@ function startingTeamForRound(firstStartingTeam, roundIndex) {
 }
 
 export const top20Game = {
-  id: "spotify-top-artists",
+  id: "top-20",
   name: "Top 20",
 
   start(state, startingTeam = "blue") {
@@ -143,8 +143,3 @@ export const top20Game = {
     return true;
   }
 };
-
-// Backwards-compatible aliases for older imports and persisted rooms.
-export const spotifyTopArtistsGame = top20Game;
-export const SPOTIFY_SLOT_COUNT = TOP_20_SLOT_COUNT;
-export const SPOTIFY_MAX_STRIKES = TOP_20_MAX_STRIKES;

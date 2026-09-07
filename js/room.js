@@ -2,6 +2,35 @@ export const TEAM_CAPACITY = 2;
 export const SCORE_SYSTEM_VERSION = 2;
 export const SHOW_WINNING_SCORE = 4;
 
+/**
+ * Frühere Spiel-Ids, die noch in rooms.current_game und in gespeicherten
+ * Spielzuständen stehen können.
+ *
+ * Jedes Spiel heisst jetzt im Code so wie in der Show. Vorher trugen die Ids
+ * technische Namen, die teils etwas anderes sagten als der Anzeigename:
+ * "germany-map" fragte längst nach Barcelona, Rom und Istanbul, und
+ * "spotify-top-artists" spielt drei Listen, von denen nur eine von Spotify
+ * kommt. "europe-map" war ein Zwischenschritt auf dem Testbranch.
+ *
+ * Ohne diese Tabelle würde ein laufender Raum sein Spiel nicht wiedererkennen
+ * und auf den Anfangszustand zurückfallen.
+ */
+const LEGACY_GAME_IDS = {
+  "estimation-game": "mittelwert",
+  "guess-the-price": "thrifty",
+  "germany-map": "kartenwissen",
+  "europe-map": "kartenwissen",
+  "word-match-game": "begriffsmatch",
+  "ranking-game": "einordnen",
+  "matching-game": "da-seh-ich-dich",
+  buzzer: "buzzer-quiz",
+  "spotify-top-artists": "top-20"
+};
+
+export function normalizeGameId(gameId) {
+  return LEGACY_GAME_IDS[gameId] || gameId;
+}
+
 export function getShowWinner(state) {
   if ((Number(state?.scores?.blue) || 0) >= SHOW_WINNING_SCORE) return "blue";
   if ((Number(state?.scores?.red) || 0) >= SHOW_WINNING_SCORE) return "red";
@@ -14,7 +43,7 @@ function emptyTeamScores() {
 
 function createInitialGame() {
   return {
-    id: "estimation-game",
+    id: "mittelwert",
     status: "not-started",
     roundIndex: 0,
     roundScores: emptyTeamScores(),
@@ -44,7 +73,7 @@ function upgradePersistedGameScores(game, legacyScores) {
     scoreSystemVersion: SCORE_SYSTEM_VERSION
   };
 
-  if (game.id === "buzzer") {
+  if (game.id === "buzzer-quiz") {
     upgradedGame.scores = normalizeTeamScores(legacyScores);
   }
 
@@ -54,7 +83,7 @@ function upgradePersistedGameScores(game, legacyScores) {
 function inferCompletedGameScores(game, legacyScores) {
   const matchScores = emptyTeamScores();
 
-  if (game.id === "buzzer") {
+  if (game.id === "buzzer-quiz") {
     if (game.status === "finished" && game.winningTeam) matchScores[game.winningTeam] = 1;
     return matchScores;
   }
@@ -85,25 +114,69 @@ export function createInitialRoomState(roomCode) {
     roomCode,
     scores: emptyTeamScores(),
     players: [],
+    gameResults: [],
     game: createInitialGame()
   };
 }
 
+/**
+ * Hält fest, welches Team welches Spiel gewonnen hat. Die Gesamtwertung in
+ * state.scores zählt nur, sie weiss nicht welches Spiel — für die Punkteübersicht
+ * wird aber genau diese Zuordnung gebraucht.
+ * Ein bereits erfasstes Spiel wird überschrieben, damit eine Korrektur des
+ * Moderators keinen zweiten Eintrag erzeugt.
+ */
+export function recordGameResult(state, gameId, team) {
+  if (!state || !gameId) return false;
+  state.gameResults ||= [];
+
+  const winner = ["blue", "red"].includes(team) ? team : null;
+  const existing = state.gameResults.find((entry) => entry.gameId === gameId);
+
+  if (existing) {
+    if (existing.team === winner) return false;
+    existing.team = winner;
+    return true;
+  }
+
+  state.gameResults.push({ gameId, team: winner });
+  return true;
+}
+
+export function normalizeGameResults(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const results = [];
+  for (const entry of value) {
+    // Historien aus der Zeit vor der Umbenennung tragen noch die alten Ids.
+    const gameId = normalizeGameId(String(entry?.gameId || ""));
+    if (!gameId || seen.has(gameId)) continue;
+    seen.add(gameId);
+    results.push({
+      gameId,
+      team: ["blue", "red"].includes(entry?.team) ? entry.team : null
+    });
+  }
+  return results;
+}
+
 export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
+  // Räume aus der Zeit vor der Umbenennung tragen noch die alten Spiel-Ids.
+  const currentGame = normalizeGameId(room.current_game);
   const persistedGame = room.game_state &&
     typeof room.game_state === "object" &&
-    room.game_state.id === room.current_game
-    ? room.game_state
+    normalizeGameId(room.game_state.id) === currentGame
+    ? { ...room.game_state, id: currentGame }
     : null;
 
   const legacyScores = normalizeTeamScores({
     blue: room.blue_score,
     red: room.red_score
   });
-  const fallbackGame = room.current_game === "estimation-game" || !room.current_game
+  const fallbackGame = currentGame === "mittelwert" || !currentGame
     ? { ...createInitialGame(), status: room.game_status || "not-started" }
     : {
-    id: room.current_game,
+    id: currentGame,
     status: room.game_status || "waiting",
     winner: room.buzzer_winner_id
       ? {
@@ -128,6 +201,7 @@ export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
       ? inferCompletedGameScores(game, legacyScores)
       : legacyScores,
     players: [],
+    gameResults: normalizeGameResults(room.game_results),
     game: isLegacyPersistedGame
       ? upgradePersistedGameScores(game, legacyScores)
       : game
@@ -145,6 +219,31 @@ export function createRoomStateFromRecords(roomCode, room, playerRecords = []) {
   }
 
   return state;
+}
+
+function comparablePlayerName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+/**
+ * Sucht den Platz, den ein zurückkehrender Spieler wieder einnehmen darf.
+ *
+ * Verliert jemand seine Spieler-Id — anderes Gerät, gelöschte Browserdaten,
+ * privates Fenster —, bekäme er sonst entweder "Dieses Team ist bereits voll"
+ * oder, wenn im Team noch Platz ist, einen zweiten Eintrag unter demselben
+ * Namen neben seiner eigenen Karteileiche. Name und Team identifizieren den
+ * Platz; Namen sind ohnehin schon eindeutig, weil "Da seh ich dich" sie zur
+ * Zuordnung benutzt.
+ */
+export function findReclaimableSeat(state, incomingPlayer) {
+  const name = comparablePlayerName(incomingPlayer?.name);
+  if (!name || !["blue", "red"].includes(incomingPlayer?.team)) return null;
+
+  return state.players.find((player) =>
+    player.id !== incomingPlayer.id &&
+    player.team === incomingPlayer.team &&
+    comparablePlayerName(player.name) === name
+  ) || null;
 }
 
 export function countTeamPlayers(state, team) {

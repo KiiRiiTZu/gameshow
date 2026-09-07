@@ -144,6 +144,17 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .topbar h1 { margin-bottom: 0; font-size: clamp(2rem, 5vw, 3.2rem); }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.button.small { padding: 9px 14px; border-radius: 11px; font-size: .82rem; }
+
+/* Solange die Übersicht offen ist, zeigt der Schalter das aktiv an. */
+.button[aria-pressed="true"] { background: #5a72f6; color: white; }
+
 .connection {
   display: flex;
   gap: 8px;
@@ -163,6 +174,19 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .dot.online {
   background: #35d08a;
   box-shadow: 0 0 0 5px rgba(53, 208, 138, .12);
+}
+
+/* Spielstand kommt nicht in der Datenbank an — die Show läuft weiter,
+   deshalb warnend statt alarmierend. */
+.dot.warning {
+  background: #efa23c;
+  box-shadow: 0 0 0 5px rgba(239, 162, 60, .18);
+  animation: connection-warning-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes connection-warning-pulse {
+  0%, 100% { box-shadow: 0 0 0 5px rgba(239, 162, 60, .18); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 162, 60, .07); }
 }
 
 .scoreboard {
@@ -266,6 +290,36 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   gap: 15px;
 }
 
+.game-title-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.game-title-line h2,
+.game-title-line .eyebrow { margin: 0; }
+.game-title-line > span { color: #7f8596; font-weight: 700; }
+
+#map-next-game-error:empty { display: none; }
+
+/* Die beiden großen Moderatoren-Spiele bleiben bündig zur Punkteanzeige.
+   Nur ihre flächenintensiven Inhalte werden kompakter dargestellt. */
+.host-page #map-game-panel,
+.host-page #matching-game-panel { padding: 25px; }
+
+.host-page #map-game-panel .europe-map {
+  width: min(1076px, 90%);
+}
+
+.host-page #matching-game-panel .matching-board {
+  width: 90%;
+  margin-right: auto;
+  margin-left: auto;
+  gap: 16px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -313,7 +367,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 
 .game-finished p { font-size: 1.25rem; font-weight: 900; }
 
-.spotify-meta {
+.top20-meta {
   display: grid;
   grid-template-columns: 1fr auto;
   align-items: stretch;
@@ -537,14 +591,14 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   min-height: 0;
 }
 
-.spotify-board {
+.top20-board {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-top: 18px;
 }
 
-.spotify-slot {
+.top20-slot {
   width: 100%;
   display: grid;
   grid-template-columns: 40px 1fr;
@@ -567,7 +621,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .top20-reveal:disabled { opacity: 1; }
 .top20-reveal.empty:disabled { cursor: not-allowed; }
 
-.spotify-slot .rank {
+.top20-slot .rank {
   display: grid;
   align-self: stretch;
   place-items: center;
@@ -576,12 +630,12 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   font-weight: 900;
 }
 
-.spotify-slot .artist { display: grid; gap: 3px; padding: 10px 12px; font-weight: 800; }
-.spotify-slot .value { color: #a8adbd; font-size: .78rem; font-weight: 650; }
-.spotify-slot.blue { border-color: rgba(90,114,246,.55); }
-.spotify-slot.red { border-color: rgba(210,55,80,.55); }
-.spotify-slot.empty .artist { color: #656b7d; font-weight: 600; }
-.spotify-board.compact { grid-template-columns: 1fr; max-height: 470px; overflow: auto; }
+.top20-slot .artist { display: grid; gap: 3px; padding: 10px 12px; font-weight: 800; }
+.top20-slot .value { color: #a8adbd; font-size: .78rem; font-weight: 650; }
+.top20-slot.blue { border-color: rgba(90,114,246,.55); }
+.top20-slot.red { border-color: rgba(210,55,80,.55); }
+.top20-slot.empty .artist { color: #656b7d; font-weight: 600; }
+.top20-board.compact { grid-template-columns: 1fr; max-height: 470px; overflow: auto; }
 .player-strikes { justify-content: center; margin: 10px 0 16px; }
 
 .ranking-meta {
@@ -654,6 +708,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .ranking-row.proposed.red { border-color: #e14c65; background: rgba(151,44,65,.2); }
 .ranking-feedback-correct { animation: ranking-correct-flash 720ms ease-out; }
 .ranking-feedback-wrong { animation: ranking-wrong-flash 720ms ease-out; }
+.ranking-feedback-land { animation: ranking-land-pop 460ms cubic-bezier(.3,1.4,.4,1); }
 .ranking-awaiting-motion { visibility: hidden; }
 
 @keyframes ranking-correct-flash {
@@ -664,6 +719,13 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 @keyframes ranking-wrong-flash {
   0%, 100% { border-color: rgba(255,255,255,.1); background: #202532; }
   28% { border-color: #ef536b; background: rgba(210,55,80,.38); box-shadow: 0 0 28px rgba(210,55,80,.3); }
+}
+
+/* Kurzes Einrasten, wenn der fliegende Begriff seine Zeile erreicht hat. */
+@keyframes ranking-land-pop {
+  0% { transform: scale(.97); box-shadow: 0 0 0 rgba(140,162,255,0); }
+  40% { transform: scale(1.018); box-shadow: 0 0 26px rgba(140,162,255,.28); }
+  100% { transform: scale(1); box-shadow: 0 0 0 rgba(140,162,255,0); }
 }
 
 .ranking-insert {
@@ -725,14 +787,36 @@ button.ranking-candidate:disabled { opacity: .72; }
   border-radius: 11px;
   background: #303a59;
   color: white;
-  box-shadow: 0 16px 40px rgba(0,0,0,.42);
+  box-shadow: 0 18px 44px rgba(0,0,0,.5), 0 0 22px rgba(140,162,255,.22);
   font-size: .86rem;
   font-weight: 800;
   text-align: center;
   pointer-events: none;
+  will-change: transform;
 }
 
-.ranking-moving-token.red { border-color: #e14c65; background: #542535; }
+.ranking-moving-token.red {
+  border-color: #e14c65;
+  background: #542535;
+  box-shadow: 0 18px 44px rgba(0,0,0,.5), 0 0 22px rgba(225,76,101,.22);
+}
+
+.ranking-moving-token.returning {
+  border-color: #ef536b;
+  background: #4a2130;
+  box-shadow: 0 18px 44px rgba(0,0,0,.5), 0 0 26px rgba(210,55,80,.34);
+}
+
+/* Eigenes Textelement: hält die Zeilenhöhe stabil und kürzt lange Begriffe,
+   statt den Token in die Höhe zu ziehen. */
+.ranking-moving-token-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
 
 @media (max-width: 720px) {
   .ranking-meta { grid-template-columns: 1fr; }
@@ -1230,19 +1314,22 @@ button.ranking-candidate:disabled { opacity: .72; }
   animation: effect-fade-in .28s ease both;
 }
 
-.game-transition-overlay.leaving { animation: effect-fade-out .45s ease both; }
+.game-transition-overlay.leaving {
+  animation: effect-fade-out var(--transition-fade-out, .45s) ease both;
+}
 
 .game-transition-card {
   width: min(620px, 82vw);
   aspect-ratio: 16 / 9;
-  perspective: 1400px;
+  perspective: 1500px;
 }
 
 .game-transition-card-inner {
   position: relative;
   width: 100%;
   height: 100%;
-  animation: game-card-flip 3.3s cubic-bezier(.7, 0, .25, 1) both;
+  transform-style: preserve-3d;
+  animation: game-card-flip var(--transition-duration, 2900ms) cubic-bezier(.62, .04, .22, 1) both;
 }
 
 .game-transition-face {
@@ -1252,6 +1339,7 @@ button.ranking-candidate:disabled { opacity: .72; }
   place-content: center;
   gap: 8px;
   padding: 35px;
+  overflow: hidden;
   border: 5px solid #f4c451;
   border-radius: 28px;
   backface-visibility: hidden;
@@ -1261,49 +1349,349 @@ button.ranking-candidate:disabled { opacity: .72; }
   -webkit-backface-visibility: hidden;
 }
 
+/* Lichtstreifen, der beim Drehen über die Karte wandert. */
+.game-transition-face::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,.42) 50%, transparent 62%);
+  animation: game-card-sheen var(--transition-duration, 2900ms) ease-in-out both;
+}
+
 .game-transition-face span {
+  position: relative;
   letter-spacing: .3em;
   font-size: clamp(.9rem, 2vw, 1.3rem);
   font-weight: 950;
 }
 
 .game-transition-face strong {
+  position: relative;
   font-size: clamp(3.4rem, 10vw, 7rem);
   line-height: 1;
   text-transform: uppercase;
+  text-shadow: 0 6px 24px rgba(0,0,0,.4);
 }
 
-.game-transition-front { animation: game-front-visibility 3.3s steps(1, end) both; }
-.game-transition-back {
-  animation: game-back-visibility 3.3s steps(1, end) both;
-}
+/* Die Vorderseite trägt nur die Nummer und bleibt dunkler, damit der
+   Namenswechsel auf der Rückseite als Auflösung wirkt. */
+.game-transition-front { background: linear-gradient(145deg, #c8391f, #7d1524); }
+.game-transition-back { transform: rotateY(180deg); }
 .game-transition-back strong { font-size: clamp(2.1rem, 6vw, 4.4rem); }
 
+/* Ausschliesslich transform — kein opacity!
+   Eine animierte Deckkraft auf diesem Element flacht in Chrome den 3D-Raum ab
+   und setzt backface-visibility ausser Kraft; man sieht dann die gespiegelte
+   Vorderseite statt der Rueckseite. Das Ein- und Ausblenden macht das Overlay. */
 @keyframes game-card-flip {
-  0% { opacity: 0; transform: translateY(35px) scale(.86); }
-  14%, 42% { opacity: 1; transform: translateY(0) scale(1, 1); }
-  49%, 51% { opacity: 1; transform: translateY(0) scale(.03, 1); }
-  58%, 88% { opacity: 1; transform: translateY(0) scale(1, 1); }
-  100% { opacity: 0; transform: translateY(-22px) scale(.94); }
+  0% { transform: translateY(46px) scale(.8) rotateY(-24deg); }
+  13% { transform: translateY(0) scale(1) rotateY(0deg); }
+  34% { transform: translateY(0) scale(1) rotateY(0deg); }
+  /* Kurz anheben, drehen, dann mit einem kleinen Nachschwingen einrasten. */
+  50% { transform: translateY(-10px) scale(1.05) rotateY(96deg); }
+  66% { transform: translateY(0) scale(1) rotateY(188deg); }
+  72% { transform: translateY(0) scale(1) rotateY(177deg); }
+  78%, 90% { transform: translateY(0) scale(1) rotateY(180deg); }
+  100% { transform: translateY(-30px) scale(.93) rotateY(180deg); }
 }
 
-@keyframes game-front-visibility {
-  0%, 49% { visibility: visible; }
-  50%, 100% { visibility: hidden; }
-}
-
-@keyframes game-back-visibility {
-  0%, 49% { visibility: hidden; }
-  50%, 100% { visibility: visible; }
+@keyframes game-card-sheen {
+  0%, 30% { transform: translateX(-115%); opacity: 0; }
+  46% { opacity: .9; }
+  62%, 100% { transform: translateX(115%); opacity: 0; }
 }
 
 @keyframes effect-fade-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes effect-fade-out { from { opacity: 1; } to { opacity: 0; } }
 
+/* ---- Siegerehrung nach einem beendeten Spiel ---- */
+
+.game-winner-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: effect-fade-in .3s ease both;
+}
+
+.game-winner-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 52%, var(--winner-glow, rgba(140,162,255,.3)) 0%, rgba(7,9,15,.9) 64%);
+  backdrop-filter: blur(7px);
+}
+
+.game-winner-overlay.blue { --winner-glow: rgba(90,114,246,.42); --winner-edge: #8ca2ff; --winner-fill: linear-gradient(150deg, #38519f, #1b2650); }
+.game-winner-overlay.red { --winner-glow: rgba(210,55,80,.42); --winner-edge: #ef8095; --winner-fill: linear-gradient(150deg, #9c2e44, #4c1523); }
+.game-winner-overlay.draw { --winner-glow: rgba(150,160,190,.3); --winner-edge: #aeb5c8; --winner-fill: linear-gradient(150deg, #2c3242, #171b26); }
+
+.game-winner-overlay.leaving { animation: effect-fade-out var(--winner-fade-out, .48s) ease both; }
+
+.game-winner-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  width: min(560px, 86vw);
+  padding: 34px 40px 30px;
+  border: 3px solid var(--winner-edge, #8ca2ff);
+  border-radius: 26px;
+  background: var(--winner-fill, #232a44);
+  box-shadow: 0 30px 90px rgba(0,0,0,.6), inset 0 0 60px rgba(255,255,255,.07);
+  text-align: center;
+  animation: winner-card-pop 720ms cubic-bezier(.24, 1.35, .38, 1) both;
+}
+
+.game-winner-trophy {
+  font-size: clamp(2.6rem, 7vw, 3.9rem);
+  line-height: 1;
+  animation: winner-trophy-bounce 1.6s ease-in-out .34s both;
+}
+
+.game-winner-headline {
+  font-size: clamp(1.6rem, 4.4vw, 2.5rem);
+  line-height: 1.15;
+  text-shadow: 0 5px 20px rgba(0,0,0,.45);
+}
+
+.game-winner-game {
+  color: rgba(255,255,255,.78);
+  letter-spacing: .12em;
+  font-size: clamp(.74rem, 1.8vw, .88rem);
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.game-winner-detail {
+  margin-top: 4px;
+  color: rgba(255,255,255,.9);
+  font-size: clamp(.86rem, 2vw, 1rem);
+  font-weight: 750;
+}
+
+.confetti-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 1002;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ---- Punkteübersicht der Show ---- */
+
+.score-overview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+  pointer-events: none;
+  /* Vollständig deckend: die Spielansicht dahinter soll nicht durchscheinen,
+     damit die Übersicht auch im Stream ruhig zu lesen ist. */
+  background: radial-gradient(circle at 50% 45%, #171f3c 0%, #0a0c13 68%);
+  animation: effect-fade-in .34s ease both;
+}
+
+.score-overview-overlay.leaving { animation: effect-fade-out var(--overview-fade-out, .52s) ease both; }
+
+/* Das Overlay selbst lässt Klicks durch; nur das Kreuz nimmt sie an. */
+.score-overview-close {
+  position: absolute;
+  top: clamp(14px, 2.4vw, 26px);
+  right: clamp(14px, 2.4vw, 26px);
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 50%;
+  background: rgba(255,255,255,.07);
+  color: #d4d8e5;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: border-color .16s ease, background .16s ease, color .16s ease;
+}
+
+.score-overview-close:hover {
+  border-color: #8ca2ff;
+  background: rgba(90,114,246,.2);
+  color: white;
+}
+
+.score-overview-close:focus-visible { outline: 2px solid #8ca2ff; outline-offset: 3px; }
+
+.score-overview {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: clamp(18px, 4vw, 54px);
+}
+
+.score-overview-team {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  animation: overview-team-in .55s cubic-bezier(.24, 1.2, .4, 1) both;
+}
+
+.score-overview-team > span {
+  color: rgba(255,255,255,.82);
+  letter-spacing: .16em;
+  font-size: clamp(.66rem, 1.5vw, .82rem);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.score-overview-team > strong {
+  display: grid;
+  place-items: center;
+  width: clamp(96px, 15vw, 168px);
+  aspect-ratio: 1;
+  border-radius: clamp(22px, 3.4vw, 36px);
+  font-size: clamp(3rem, 8vw, 5.6rem);
+  line-height: 1;
+}
+
+.score-overview-team.blue > strong {
+  background: linear-gradient(150deg, #5a72f6, #2f3f9e);
+  box-shadow: 0 20px 54px rgba(90,114,246,.34), inset 0 0 40px rgba(255,255,255,.1);
+}
+
+.score-overview-team.red > strong {
+  background: linear-gradient(150deg, #e14c65, #8d2035);
+  box-shadow: 0 20px 54px rgba(210,55,80,.34), inset 0 0 40px rgba(255,255,255,.1);
+}
+
+.score-overview-middle { display: grid; justify-items: center; gap: 18px; }
+
+/* Breit genug für vier Felder in der ersten Reihe: die sieben Spiele stehen
+   dann als 4 + 3 statt als 3 + 3 + 1 mit einem einzelnen Feld darunter. */
+.score-overview-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(8px, 1.2vw, 14px);
+  max-width: min(566px, 100%);
+}
+
+.score-overview-game {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  width: clamp(94px, 13vw, 122px);
+  min-height: clamp(74px, 9vw, 96px);
+  padding: 10px 8px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 16px;
+  background: #202532;
+  text-align: center;
+}
+
+.score-overview-game strong { font-size: clamp(.92rem, 2vw, 1.1rem); }
+
+.score-overview-game span {
+  color: rgba(255,255,255,.58);
+  font-size: clamp(.6rem, 1.3vw, .7rem);
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+/* Platzhalter für ein noch nicht gespieltes Spiel: hält die Zeile, ohne den
+   Namen zu verraten. */
+.score-overview-unrevealed {
+  color: rgba(255,255,255,.3);
+  font-size: clamp(.72rem, 1.5vw, .84rem);
+  letter-spacing: .1em;
+}
+
+.score-overview-game.won.blue,
+.score-overview-game.claiming.blue { --claim: #5a72f6; --claim-edge: #8ca2ff; --claim-glow: rgba(90,114,246,.5); }
+.score-overview-game.won.red,
+.score-overview-game.claiming.red { --claim: #e14c65; --claim-edge: #ef8095; --claim-glow: rgba(210,55,80,.5); }
+
+.score-overview-game.won {
+  border-color: var(--claim-edge);
+  background: var(--claim);
+  box-shadow: 0 0 20px var(--claim-glow);
+}
+
+.score-overview-game.won span { color: rgba(255,255,255,.85); }
+
+/* Dreimal kurz in der Siegerfarbe aufblitzen, danach darin stehen bleiben. */
+.score-overview-game.claiming {
+  animation: overview-claim 2000ms ease-out both;
+  animation-delay: .45s;
+}
+
+/* Drei Blitze von je rund 120 ms, danach bleibt das Feld in der Siegerfarbe.
+   Die Pause vor dem Einrasten ist bewusst länger, damit der Endzustand nicht
+   als vierter Blitz gelesen wird. */
+@keyframes overview-claim {
+  0%, 5% { border-color: rgba(255,255,255,.1); background: #202532; box-shadow: none; transform: scale(1); }
+  8%, 14% { border-color: var(--claim-edge); background: var(--claim); box-shadow: 0 0 30px var(--claim-glow); transform: scale(1.09); }
+  17%, 23% { border-color: rgba(255,255,255,.1); background: #202532; box-shadow: none; transform: scale(1); }
+  26%, 32% { border-color: var(--claim-edge); background: var(--claim); box-shadow: 0 0 30px var(--claim-glow); transform: scale(1.09); }
+  35%, 41% { border-color: rgba(255,255,255,.1); background: #202532; box-shadow: none; transform: scale(1); }
+  44%, 50% { border-color: var(--claim-edge); background: var(--claim); box-shadow: 0 0 30px var(--claim-glow); transform: scale(1.09); }
+  53%, 62% { border-color: rgba(255,255,255,.1); background: #202532; box-shadow: none; transform: scale(1); }
+  72%, 100% { border-color: var(--claim-edge); background: var(--claim); box-shadow: 0 0 20px var(--claim-glow); transform: scale(1); }
+}
+
+@keyframes overview-team-in {
+  from { opacity: 0; transform: translateY(22px) scale(.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.score-overview-note {
+  margin: 0;
+  color: rgba(255,255,255,.66);
+  font-size: clamp(.74rem, 1.7vw, .9rem);
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .score-overview { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .score-overview-middle { grid-column: 1 / -1; order: -1; }
+}
+
+@keyframes winner-card-pop {
+  0% { opacity: 0; transform: scale(.72) translateY(26px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes winner-trophy-bounce {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  22% { transform: translateY(-13px) rotate(-9deg); }
+  46% { transform: translateY(0) rotate(0deg); }
+  62% { transform: translateY(-7px) rotate(6deg); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .game-transition-card-inner { animation: none; }
-  .game-transition-front { display: none; }
-  .game-transition-back { visibility: visible; animation: none; }
+  .game-transition-card-inner { animation: none; transform: rotateY(180deg); }
+  .game-transition-face::after { animation: none; opacity: 0; }
+  .game-winner-card,
+  .game-winner-trophy,
+  .score-overview-team { animation: none; }
+  /* Ohne Blinken direkt in der Siegerfarbe zeigen. */
+  .score-overview-game.claiming {
+    animation: none;
+    border-color: var(--claim-edge);
+    background: var(--claim);
+    box-shadow: 0 0 20px var(--claim-glow);
+  }
 }
 
 .team-picker {
@@ -1398,25 +1786,25 @@ button.ranking-candidate:disabled { opacity: .72; }
     width: min(1400px, calc(100% - 48px));
   }
 
-  .spotify-board,
-  .spotify-board.compact {
+  .top20-board,
+  .top20-board.compact {
     grid-template-columns: repeat(10, minmax(0, 1fr));
     max-height: none;
     overflow: visible;
   }
 
-  .spotify-slot {
+  .top20-slot {
     grid-template-columns: 1fr;
     grid-template-rows: 36px 1fr;
     min-height: 128px;
     text-align: center;
   }
 
-  .spotify-slot .rank {
+  .top20-slot .rank {
     min-height: 36px;
   }
 
-  .spotify-slot .artist {
+  .top20-slot .artist {
     align-content: center;
     padding: 9px 7px;
     font-size: clamp(.7rem, .85vw, .88rem);
@@ -1424,12 +1812,12 @@ button.ranking-candidate:disabled { opacity: .72; }
     overflow-wrap: anywhere;
   }
 
-  .spotify-slot .value {
+  .top20-slot .value {
     font-size: .7rem;
   }
 
   .player-map {
-    width: min(960px, 100%);
+    width: min(864px, 90%);
   }
 }
 
@@ -1463,7 +1851,7 @@ button.ranking-candidate:disabled { opacity: .72; }
   .shell { padding-top: 24px; }
   .hero-card { padding: 27px; }
   .choice-grid, .scoreboard { grid-template-columns: 1fr; }
-  .spotify-meta, .spotify-board, .top20-team-notes, .estimation-submissions,
+  .top20-meta, .top20-board, .top20-team-notes, .estimation-submissions,
   .word-match-lists, .word-match-fields { grid-template-columns: 1fr; }
   .matching-board, .price-host-layout, .player-price-layout { grid-template-columns: 1fr; }
   .top20-actions { align-items: stretch; flex-direction: column; }

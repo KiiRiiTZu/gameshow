@@ -23,8 +23,8 @@ function currentQuestionIndex(state) {
   );
 }
 
-export const buzzerGame = {
-  id: "buzzer",
+export const buzzerQuizGame = {
+  id: "buzzer-quiz",
   name: "Buzzer Quiz",
 
   start(state) {
@@ -51,7 +51,7 @@ export const buzzerGame = {
     const scores = currentGameScores(state);
 
     state.game = {
-      id: "buzzer",
+      id: "buzzer-quiz",
       status: "open",
       winner: null,
       winningTeam: null,
@@ -83,7 +83,7 @@ export const buzzerGame = {
     const scores = currentGameScores(state);
 
     state.game = {
-      id: "buzzer",
+      id: "buzzer-quiz",
       status: "waiting",
       winner: null,
       winningTeam: null,

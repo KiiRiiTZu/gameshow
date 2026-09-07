@@ -17,8 +17,8 @@ function cents(value) {
   return Math.round(Number(value) * 100) / 100;
 }
 
-export const guessThePriceGame = {
-  id: "guess-the-price",
+export const thriftyGame = {
+  id: "thrifty",
   name: "Thrifty",
 
   start(state) {

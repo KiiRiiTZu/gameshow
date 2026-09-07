@@ -8,7 +8,7 @@ export async function createRoom(roomCode) {
       status: "waiting",
       blue_score: 0,
       red_score: 0,
-      current_game: "estimation-game",
+      current_game: "mittelwert",
       game_status: "not-started"
     })
     .select()
@@ -54,6 +54,21 @@ export async function updateRoomGameState(roomId, gameState) {
 
   const missingColumn = error.code === "PGRST204" ||
     String(error.message || "").includes("game_state");
+
+  if (missingColumn) return false;
+  throw error;
+}
+
+export async function updateRoomGameResults(roomId, gameResults) {
+  const { error } = await supabase
+    .from("rooms")
+    .update({ game_results: gameResults })
+    .eq("id", roomId);
+
+  if (!error) return true;
+
+  const missingColumn = error.code === "PGRST204" ||
+    String(error.message || "").includes("game_results");
 
   if (missingColumn) return false;
   throw error;

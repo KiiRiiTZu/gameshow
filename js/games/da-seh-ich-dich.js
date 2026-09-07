@@ -172,8 +172,8 @@ export function scoreMatchingAssignments(assignments) {
   return scores;
 }
 
-export const matchingGame = {
-  id: "matching-game",
+export const daSehIchDichGame = {
+  id: "da-seh-ich-dich",
   name: "Da seh ich dich",
 
   start(state, assignerOrder) {

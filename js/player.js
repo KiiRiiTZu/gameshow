@@ -5,10 +5,10 @@ import {
 
 import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
-import { playBuzzerSound } from "./audio.js";
-import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
+import { playBuzzerSound, unlockBuzzerSound } from "./audio.js";
+import { KARTENWISSEN_QUESTIONS } from "./games/kartenwissen.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
-import { captureRankingMove, playRankingMove } from "./ranking-motion.js";
+import { captureRankingMove, isRankingMotionPending, playRankingMove } from "./ranking-motion.js";
 import { createEuropeMap } from "./europe-map-view.js";
 import {
   MATCHING_ASSIGNERS,
@@ -17,10 +17,10 @@ import {
   areMatchingValuesUnique,
   getMatchingRoleRoundIndex,
   getMatchingTurn
-} from "./games/matching-game.js";
+} from "./games/da-seh-ich-dich.js";
 import { PRICE_PRODUCTS, getPriceProduct } from "./games/guess-the-price-products.js";
 import { formatEuroAmount, parseEuroAmount } from "./euro.js";
-import { ESTIMATION_ROUND_COUNT, parseEstimate } from "./games/estimation-game.js";
+import { ESTIMATION_ROUND_COUNT, parseEstimate } from "./games/mittelwert.js";
 import {
   WORD_MATCH_CATEGORIES,
   WORD_MATCH_PHASE_SECONDS,
@@ -29,24 +29,25 @@ import {
   WORD_MATCH_TIEBREAK_SECONDS,
   getWordMatchGuessOrder,
   getWordMatchRoles
-} from "./games/word-match-game.js";
+} from "./games/begriffsmatch.js";
 import {
   createEncryptionKeyPair,
   decryptPrivatePayload,
   encryptPrivatePayload,
   exportEncryptionPublicKey
 } from "./private-channel-crypto.js";
-import { showGameTransition } from "./game-effects.js";
+import { renderScoreOverview, showGameTransition, showGameWinner } from "./game-effects.js";
+import { getModeratorGameScore } from "./moderator-score.js";
 import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
 
-const TOP_20_GAME_ID = "spotify-top-artists";
-const RANKING_GAME_ID = "ranking-game";
+const TOP_20_GAME_ID = "top-20";
+const RANKING_GAME_ID = "einordnen";
 const TOP_20_SLOT_COUNT = 20;
-const GERMANY_MAP_GAME_ID = "germany-map";
-const MATCHING_GAME_ID = "matching-game";
-const PRICE_GAME_ID = "guess-the-price";
-const ESTIMATION_GAME_ID = "estimation-game";
-const WORD_MATCH_GAME_ID = "word-match-game";
+const KARTENWISSEN_GAME_ID = "kartenwissen";
+const MATCHING_GAME_ID = "da-seh-ich-dich";
+const PRICE_GAME_ID = "thrifty";
+const ESTIMATION_GAME_ID = "mittelwert";
+const WORD_MATCH_GAME_ID = "begriffsmatch";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -58,9 +59,32 @@ if (!roomCode) {
 
 $("room-code").textContent = roomCode;
 
-const storedId = sessionStorage.getItem(`gameshow-player-id-${roomCode}`);
-const playerId = storedId || crypto.randomUUID();
-sessionStorage.setItem(`gameshow-player-id-${roomCode}`, playerId);
+const PLAYER_ID_KEY = `gameshow-player-id-${roomCode}`;
+
+// Die Spieler-Id liegt in localStorage, damit ein geschlossener oder
+// abgestürzter Tab den Platz im Team nicht verliert. sessionStorage wird nur
+// noch gelesen, um eine bereits laufende Show aus der Zeit davor zu übernehmen.
+function readStoredPlayerId() {
+  try {
+    return localStorage.getItem(PLAYER_ID_KEY) || sessionStorage.getItem(PLAYER_ID_KEY) || null;
+  } catch (error) {
+    console.warn("Player id could not be read:", error);
+    return null;
+  }
+}
+
+function storePlayerId(id) {
+  try {
+    localStorage.setItem(PLAYER_ID_KEY, id);
+  } catch (error) {
+    // Privater Modus kann das Schreiben verbieten; die Sitzung läuft trotzdem,
+    // nur ohne Wiedererkennung nach einem Reload.
+    console.warn("Player id could not be stored:", error);
+  }
+}
+
+let playerId = readStoredPlayerId() || crypto.randomUUID();
+storePlayerId(playerId);
 
 let player = null;
 let roomState = null;
@@ -174,11 +198,11 @@ async function initializePlayer() {
     showPlayerGame();
   }
 
-  playerMap = createEuropeMap($("player-germany-map"), {
+  playerMap = createEuropeMap($("player-kartenwissen-map"), {
     enableZoom: true,
     compactMarkers: true,
     async onPlacePin(position) {
-      if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
+      if (!player || roomState?.game?.id !== KARTENWISSEN_GAME_ID ||
           roomState.game.status !== "placing" || roomState.game.lockedTeams?.[player.team]) return;
 
       await realtime.send("map_pin", { playerId, position });
@@ -194,6 +218,10 @@ async function initializePlayer() {
 
 $("player-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  // Aus der Nutzergeste heraus, damit der Buzzer-Sound später auch bei denen
+  // ankommt, die nicht selbst buzzern.
+  void unlockBuzzerSound();
 
   $("join-error").textContent = "";
 
@@ -293,7 +321,7 @@ function teamChatIsWritable() {
   if (roomState.game.id === RANKING_GAME_ID) {
     return ["playing", "ready-to-reveal"].includes(roomState.game.status);
   }
-  if (roomState.game.id === GERMANY_MAP_GAME_ID) {
+  if (roomState.game.id === KARTENWISSEN_GAME_ID) {
     return roomState.game.status === "placing" && !roomState.game.lockedTeams?.[player.team];
   }
   if (roomState.game.id === PRICE_GAME_ID) {
@@ -365,7 +393,7 @@ document.addEventListener("submit", async (event) => {
 });
 
 $("lock-map-pin").addEventListener("click", async () => {
-  if (!player || roomState?.game?.id !== GERMANY_MAP_GAME_ID ||
+  if (!player || roomState?.game?.id !== KARTENWISSEN_GAME_ID ||
       roomState.game.status !== "placing" || !roomState.game.pins?.[player.team] ||
       roomState.game.lockedTeams?.[player.team]) return;
 
@@ -538,7 +566,16 @@ async function handleEvent(event, payload) {
     }
 
     player = payload.player || player;
+    // Der Moderator kann einen früheren Platz zurückgeben; dann übernimmt der
+    // Browser wieder dessen Id, damit alle laufenden Spiele den Spieler kennen.
+    if (player?.id && player.id !== playerId) {
+      playerId = player.id;
+      storePlayerId(playerId);
+    }
     showPlayerGame();
+    if (payload.reclaimed) {
+      $("player-message").textContent = "Willkommen zurück — dein Platz ist wieder da.";
+    }
     await registerPriceKey();
     render();
     return;
@@ -783,17 +820,29 @@ async function handleEvent(event, payload) {
   }
 }
 
+function gameWinnerDetail(game) {
+  const score = getModeratorGameScore(game);
+  if (!score) return "";
+  return `${score.label} ${score.scores.blue} : ${score.scores.red}`;
+}
+
 function render() {
   if (!joined || !roomState) return;
 
   const currentGameId = roomState.game?.id;
   if (previousGameId && previousGameId !== currentGameId) {
     showGameTransition(currentGameId);
-  } else if (["buzzer", ESTIMATION_GAME_ID].includes(currentGameId) &&
+  } else if (["buzzer-quiz", ESTIMATION_GAME_ID].includes(currentGameId) &&
       previousGameStatus === "not-started" &&
       roomState.game.status !== "not-started") {
     showGameTransition(currentGameId);
+  } else if (previousGameId === currentGameId && previousGameStatus &&
+      previousGameStatus !== "finished" && roomState.game.status === "finished") {
+    // Erst der Übergang von "läuft" auf "beendet" feiert — wer in ein bereits
+    // beendetes Spiel hineinlädt, bekommt kein Konfetti.
+    showGameWinner(currentGameId, roomState.game.winningTeam, gameWinnerDetail(roomState.game));
   }
+  renderScoreOverview(roomState);
   previousGameId = currentGameId;
   previousGameStatus = roomState.game.status;
 
@@ -803,22 +852,22 @@ function render() {
     ? `🏆 ${getTeamName(showWinner)} gewinnt die Gameshow mit ${roomState.scores[showWinner]} Spielpunkten!`
     : "";
 
-  const spotifyIsActive = roomState.game?.id === TOP_20_GAME_ID;
+  const top20IsActive = roomState.game?.id === TOP_20_GAME_ID;
   const rankingIsActive = roomState.game?.id === RANKING_GAME_ID;
-  const mapIsActive = roomState.game?.id === GERMANY_MAP_GAME_ID;
+  const mapIsActive = roomState.game?.id === KARTENWISSEN_GAME_ID;
   const matchingIsActive = roomState.game?.id === MATCHING_GAME_ID;
   const priceIsActive = roomState.game?.id === PRICE_GAME_ID;
   const estimationIsActive = roomState.game?.id === ESTIMATION_GAME_ID;
   const wordMatchIsActive = roomState.game?.id === WORD_MATCH_GAME_ID;
   document.querySelector(".player-shell").classList.toggle(
     "wide-game",
-    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
   $("player-buzzer-game").classList.toggle(
     "hidden",
-    spotifyIsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
   );
-  $("player-spotify-game").classList.toggle("hidden", !spotifyIsActive);
+  $("player-top20-game").classList.toggle("hidden", !top20IsActive);
   $("player-ranking-game").classList.toggle("hidden", !rankingIsActive);
   $("player-map-game").classList.toggle("hidden", !mapIsActive);
   $("player-matching-game").classList.toggle("hidden", !matchingIsActive);
@@ -856,8 +905,8 @@ function render() {
     return;
   }
 
-  if (spotifyIsActive) {
-    renderSpotifyGame();
+  if (top20IsActive) {
+    renderTop20Game();
     return;
   }
 
@@ -949,7 +998,7 @@ function renderPlayerTeamChat(containerId, writable) {
   button.disabled = !writable || !teamChatDraft.trim();
 }
 
-function renderSpotifyGame() {
+function renderTop20Game() {
   const game = roomState.game;
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
@@ -960,18 +1009,18 @@ function renderSpotifyGame() {
   $("player-top20-description").textContent = game.listDescription || "";
   $("player-top20-round-wins").textContent =
     `Rundensiege · Blau ${game.roundWins.blue} : ${game.roundWins.red} Rot`;
-  $("player-spotify-turn").textContent = isFinished
+  $("player-top20-turn").textContent = isFinished
     ? `${getTeamName(game.winningTeam)} gewinnt das Spiel!`
     : isRoundFinished
       ? `${getTeamName(game.roundWinner)} gewinnt Runde ${roundNumber}!`
     : `${getTeamName(game.currentTeam)} ist dran`;
-  $("player-spotify-turn").className = `turn-card ${displayTeam}`;
+  $("player-top20-turn").className = `turn-card ${displayTeam}`;
   $("player-blue-strikes").textContent = renderStrikes(game.strikes?.blue);
   $("player-red-strikes").textContent = renderStrikes(game.strikes?.red);
-  $("player-spotify-board").innerHTML = renderSpotifySlots(game.revealed);
+  $("player-top20-board").innerHTML = renderTop20Slots(game.revealed);
   renderPlayerTeamChat("player-top20-chat", teamChatIsWritable());
-  $("player-spotify-result").classList.toggle("hidden", !isFinished && !isRoundFinished);
-  $("player-spotify-result").textContent = isFinished
+  $("player-top20-result").classList.toggle("hidden", !isFinished && !isRoundFinished);
+  $("player-top20-result").textContent = isFinished
     ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Top 20!`
     : isRoundFinished
       ? `Liste ${roundNumber} ist beendet. Wartet auf die nächste Liste.`
@@ -984,7 +1033,7 @@ function renderPlayerRankingBoard(game, list, rankingMove = null) {
   for (let index = 0; index <= game.placedIds.length; index += 1) {
     if (proposalIndex === index) {
       const proposed = getRankingEntry(list, game.proposal.itemId);
-      const awaitingMove = rankingMove?.direction === "into-list" && rankingMove.itemId === proposed?.id;
+      const awaitingMove = isRankingMotionPending(proposed?.id, "into-list", rankingMove);
       rows.push(`<div class="ranking-row proposed ${game.proposal.team}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-proposal="${escapeHtml(proposed?.id || "")}">
         <span>${index + 1}</span><strong>${escapeHtml(proposed?.label || "")}</strong><small>vorgemerkt</small>
       </div>`);
@@ -993,7 +1042,7 @@ function renderPlayerRankingBoard(game, list, rankingMove = null) {
       const entry = getRankingEntry(list, game.placedIds[index]);
       const isAnchor = entry?.id === list.anchorId;
       const displayPosition = index + 1 + (proposalIndex >= 0 && proposalIndex <= index ? 1 : 0);
-      const awaitingMove = rankingMove?.direction === "cleanup-into-list" && rankingMove.itemId === entry?.id;
+      const awaitingMove = isRankingMotionPending(entry?.id, "cleanup-into-list", rankingMove);
       rows.push(`<div class="ranking-row${isAnchor ? " anchor" : ""}${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-placed="${escapeHtml(entry?.id || "")}">
         <span>${displayPosition}</span><strong>${escapeHtml(entry?.label || "")}</strong>
         <small>${escapeHtml(entry?.value || "")}${isAnchor ? " · Vorgabe" : ""}</small>
@@ -1032,7 +1081,7 @@ function renderRankingGame() {
   $("player-ranking-board").innerHTML = renderPlayerRankingBoard(game, list, rankingMove);
   $("player-ranking-pool").innerHTML = game.remainingIds.filter((id) => id !== game.proposal?.itemId).map((id) => {
     const entry = getRankingEntry(list, id);
-    const awaitingMove = rankingMove?.direction === "wrong-back-to-pool" && rankingMove.itemId === id;
+    const awaitingMove = isRankingMotionPending(id, "wrong-back-to-pool", rankingMove);
     return `<span class="ranking-candidate${awaitingMove ? " ranking-awaiting-motion" : ""}" data-ranking-item="${escapeHtml(id)}">${escapeHtml(entry?.label || "")}</span>`;
   }).join("");
   playRankingMove(rankingMove, $("player-ranking-pool"), $("player-ranking-board"));
@@ -1097,7 +1146,7 @@ function renderPersonalNoteFields(containerId, notes = {}, ownEditable = true) {
   }
 }
 
-function renderSpotifySlots(revealed = []) {
+function renderTop20Slots(revealed = []) {
   return Array.from({ length: TOP_20_SLOT_COUNT }, (_, index) => {
     const slot = revealed[index];
     const teamClass = slot?.team || "empty";
@@ -1107,7 +1156,7 @@ function renderSpotifySlots(revealed = []) {
       : "";
 
     return `
-      <div class="spotify-slot ${teamClass}">
+      <div class="top20-slot ${teamClass}">
         <span class="rank">${index + 1}</span>
         <span class="artist">${answer}${value}</span>
       </div>
@@ -1117,7 +1166,7 @@ function renderSpotifySlots(revealed = []) {
 
 function renderMapGame() {
   const game = roomState.game;
-  const question = GERMANY_MAP_QUESTIONS[game.roundIndex];
+  const question = KARTENWISSEN_QUESTIONS[game.roundIndex];
   const isPending = game.status === "round-pending";
   const isFinished = game.status === "finished";
   const hasRoundResult = Number.isFinite(game.distances?.blue) && Number.isFinite(game.distances?.red);
@@ -1127,7 +1176,7 @@ function renderMapGame() {
   const bothTeamsLocked = Boolean(game.lockedTeams?.blue && game.lockedTeams?.red);
 
   $("player-map-question-number").textContent =
-    `FRAGE ${game.roundIndex + 1} VON ${GERMANY_MAP_QUESTIONS.length}`;
+    `FRAGE ${game.roundIndex + 1} VON ${KARTENWISSEN_QUESTIONS.length}`;
   $("player-map-question").textContent = isPending ? "" : question.prompt;
   $("player-map-question-number").closest(".map-question-card").classList.toggle("hidden", isPending);
   $("player-map-blue-score").textContent = game.roundScores.blue;
@@ -1749,3 +1798,8 @@ initializePlayer().catch((error) => {
   $("join-error").textContent = "Der Raum konnte nicht geladen werden.";
   $("connection-text").textContent = "Verbindung fehlgeschlagen";
 });
+
+// Ein wiederhergestellter Spieler füllt kein Formular aus und hat damit keine
+// Geste, über die die Wiedergabe freigeschaltet würde. Jeder Klick holt das
+// nach; nach dem ersten Erfolg kehrt die Funktion sofort zurück.
+document.addEventListener("click", () => void unlockBuzzerSound());
