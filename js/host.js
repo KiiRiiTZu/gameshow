@@ -446,7 +446,7 @@ async function initializeHost() {
     window.history.replaceState({}, "", `./host.html?room=${roomCode}`);
   }
 
-  const players = await getPlayers(roomRecord);
+  const players = await getPlayers(roomRecord.id);
   state = createRoomStateFromRecords(roomCode, roomRecord, players);
   restoreLocalGameState();
   restoreGameResults();
