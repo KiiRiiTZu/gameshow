@@ -5,7 +5,7 @@ import {
 
 import { createRoomStateFromRecords, getShowWinner, normalizeRoomCode } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
-import { playBuzzerSound } from "./audio.js";
+import { playBuzzerSound, unlockBuzzerSound } from "./audio.js";
 import { GERMANY_MAP_QUESTIONS } from "./games/germany-map.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
 import { captureRankingMove, isRankingMotionPending, playRankingMove } from "./ranking-motion.js";
@@ -218,6 +218,10 @@ async function initializePlayer() {
 
 $("player-form").addEventListener("submit", async (event) => {
   event.preventDefault();
+
+  // Aus der Nutzergeste heraus, damit der Buzzer-Sound später auch bei denen
+  // ankommt, die nicht selbst buzzern.
+  void unlockBuzzerSound();
 
   $("join-error").textContent = "";
 
@@ -1795,3 +1799,8 @@ initializePlayer().catch((error) => {
   $("join-error").textContent = "Der Raum konnte nicht geladen werden.";
   $("connection-text").textContent = "Verbindung fehlgeschlagen";
 });
+
+// Ein wiederhergestellter Spieler füllt kein Formular aus und hat damit keine
+// Geste, über die die Wiedergabe freigeschaltet würde. Jeder Klick holt das
+// nach; nach dem ersten Erfolg kehrt die Funktion sofort zurück.
+document.addEventListener("click", () => void unlockBuzzerSound());

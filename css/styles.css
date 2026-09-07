@@ -176,6 +176,19 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
   box-shadow: 0 0 0 5px rgba(53, 208, 138, .12);
 }
 
+/* Spielstand kommt nicht in der Datenbank an — die Show läuft weiter,
+   deshalb warnend statt alarmierend. */
+.dot.warning {
+  background: #efa23c;
+  box-shadow: 0 0 0 5px rgba(239, 162, 60, .18);
+  animation: connection-warning-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes connection-warning-pulse {
+  0%, 100% { box-shadow: 0 0 0 5px rgba(239, 162, 60, .18); }
+  50% { box-shadow: 0 0 0 8px rgba(239, 162, 60, .07); }
+}
+
 .scoreboard {
   display: grid;
   grid-template-columns: 1fr auto 1fr;

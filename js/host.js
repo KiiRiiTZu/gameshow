@@ -17,7 +17,7 @@ import {
   recordGameResult
 } from "./room.js";
 import { createRoomChannel } from "./realtime.js";
-import { playBuzzerSound } from "./audio.js";
+import { playBuzzerSound, unlockBuzzerSound } from "./audio.js";
 import { registerGame } from "./games/game-engine.js";
 import { BUZZER_WINNING_SCORE, buzzerGame } from "./games/buzzer.js";
 import { BUZZER_QUESTIONS, getBuzzerQuestion } from "./games/buzzer-questions.js";
@@ -1553,11 +1553,56 @@ function syncGameResult() {
   if (recordGameResult(state, state.game.id, state.game.winningTeam)) saveGameResults();
 }
 
+// Zwei Signale speisen dieselbe Anzeige: steht die Realtime-Verbindung, und
+// kommt der Spielstand in der Datenbank an?
+let realtimeOnline = false;
+let persistenceError = null;
+
+function renderConnectionStatus() {
+  const dot = $("connection-dot");
+  const text = $("connection-text");
+  if (!dot || !text) return;
+
+  dot.classList.toggle("online", realtimeOnline && !persistenceError);
+  dot.classList.toggle("warning", Boolean(persistenceError));
+  text.textContent = persistenceError
+    ? "Nicht gespeichert"
+    : realtimeOnline ? "Live verbunden" : "Verbinde…";
+  text.title = persistenceError
+    ? "Die Show läuft weiter, alle Spieler sind auf dem aktuellen Stand. " +
+      "Der Spielstand liegt aber nur lokal — bis das behoben ist, kein Gerätewechsel."
+    : "";
+}
+
+function setPersistenceError(error) {
+  const changed = Boolean(persistenceError) !== Boolean(error);
+  persistenceError = error || null;
+  if (changed) renderConnectionStatus();
+}
+
 async function persistRenderAndBroadcast() {
   syncGameResult();
   render();
-  await persistRoomState();
-  await broadcastState();
+
+  // Reihenfolge und Fehlerbehandlung sind Absicht: der Broadcast trägt die
+  // laufende Show, die Datenbank nur die Wiederherstellung nach einem Reload.
+  // Scheitert das Speichern, dürfen Moderator und Spieler deshalb trotzdem
+  // nicht auseinanderlaufen — früher blieb der Broadcast bei einem
+  // Datenbankfehler stillschweigend aus.
+  try {
+    await persistRoomState();
+    setPersistenceError(null);
+  } catch (error) {
+    console.error("Room state could not be saved:", error);
+    setPersistenceError(error);
+  }
+
+  try {
+    await broadcastState();
+  } catch (error) {
+    // Bleibt der Broadcast aus, zeigt bereits die Verbindungsanzeige das Problem.
+    console.error("Room state could not be broadcast:", error);
+  }
 }
 
 async function runModeratorAction(action) {
@@ -2241,9 +2286,8 @@ function startRealtime() {
   realtime = createRoomChannel(roomCode, {
     onEvent: handleEvent,
     onStatus(status, error) {
-      const online = status === "SUBSCRIBED";
-      $("connection-dot").classList.toggle("online", online);
-      $("connection-text").textContent = online ? "Live verbunden" : "Verbinde…";
+      realtimeOnline = status === "SUBSCRIBED";
+      renderConnectionStatus();
       if (error) console.error("Realtime error:", error);
     }
   });
@@ -2904,3 +2948,8 @@ initializeHost().catch((error) => {
   console.error(error);
   alert("Der Raum konnte nicht gestartet werden. Siehe Browser-Konsole.");
 });
+
+// Der Moderator hört den Buzzer über dasselbe Element. Der erste Klick im
+// Fenster schaltet die Wiedergabe frei, damit der Ton auch dann kommt, wenn der
+// erste Buzz vor der ersten eigenen Interaktion eintrifft.
+document.addEventListener("click", () => void unlockBuzzerSound());
