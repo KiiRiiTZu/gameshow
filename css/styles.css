@@ -1073,6 +1073,10 @@ button.ranking-candidate:disabled { opacity: .72; }
   object-fit: contain;
 }
 
+.player-price-layout .price-product-image.landscape {
+  aspect-ratio: 1 / 1;
+}
+
 .price-product-card h3 {
   margin: 0;
   padding: 15px 18px;
@@ -1143,8 +1147,8 @@ button.ranking-candidate:disabled { opacity: .72; }
 }
 
 @media (min-width: 631px) {
-  .price-team-form #player-price-chat .team-chat-messages {
-    min-height: 160px;
+  .player-price-layout .price-team-form {
+    contain: size;
   }
 }
 

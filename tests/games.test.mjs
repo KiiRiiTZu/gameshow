@@ -798,13 +798,12 @@ test("scales only the two large player game views down by another ten percent", 
   assert.match(styles, /\.player-panel-scale-90\s*\{[^}]*width:\s*100%;[^}]*zoom:\s*\.9;/s);
 });
 
-test("keeps enough message space in the desktop Thrifty team chat", () => {
+test("adds vertical space around landscape Thrifty product images", () => {
   const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
-  assert.match(
-    styles,
-    /@media\s*\(min-width:\s*631px\)[\s\S]*?\.price-team-form\s+#player-price-chat\s+\.team-chat-messages\s*\{[^}]*min-height:\s*160px;/
-  );
-  assert.doesNotMatch(styles, /\.player-price-layout\s+\.price-team-form\s*\{[^}]*contain:\s*size;/s);
+  const playerScript = readFileSync(new URL("../js/player.js", import.meta.url), "utf8");
+  assert.match(styles, /\.player-price-layout\s+\.price-product-image\.landscape\s*\{[^}]*aspect-ratio:\s*1\s*\/\s*1;/s);
+  assert.match(styles, /\.player-price-layout\s+\.price-team-form\s*\{[^}]*contain:\s*size;/s);
+  assert.match(playerScript, /player-price-product-image[\s\S]*?naturalWidth\s*>\s*image\.naturalHeight/);
 });
 
 test("keeps fixed effects outside the interface zoom", () => {

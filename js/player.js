@@ -433,6 +433,14 @@ $("player-price-amount").addEventListener("blur", () => {
   void sendPriceSubmission("amount");
 });
 
+$("player-price-product-image").addEventListener("load", (event) => {
+  const image = event.currentTarget;
+  image.closest(".price-product-image")?.classList.toggle(
+    "landscape",
+    image.naturalWidth > image.naturalHeight
+  );
+});
+
 $("lock-price-guess").addEventListener("click", async () => {
   if (priceSubmissionPending || parseEuroAmount(priceDraft.amount) === null) {
     $("player-price-error").textContent = "Bitte gebt zuerst einen gültigen Euro-Betrag ein.";
