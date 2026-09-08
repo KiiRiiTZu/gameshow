@@ -393,7 +393,7 @@ input:focus, select:focus, textarea:focus { border-color: #8ca2ff; }
 .game-title-line > span { color: #7f8596; font-weight: 700; }
 
 .player-panel-scale-90 {
-  width: 111.111%;
+  width: 100%;
   zoom: .9;
 }
 

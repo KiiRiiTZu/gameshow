@@ -795,7 +795,7 @@ test("scales only the two large player game views down by another ten percent", 
   const playerMarkup = readFileSync(new URL("../player.html", import.meta.url), "utf8");
   assert.match(playerMarkup, /id="player-map-game"\s+class="player-panel-scale-90 hidden"/);
   assert.match(playerMarkup, /id="player-matching-game"\s+class="player-panel-scale-90 hidden"/);
-  assert.match(styles, /\.player-panel-scale-90\s*\{[^}]*width:\s*111\.111%;[^}]*zoom:\s*\.9;/s);
+  assert.match(styles, /\.player-panel-scale-90\s*\{[^}]*width:\s*100%;[^}]*zoom:\s*\.9;/s);
 });
 
 test("keeps fixed effects outside the interface zoom", () => {
