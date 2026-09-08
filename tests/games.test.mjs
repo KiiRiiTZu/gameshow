@@ -781,11 +781,21 @@ test("keeps the moderator map and its zoom controls inside the styled map frame"
 
 test("keeps wide moderator games inside the middle chat column", () => {
   const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
+  const hostMarkup = readFileSync(new URL("../host.html", import.meta.url), "utf8");
   const chatColumnRule = styles.match(
     /\.host-layout\.chat-active\s*>\s*\.shell\.wide-game\s*\{([^}]*)\}/
   )?.[1] || "";
   assert.match(chatColumnRule, /width:\s*100%/);
   assert.match(chatColumnRule, /min-width:\s*0/);
+  assert.doesNotMatch(hostMarkup, /host-panel-scale-90/);
+});
+
+test("scales only the two large player game views down by another ten percent", () => {
+  const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
+  const playerMarkup = readFileSync(new URL("../player.html", import.meta.url), "utf8");
+  assert.match(playerMarkup, /id="player-map-game"\s+class="player-panel-scale-90 hidden"/);
+  assert.match(playerMarkup, /id="player-matching-game"\s+class="player-panel-scale-90 hidden"/);
+  assert.match(styles, /\.player-panel-scale-90\s*\{[^}]*width:\s*111\.111%;[^}]*zoom:\s*\.9;/s);
 });
 
 test("keeps fixed effects outside the interface zoom", () => {
