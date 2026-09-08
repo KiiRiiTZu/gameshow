@@ -246,9 +246,9 @@ export const begriffsmatchGame = {
     const clinched = state.game.scores.blue > redMaximum || state.game.scores.red > blueMaximum;
     if (clinched) finishGame(state);
     else if (remainingRounds === 0 && state.game.scores.blue === state.game.scores.red) {
-      state.game.status = "tiebreak-pending";
+      // Keep the final round result visible until the moderator explicitly starts the finale.
+      state.game.status = "round-finished";
       state.game.phaseEndsAt = null;
-      state.game.tiebreak = emptyTiebreak();
     }
     else if (remainingRounds === 0) finishGame(state);
     else state.game.status = "round-finished";
@@ -256,8 +256,14 @@ export const begriffsmatchGame = {
   },
 
   startTiebreaker(state, now = Date.now()) {
-    if (state.game.id !== this.id || state.game.status !== "tiebreak-pending" ||
-        !state.game.tiebreak) return false;
+    if (state.game.id !== this.id) return false;
+    const finalRoundTie = state.game.status === "round-finished" &&
+      state.game.roundIndex === WORD_MATCH_CATEGORIES.length - 1 &&
+      state.game.scores.blue === state.game.scores.red && !state.game.tiebreak;
+    const legacyPendingTiebreak = state.game.status === "tiebreak-pending" &&
+      Boolean(state.game.tiebreak);
+    if (!finalRoundTie && !legacyPendingTiebreak) return false;
+    if (finalRoundTie) state.game.tiebreak = emptyTiebreak();
     state.game.status = "tiebreak-playing";
     state.game.phaseEndsAt = now + WORD_MATCH_TIEBREAK_SECONDS * 1000;
     return true;

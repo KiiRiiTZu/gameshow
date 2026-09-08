@@ -792,6 +792,9 @@ function renderWordMatchGame() {
   const isSeedCollecting = game.status === "seed-collecting";
   const isRoundFinished = game.status === "round-finished";
   const isFinished = game.status === "finished";
+  const finaleReady = isRoundFinished &&
+    game.roundIndex === WORD_MATCH_CATEGORIES.length - 1 &&
+    game.scores.blue === game.scores.red;
   $("word-match-round-label").textContent =
     `Runde ${game.roundIndex + 1} von ${WORD_MATCH_CATEGORIES.length}`;
   renderEditableScore("word-match-blue-score", game.scores.blue);
@@ -853,15 +856,15 @@ function renderWordMatchGame() {
   $("start-red-guess-phase").classList.toggle("hidden", game.status !== "red-guess-pending");
   $("finish-red-guess-phase").classList.toggle("hidden", game.status !== "red-guessing");
   $("reveal-word-match-round").classList.toggle("hidden", game.status !== "results-pending");
-  $("next-word-match-round").classList.toggle("hidden", !isRoundFinished);
+  $("next-word-match-round").classList.toggle("hidden", !isRoundFinished || finaleReady);
   $("start-ranking-after-word").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
-  $("start-word-tiebreak").classList.add("hidden");
+  $("start-word-tiebreak").classList.toggle("hidden", !finaleReady);
   $("finish-word-tiebreak").classList.add("hidden");
   $("start-ranking-after-word").disabled = moderatorActionPending;
   for (const id of [
     "start-word-seed-phase", "finish-word-seed-phase", "start-blue-guess-phase",
     "finish-blue-guess-phase", "start-red-guess-phase", "finish-red-guess-phase",
-    "reveal-word-match-round", "next-word-match-round"
+    "reveal-word-match-round", "next-word-match-round", "start-word-tiebreak"
   ]) $(id).disabled = moderatorActionPending || wordTimerActionPending;
 
   const result = game.roundResults[game.roundIndex];
@@ -871,7 +874,9 @@ function renderWordMatchGame() {
       ? game.winningTeam
         ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Begriffsmatch!`
         : "Begriffsmatch endet unentschieden."
-      : "Bereit für die nächste Runde.";
+      : finaleReady
+        ? "Gleichstand! Starte das Finale, sobald ihr die Ergebnisse angesehen habt."
+        : "Bereit für die nächste Runde.";
     $("word-match-result").innerHTML = `
       <strong>Runde ${game.roundIndex + 1}: Blau ${result.blue} · Rot ${result.red}</strong>
       <span>${conclusion}</span>

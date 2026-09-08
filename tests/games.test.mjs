@@ -363,9 +363,12 @@ test("starts the Begriffsmatch Kino tiebreak after four tied rounds", () => {
     if (round < WORD_MATCH_CATEGORIES.length - 1) begriffsmatchGame.startNextRound(state);
   }
 
-  assert.equal(state.game.status, "tiebreak-pending");
-  assert.deepEqual(state.game.tiebreak.terms, WORD_MATCH_TIEBREAK_TERMS);
+  assert.equal(state.game.status, "round-finished");
+  assert.equal(state.game.tiebreak, null);
+  assert.deepEqual(state.game.roundResults[state.game.roundIndex], { blue: 0, red: 0 });
   assert.equal(begriffsmatchGame.startTiebreaker(state, 4_000), true);
+  assert.equal(state.game.status, "tiebreak-playing");
+  assert.deepEqual(state.game.tiebreak.terms, WORD_MATCH_TIEBREAK_TERMS);
   assert.equal(state.game.phaseEndsAt, 4_000 + WORD_MATCH_TIEBREAK_SECONDS * 1000);
   assert.equal(begriffsmatchGame.claimTiebreakTerm(state, 0, "red"), true);
   assert.equal(state.game.tiebreak.revealed[0], false);
