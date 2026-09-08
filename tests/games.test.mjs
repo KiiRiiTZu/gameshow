@@ -763,6 +763,8 @@ test("ships detailed European country geometry", () => {
   assert.ok(mapData.features.every((feature) =>
     ["Polygon", "MultiPolygon"].includes(feature.geometry?.type)
   ));
+  assert.ok(mapData.features.some((feature) => feature.properties?.name === "Türkei"));
+  assert.deepEqual(KARTENWISSEN_QUESTIONS[4].target, { lat: 41.0086, lng: 28.9802 });
 });
 
 test("keeps map distance lines visually constant while zooming", () => {
