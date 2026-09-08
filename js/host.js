@@ -1316,6 +1316,9 @@ function renderMatchingGame() {
   const roundAssignments = currentMatchingAssignments(game) || emptyMatchingAssignments()[0];
   const turn = getMatchingTurn(getMatchingRoleRoundIndex(game), game.activeTurnIndex);
   const activePlayer = turn.assignerIndex === null ? null : game.assignerOrder[turn.assignerIndex];
+  const seederTurn = getMatchingTurn(getMatchingRoleRoundIndex(game), 0);
+  $("matching-instructions").textContent =
+    `Beide Spieler ${seederTurn.playerIndex + 1} ordnen gleichzeitig selbst oder über den Moderator zu. Danach matcht erst Team Blau, dann Team Rot.`;
   const isAssigning = matchingIsAssigning(game);
   const isPending = ["round-pending", "tiebreak-pending"].includes(game.status);
   const isRevealing = ["ready-to-reveal", "revealing", "tiebreak-ready-to-reveal"].includes(game.status);
@@ -1397,7 +1400,8 @@ function renderMatchingGame() {
   $("reveal-matching-all").classList.toggle("hidden", !isRevealing);
   $("reveal-matching-all").disabled = moderatorActionPending;
   $("next-matching-round").classList.toggle("hidden", !isRoundFinished);
-  $("next-matching-round").textContent = isTiebreak ? "Nächstes Golden Image" : "Nächste Runde";
+  $("next-matching-round").textContent = isTiebreak ? "Nächstes Golden Image"
+    : game.roundIndex === MATCHING_GAME_ROUNDS.length - 1 ? "Golden Image starten" : "Nächste Runde";
   $("next-matching-round").disabled = moderatorActionPending;
   $("start-buzzer-after-matching").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
   $("start-buzzer-after-matching").disabled = moderatorActionPending;
@@ -1408,7 +1412,10 @@ function renderMatchingGame() {
       ? game.winningTeam
         ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Da seh ich dich!`
         : "Da seh ich dich endet unentschieden."
-      : isTiebreak ? "Das Stechen geht mit dem nächsten Bild weiter." : "Bereit für die nächste Runde.";
+      : isTiebreak ? "Das Stechen geht mit dem nächsten Bild weiter."
+        : game.roundIndex === MATCHING_GAME_ROUNDS.length - 1
+          ? "Gleichstand! Starte Golden Image, sobald die Ergebnisse besprochen sind."
+          : "Bereit für die nächste Runde.";
     $("matching-round-result").innerHTML = `
       <strong>${isTiebreak ? "Golden Image" : `Team Blau: ${result.blue} Punkte · Team Rot: ${result.red} Punkte`}</strong>
       ${isTiebreak ? `<span>Blau: ${result.blue ? "Treffer" : "kein Treffer"} · Rot: ${result.red ? "Treffer" : "kein Treffer"}</span>` : ""}
@@ -1470,7 +1477,9 @@ function escapeHtml(value) {
 }
 
 function matchingStorageIndex(game = state.game) {
-  return getMatchingRoleRoundIndex(game);
+  return game?.tiebreak
+    ? MATCHING_GAME_ROUNDS.length + (Number(game.tiebreak.imageIndex) || 0)
+    : Number(game?.roundIndex) || 0;
 }
 
 function currentMatchingAssignments(game = state.game) {

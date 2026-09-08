@@ -90,7 +90,7 @@ export const MATCHING_TIEBREAK_IMAGES = [
 
 export function getMatchingRoleRoundIndex(game) {
   return game?.tiebreak
-    ? MATCHING_GAME_ROUNDS.length + (Number(game.tiebreak.imageIndex) || 0)
+    ? 1 // Im Golden Image ordnen immer beide Spieler 2 zuerst selbst zu.
     : Number(game?.roundIndex) || 0;
 }
 
@@ -338,9 +338,7 @@ export const daSehIchDichGame = {
     }
 
     if (state.game.scores.blue === state.game.scores.red) {
-      state.game.tiebreak = emptyTiebreak();
-      resetTurnState(state.game);
-      state.game.status = "tiebreak-pending";
+      state.game.status = "round-finished";
       return true;
     }
     finishMatchingGame(
@@ -398,7 +396,13 @@ export const daSehIchDichGame = {
 
   startNextRound(state) {
     if (state.game.id !== this.id || state.game.status !== "round-finished") return false;
-    if (state.game.roundIndex >= MATCHING_GAME_ROUNDS.length - 1) return false;
+    if (state.game.roundIndex >= MATCHING_GAME_ROUNDS.length - 1) {
+      if (state.game.tiebreak || state.game.scores.blue !== state.game.scores.red) return false;
+      state.game.tiebreak = emptyTiebreak();
+      resetTurnState(state.game);
+      state.game.status = "tiebreak-assigning";
+      return true;
+    }
 
     state.game.roundIndex += 1;
     resetTurnState(state.game);

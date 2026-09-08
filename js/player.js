@@ -134,7 +134,9 @@ let previousGameId = null;
 let previousGameStatus = null;
 
 function matchingDraftRoundIndex(game = roomState?.game) {
-  return getMatchingRoleRoundIndex(game);
+  return game?.tiebreak
+    ? MATCHING_GAME_ROUNDS.length + (Number(game.tiebreak.imageIndex) || 0)
+    : Number(game?.roundIndex) || 0;
 }
 
 function matchingDraftValueCount(game = roomState?.game) {

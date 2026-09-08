@@ -980,7 +980,7 @@ test("ends matching early when the trailing team cannot catch up", () => {
   assert.equal(daSehIchDichGame.revealAll(state, { blue: perfect, red: perfect }), false);
 });
 
-test("starts Golden Image after a draw and alternates the assigning players", () => {
+test("keeps round four results until Golden Image is started and uses both second players", () => {
   const state = createInitialRoomState("TEST");
   const players = MATCHING_ASSIGNERS.map((assigner, index) => ({
     id: String(index),
@@ -997,14 +997,24 @@ test("starts Golden Image after a draw and alternates the assigning players", ()
     blue: equalAssignments,
     red: equalAssignments
   }), true);
-  assert.equal(state.game.status, "tiebreak-pending");
+  assert.equal(state.game.status, "round-finished");
+  assert.equal(state.game.tiebreak, null);
+  assert.deepEqual(state.game.revealedAssignments.blue, equalAssignments);
+  assert.deepEqual(state.game.revealedAssignments.red, equalAssignments);
+  assert.deepEqual(state.game.roundResults[3], { blue: 4, red: 4 });
+  daSehIchDichGame.normalize(state);
+  assert.deepEqual(state.game.revealedAssignments.blue, equalAssignments);
+  assert.equal(daSehIchDichGame.startNextRound(state), true);
   assert.equal(state.game.tiebreak.imageIndex, 0);
+  assert.equal(state.game.status, "tiebreak-assigning");
+  assert.deepEqual(state.game.revealedAssignments, { blue: null, red: null });
+  assert.equal(daSehIchDichGame.startNextRound(state), false);
   assert.deepEqual(state.scores, { blue: 0, red: 0 });
 
-  assert.equal(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).playerIndex, 0);
-  assert.equal(daSehIchDichGame.startTiebreakRound(state), true);
-  daSehIchDichGame.submitTeam(state, "blue");
-  daSehIchDichGame.submitTeam(state, "red");
+  assert.deepEqual(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).assignerIndexes, [2, 3]);
+  assert.equal(daSehIchDichGame.submitTeam(state, "red"), true);
+  assert.equal(daSehIchDichGame.completeTurn(state), false);
+  assert.equal(daSehIchDichGame.submitTeam(state, "blue"), true);
   daSehIchDichGame.completeTurn(state);
   daSehIchDichGame.submitTeam(state, "blue");
   daSehIchDichGame.completeTurn(state);
