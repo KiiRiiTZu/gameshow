@@ -779,6 +779,24 @@ test("keeps the moderator map and its zoom controls inside the styled map frame"
   );
 });
 
+test("keeps wide moderator games inside the middle chat column", () => {
+  const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
+  const chatColumnRule = styles.match(
+    /\.host-layout\.chat-active\s*>\s*\.shell\.wide-game\s*\{([^}]*)\}/
+  )?.[1] || "";
+  assert.match(chatColumnRule, /width:\s*100%/);
+  assert.match(chatColumnRule, /min-width:\s*0/);
+});
+
+test("keeps fixed effects outside the interface zoom", () => {
+  const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
+  const effectRule = styles.match(
+    /\.ranking-moving-token,[\s\S]*?\.score-overview-overlay\s*\{([^}]*)\}/
+  )?.[1] || "";
+  assert.match(styles, /--ui-scale:\s*\.9/);
+  assert.match(effectRule, /zoom:\s*var\(--ui-scale-inverse\)/);
+});
+
 test("calculates geographic distances in kilometers", () => {
   const berlin = { lat: 52.5200, lng: 13.4050 };
   const hamburg = { lat: 53.5511, lng: 9.9937 };
