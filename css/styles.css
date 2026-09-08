@@ -1143,8 +1143,8 @@ button.ranking-candidate:disabled { opacity: .72; }
 }
 
 @media (min-width: 631px) {
-  .player-price-layout .price-team-form {
-    contain: size;
+  .price-team-form #player-price-chat .team-chat-messages {
+    min-height: 160px;
   }
 }
 

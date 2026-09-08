@@ -798,6 +798,15 @@ test("scales only the two large player game views down by another ten percent", 
   assert.match(styles, /\.player-panel-scale-90\s*\{[^}]*width:\s*100%;[^}]*zoom:\s*\.9;/s);
 });
 
+test("keeps enough message space in the desktop Thrifty team chat", () => {
+  const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
+  assert.match(
+    styles,
+    /@media\s*\(min-width:\s*631px\)[\s\S]*?\.price-team-form\s+#player-price-chat\s+\.team-chat-messages\s*\{[^}]*min-height:\s*160px;/
+  );
+  assert.doesNotMatch(styles, /\.player-price-layout\s+\.price-team-form\s*\{[^}]*contain:\s*size;/s);
+});
+
 test("keeps fixed effects outside the interface zoom", () => {
   const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
   const effectRule = styles.match(
