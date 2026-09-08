@@ -777,6 +777,7 @@ test("keeps the moderator map and its zoom controls inside the styled map frame"
     hostMarkup,
     /id="host-kartenwissen-map"\s+class="europe-map"/
   );
+  assert.doesNotMatch(hostMarkup, /id="target-legend"/);
 });
 
 test("keeps wide moderator games inside the middle chat column", () => {

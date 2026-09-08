@@ -916,7 +916,7 @@ button.ranking-candidate:disabled { opacity: .72; }
 .distance-line.blue { stroke: #7f94ff; }
 .distance-line.red { stroke: #ff7185; }
 
-.map-legend, .map-pin-status {
+.map-pin-status {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -925,11 +925,6 @@ button.ranking-candidate:disabled { opacity: .72; }
   color: #c8ccda;
   font-size: .9rem;
 }
-
-.legend-dot { display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 50%; }
-.legend-dot.blue { background: #5a72f6; }
-.legend-dot.red { background: #d23750; }
-.legend-dot.target { background: #f5b83d; }
 
 .map-pin-status span { padding: 8px 11px; border-radius: 999px; background: #232938; }
 .map-pin-status .ready { color: #65e3a8; }
