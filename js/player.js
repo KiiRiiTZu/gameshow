@@ -263,10 +263,13 @@ async function registerPriceKey() {
 async function sendMatchingSubmission(type = "draft") {
   if (!player || roomState?.game?.id !== MATCHING_GAME_ID ||
       !["assigning", "tiebreak-assigning"].includes(roomState.game.status) ||
-      roomState.game.activeTurnIndex !== 0 ||
+      (!roomState.game.tiebreak && roomState.game.activeTurnIndex !== 0) ||
       matchingDraft.locked || !roomState.matchingSubmissionKey) return false;
   const assignerIndex = roomState.game.assignerOrder?.findIndex((item) => item.id === playerId) ?? -1;
-  if (!getMatchingTurn(getMatchingRoleRoundIndex(roomState.game), 0).assignerIndexes.includes(assignerIndex)) return false;
+  const turnIndex = roomState.game.tiebreak ? roomState.game.activeTurnIndex : 0;
+  if (!getMatchingTurn(
+    getMatchingRoleRoundIndex(roomState.game), turnIndex, Boolean(roomState.game.tiebreak)
+  ).assignerIndexes.includes(assignerIndex)) return false;
 
   try {
     const encrypted = await encryptPrivatePayload(roomState.matchingSubmissionKey, {
@@ -1312,12 +1315,16 @@ function renderMatchingGame() {
   const round = isTiebreak
     ? { title: "Golden Image", images: [MATCHING_TIEBREAK_IMAGES[game.tiebreak.imageIndex]] }
     : MATCHING_GAME_ROUNDS[game.roundIndex];
-  const turn = getMatchingTurn(getMatchingRoleRoundIndex(game), game.activeTurnIndex);
+  const turn = getMatchingTurn(getMatchingRoleRoundIndex(game), game.activeTurnIndex, isTiebreak);
   const activePlayer = turn.assignerIndex === null ? null : game.assignerOrder?.[turn.assignerIndex];
   const ownAssignerIndex = game.assignerOrder?.findIndex((item) => item.id === playerId) ?? -1;
-  const isSeeder = getMatchingTurn(getMatchingRoleRoundIndex(game), 0).assignerIndexes.includes(ownAssignerIndex);
+  const selfAssignTurnIndex = isTiebreak ? game.activeTurnIndex : 0;
+  const isSeeder = getMatchingTurn(
+    getMatchingRoleRoundIndex(game), selfAssignTurnIndex, isTiebreak
+  ).assignerIndexes.includes(ownAssignerIndex);
   const isPending = ["round-pending", "tiebreak-pending"].includes(game.status);
-  const canSelfAssign = ["assigning", "tiebreak-assigning"].includes(game.status) && game.activeTurnIndex === 0 &&
+  const canSelfAssign = ["assigning", "tiebreak-assigning"].includes(game.status) &&
+    (isTiebreak || game.activeTurnIndex === 0) &&
     isSeeder && !game.submittedTeams?.[player.team] && !matchingDraft.locked;
   const isFinished = game.status === "finished";
   const isRoundFinished = ["round-finished", "tiebreak-round-finished"].includes(game.status);
@@ -1362,7 +1369,7 @@ function renderMatchingGame() {
         ? isTiebreak ? "Beide Teams hatten dasselbe Ergebnis." : `Runde ${game.roundIndex + 1} ist beendet.`
         : "Der Moderator deckt gleich alle Antworten auf.";
   } else {
-    if (game.activeTurnIndex === 0) {
+    if (isTiebreak || game.activeTurnIndex === 0) {
       $("player-matching-turn").className = "matching-turn split";
       $("player-matching-turn").textContent = isSeeder
         ? `${matchingDraft.opponentValues

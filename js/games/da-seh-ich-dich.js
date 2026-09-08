@@ -11,13 +11,24 @@ export const MATCHING_TURNS = [
   { playerIndex: 1, label: "Spieler 2 · Team Rot", team: "red", assignerIndexes: [3] }
 ];
 
-export function getMatchingTurn(roundIndex, activeTurnIndex) {
+export function getMatchingTurn(roundIndex, activeTurnIndex, simultaneousTeams = false) {
   const turnIndex = Math.min(
     Math.max(Number(activeTurnIndex) || 0, 0),
-    MATCHING_TURNS.length - 1
+    simultaneousTeams ? 1 : MATCHING_TURNS.length - 1
   );
   const assigningPlayerIndex = Math.abs(Number(roundIndex) || 0) % 2;
   const matchingPlayerIndex = assigningPlayerIndex === 0 ? 1 : 0;
+  if (simultaneousTeams) {
+    const playerIndex = turnIndex === 0 ? assigningPlayerIndex : matchingPlayerIndex;
+    const assignerIndexes = [playerIndex * 2, playerIndex * 2 + 1];
+    return {
+      playerIndex,
+      label: `Spieler ${playerIndex + 1} beider Teams`,
+      team: null,
+      assignerIndexes,
+      assignerIndex: null
+    };
+  }
   const playerIndex = turnIndex === 0 ? assigningPlayerIndex : matchingPlayerIndex;
   const team = turnIndex === 0 ? null : turnIndex === 1 ? "blue" : "red";
   const assignerIndexes = turnIndex === 0
@@ -90,8 +101,12 @@ export const MATCHING_TIEBREAK_IMAGES = [
 
 export function getMatchingRoleRoundIndex(game) {
   return game?.tiebreak
-    ? 1 // Im Golden Image ordnen immer beide Spieler 2 zuerst selbst zu.
+    ? MATCHING_GAME_ROUNDS.length + (Number(game.tiebreak.imageIndex) || 0)
     : Number(game?.roundIndex) || 0;
+}
+
+export function getMatchingTurnCount(game) {
+  return game?.tiebreak ? 2 : MATCHING_TURNS.length;
 }
 
 function emptyScores() {
@@ -219,7 +234,7 @@ export const daSehIchDichGame = {
     );
     state.game.activeTurnIndex = Math.min(
       Math.max(Number(state.game.activeTurnIndex) || 0, 0),
-      MATCHING_TURNS.length - 1
+      getMatchingTurnCount(state.game) - 1
     );
     delete state.game.activeAssignerIndex;
     state.game.turnSubmitted = Boolean(state.game.turnSubmitted);
@@ -268,13 +283,17 @@ export const daSehIchDichGame = {
     if (state.game.id !== this.id || !isAssigningStatus(state.game)) return false;
     if (!["blue", "red"].includes(team)) return false;
 
-    if (state.game.activeTurnIndex === 0) {
+    if (state.game.tiebreak || state.game.activeTurnIndex === 0) {
       if (state.game.submittedTeams[team]) return false;
       state.game.submittedTeams[team] = true;
       return true;
     }
 
-    const turn = getMatchingTurn(getMatchingRoleRoundIndex(state.game), state.game.activeTurnIndex);
+    const turn = getMatchingTurn(
+      getMatchingRoleRoundIndex(state.game),
+      state.game.activeTurnIndex,
+      Boolean(state.game.tiebreak)
+    );
     if (team !== turn.team || state.game.turnSubmitted) return false;
 
     state.game.turnSubmitted = true;
@@ -283,13 +302,14 @@ export const daSehIchDichGame = {
 
   completeTurn(state) {
     if (state.game.id !== this.id || !isAssigningStatus(state.game)) return false;
-    if (state.game.activeTurnIndex === 0) {
+    if (state.game.tiebreak || state.game.activeTurnIndex === 0) {
       if (!state.game.submittedTeams.blue || !state.game.submittedTeams.red) return false;
     } else if (!state.game.turnSubmitted) return false;
 
-    if (state.game.activeTurnIndex < MATCHING_TURNS.length - 1) {
+    if (state.game.activeTurnIndex < getMatchingTurnCount(state.game) - 1) {
       state.game.activeTurnIndex += 1;
       state.game.turnSubmitted = false;
+      if (state.game.tiebreak) state.game.submittedTeams = { blue: false, red: false };
       return true;
     }
 

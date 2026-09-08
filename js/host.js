@@ -34,10 +34,10 @@ import {
   MATCHING_ASSIGNERS,
   MATCHING_GAME_ROUNDS,
   MATCHING_TIEBREAK_IMAGES,
-  MATCHING_TURNS,
   areMatchingValuesUnique,
   getMatchingRoleRoundIndex,
   getMatchingTurn,
+  getMatchingTurnCount,
   daSehIchDichGame
 } from "./games/da-seh-ich-dich.js";
 import {
@@ -1266,10 +1266,12 @@ function renderMatchingAssignment(roundAssignments, imageIndex, assignerIndex, g
   const assigner = MATCHING_ASSIGNERS[assignerIndex];
   const positions = ["top-left", "top-right", "bottom-left", "bottom-right"];
   const roleRoundIndex = getMatchingRoleRoundIndex(game);
-  const turnIndex = getMatchingTurn(roleRoundIndex, 0).assignerIndexes.includes(assignerIndex)
-    ? 0
-    : getMatchingTurn(roleRoundIndex, 1).assignerIndex === assignerIndex ? 1 : 2;
-  const alreadySubmitted = turnIndex === 0
+  const turnIndex = game.tiebreak
+    ? [0, 1].find((index) => getMatchingTurn(roleRoundIndex, index, true).assignerIndexes.includes(assignerIndex))
+    : getMatchingTurn(roleRoundIndex, 0).assignerIndexes.includes(assignerIndex)
+      ? 0
+      : getMatchingTurn(roleRoundIndex, 1).assignerIndex === assignerIndex ? 1 : 2;
+  const alreadySubmitted = game.tiebreak || turnIndex === 0
     ? game.submittedTeams?.[assigner.team]
     : game.turnSubmitted;
   const isActive = matchingIsAssigning(game) && game.activeTurnIndex === turnIndex &&
@@ -1314,11 +1316,12 @@ function renderMatchingGame() {
     ? { title: "Golden Image", images: [MATCHING_TIEBREAK_IMAGES[game.tiebreak.imageIndex]] }
     : MATCHING_GAME_ROUNDS[game.roundIndex];
   const roundAssignments = currentMatchingAssignments(game) || emptyMatchingAssignments()[0];
-  const turn = getMatchingTurn(getMatchingRoleRoundIndex(game), game.activeTurnIndex);
+  const turn = getMatchingTurn(getMatchingRoleRoundIndex(game), game.activeTurnIndex, isTiebreak);
   const activePlayer = turn.assignerIndex === null ? null : game.assignerOrder[turn.assignerIndex];
-  const seederTurn = getMatchingTurn(getMatchingRoleRoundIndex(game), 0);
-  $("matching-instructions").textContent =
-    `Beide Spieler ${seederTurn.playerIndex + 1} ordnen gleichzeitig selbst oder über den Moderator zu. Danach matcht erst Team Blau, dann Team Rot.`;
+  const seederTurn = getMatchingTurn(getMatchingRoleRoundIndex(game), 0, isTiebreak);
+  $("matching-instructions").textContent = isTiebreak
+    ? `Beide Spieler ${seederTurn.playerIndex + 1} ordnen gleichzeitig selbst zu. Danach ordnen beide Spieler ${seederTurn.playerIndex === 0 ? 2 : 1} ebenfalls gleichzeitig selbst zu.`
+    : `Beide Spieler ${seederTurn.playerIndex + 1} ordnen gleichzeitig selbst oder über den Moderator zu. Danach matcht erst Team Blau, dann Team Rot.`;
   const isAssigning = matchingIsAssigning(game);
   const isPending = ["round-pending", "tiebreak-pending"].includes(game.status);
   const isRevealing = ["ready-to-reveal", "revealing", "tiebreak-ready-to-reveal"].includes(game.status);
@@ -1349,7 +1352,7 @@ function renderMatchingGame() {
       ? "Beide Teams sind gleichauf. Starte das nächste Golden Image."
       : "Starte die erste Runde, sobald beide Teams bereit sind.";
   } else if (isAssigning) {
-    if (game.activeTurnIndex === 0) {
+    if (isTiebreak || game.activeTurnIndex === 0) {
       const blueIndex = turn.assignerIndexes.find((index) => MATCHING_ASSIGNERS[index].team === "blue");
       const redIndex = turn.assignerIndexes.find((index) => MATCHING_ASSIGNERS[index].team === "red");
       const bluePlayer = game.assignerOrder[blueIndex]?.name || "Spieler fehlt";
@@ -1381,20 +1384,20 @@ function renderMatchingGame() {
   $("start-first-matching-round").disabled = moderatorActionPending;
   $("save-matching-assignment").classList.toggle("hidden", !isAssigning);
   $("save-matching-assignment").disabled = moderatorActionPending ||
-    (game.activeTurnIndex === 0
+    (isTiebreak || game.activeTurnIndex === 0
       ? game.submittedTeams?.blue && game.submittedTeams?.red
       : game.turnSubmitted);
   $("complete-matching-turn").classList.toggle(
     "hidden",
-    !isAssigning || (game.activeTurnIndex === 0
+    !isAssigning || (isTiebreak || game.activeTurnIndex === 0
       ? !game.submittedTeams?.blue || !game.submittedTeams?.red
       : !game.turnSubmitted)
   );
   $("complete-matching-turn").disabled = moderatorActionPending;
-  const nextTurn = getMatchingTurn(getMatchingRoleRoundIndex(game), game.activeTurnIndex + 1);
-  $("complete-matching-turn").textContent = game.activeTurnIndex === 0
-    ? `Spieler ${nextTurn.playerIndex + 1} · Team Blau`
-    : game.activeTurnIndex === 1
+  const nextTurn = getMatchingTurn(getMatchingRoleRoundIndex(game), game.activeTurnIndex + 1, isTiebreak);
+  $("complete-matching-turn").textContent = game.activeTurnIndex < getMatchingTurnCount(game) - 1
+    ? isTiebreak ? `Spieler ${nextTurn.playerIndex + 1} beider Teams` : `Spieler ${nextTurn.playerIndex + 1} · Team Blau`
+    : !isTiebreak && game.activeTurnIndex === 1
       ? `Spieler ${nextTurn.playerIndex + 1} · Team Rot`
       : "Antworten aufdecken";
   $("reveal-matching-all").classList.toggle("hidden", !isRevealing);
@@ -1789,7 +1792,10 @@ async function syncAllPriceTeams() {
 
 function getMatchingSeederIndex(playerId) {
   const index = state.game.assignerOrder?.findIndex((item) => item.id === playerId) ?? -1;
-  const seederIndexes = getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).assignerIndexes;
+  const turnIndex = state.game.tiebreak ? state.game.activeTurnIndex : 0;
+  const seederIndexes = getMatchingTurn(
+    getMatchingRoleRoundIndex(state.game), turnIndex, Boolean(state.game.tiebreak)
+  ).assignerIndexes;
   return seederIndexes.includes(index) ? index : -1;
 }
 
@@ -1801,7 +1807,10 @@ async function sendMatchingPrivateState(playerId) {
   const team = MATCHING_ASSIGNERS[assignerIndex].team;
   const storageIndex = matchingStorageIndex();
   const roundAssignments = currentMatchingAssignments();
-  const seederIndexes = getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).assignerIndexes;
+  const seederIndexes = getMatchingTurn(
+    getMatchingRoleRoundIndex(state.game), state.game.tiebreak ? state.game.activeTurnIndex : 0,
+    Boolean(state.game.tiebreak)
+  ).assignerIndexes;
   const opponentIndex = seederIndexes.find((index) => index !== assignerIndex);
   const bothTeamsSubmitted = Boolean(
     state.game.submittedTeams?.blue && state.game.submittedTeams?.red
@@ -1826,7 +1835,10 @@ async function sendMatchingPrivateState(playerId) {
 }
 
 async function syncMatchingSeeders() {
-  const seederIndexes = getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).assignerIndexes;
+  const seederIndexes = getMatchingTurn(
+    getMatchingRoleRoundIndex(state.game), state.game.tiebreak ? state.game.activeTurnIndex : 0,
+    Boolean(state.game.tiebreak)
+  ).assignerIndexes;
   await Promise.all(seederIndexes.map((index) =>
     sendMatchingPrivateState(state.game.assignerOrder[index]?.id)
   ));
@@ -1834,7 +1846,7 @@ async function syncMatchingSeeders() {
 
 async function handleMatchingSubmission(payload) {
   if (state.game.id !== daSehIchDichGame.id || !matchingIsAssigning() ||
-      state.game.activeTurnIndex !== 0 || !payload?.playerId || !payload.encrypted ||
+      (!state.game.tiebreak && state.game.activeTurnIndex !== 0) || !payload?.playerId || !payload.encrypted ||
       !matchingKeyPair?.privateKey) return;
   const assignerIndex = getMatchingSeederIndex(payload.playerId);
   if (assignerIndex < 0) return;
@@ -2602,7 +2614,10 @@ $("matching-board").addEventListener("change", async (event) => {
   roundAssignments[imageIndex][assignerIndex] = select.value;
   saveMatchingAssignments();
   renderMatchingGame();
-  if (getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).assignerIndexes.includes(assignerIndex)) {
+  if (getMatchingTurn(
+    getMatchingRoleRoundIndex(state.game), state.game.tiebreak ? state.game.activeTurnIndex : 0,
+    Boolean(state.game.tiebreak)
+  ).assignerIndexes.includes(assignerIndex)) {
     const player = state.game.assignerOrder?.[assignerIndex];
     if (player) await sendMatchingPrivateState(player.id);
   }
@@ -2611,11 +2626,11 @@ $("matching-board").addEventListener("change", async (event) => {
 $("save-matching-assignment").addEventListener("click", async () => {
   $("matching-error").textContent = "";
   const turnIndex = state.game.activeTurnIndex;
-  const turn = getMatchingTurn(getMatchingRoleRoundIndex(state.game), turnIndex);
+  const turn = getMatchingTurn(getMatchingRoleRoundIndex(state.game), turnIndex, Boolean(state.game.tiebreak));
   const registeredNames = new Set(state.players.map((player) => player.name));
   const assignerIndexes = turn.assignerIndexes.filter((assignerIndex) => {
     const team = MATCHING_ASSIGNERS[assignerIndex].team;
-    return turnIndex !== 0 || !state.game.submittedTeams?.[team];
+    return (!state.game.tiebreak && turnIndex !== 0) || !state.game.submittedTeams?.[team];
   });
   const entries = assignerIndexes.map((assignerIndex) => {
     const inputs = [...document.querySelectorAll(`[data-matching-input="${assignerIndex}"]`)];
@@ -2658,9 +2673,9 @@ $("save-matching-assignment").addEventListener("click", async () => {
 
 $("complete-matching-turn").addEventListener("click", async () => {
   $("matching-error").textContent = "";
-  const shouldReveal = state.game.activeTurnIndex === MATCHING_TURNS.length - 1;
+  const shouldReveal = state.game.activeTurnIndex === getMatchingTurnCount(state.game) - 1;
   const isTiebreak = Boolean(state.game.tiebreak);
-  await runModeratorAction(() => {
+  const accepted = await runModeratorAction(() => {
     if (!daSehIchDichGame.completeTurn(state)) return false;
     if (!shouldReveal) return true;
 
@@ -2673,6 +2688,7 @@ $("complete-matching-turn").addEventListener("click", async () => {
       ? daSehIchDichGame.revealTiebreak(state, { blue: assignments.blue[0], red: assignments.red[0] })
       : daSehIchDichGame.revealAll(state, assignments);
   });
+  if (accepted && !shouldReveal) await syncMatchingSeeders();
 });
 
 $("reveal-matching-all").addEventListener("click", async () => {

@@ -1011,15 +1011,17 @@ test("keeps round four results until Golden Image is started and uses both secon
   assert.equal(daSehIchDichGame.startNextRound(state), false);
   assert.deepEqual(state.scores, { blue: 0, red: 0 });
 
-  assert.deepEqual(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).assignerIndexes, [2, 3]);
+  assert.deepEqual(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0, true).assignerIndexes, [0, 1]);
   assert.equal(daSehIchDichGame.submitTeam(state, "red"), true);
   assert.equal(daSehIchDichGame.completeTurn(state), false);
   assert.equal(daSehIchDichGame.submitTeam(state, "blue"), true);
-  daSehIchDichGame.completeTurn(state);
-  daSehIchDichGame.submitTeam(state, "blue");
-  daSehIchDichGame.completeTurn(state);
-  daSehIchDichGame.submitTeam(state, "red");
-  daSehIchDichGame.completeTurn(state);
+  assert.equal(daSehIchDichGame.completeTurn(state), true);
+  assert.deepEqual(state.game.submittedTeams, { blue: false, red: false });
+  assert.deepEqual(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 1, true).assignerIndexes, [2, 3]);
+  assert.equal(daSehIchDichGame.submitTeam(state, "blue"), true);
+  assert.equal(daSehIchDichGame.completeTurn(state), false);
+  assert.equal(daSehIchDichGame.submitTeam(state, "red"), true);
+  assert.equal(daSehIchDichGame.completeTurn(state), true);
   assert.equal(state.game.status, "tiebreak-ready-to-reveal");
   assert.equal(daSehIchDichGame.revealTiebreak(state, {
     blue: ["Max", "Max"],
@@ -1028,14 +1030,14 @@ test("keeps round four results until Golden Image is started and uses both secon
   assert.equal(state.game.status, "tiebreak-round-finished");
   assert.equal(daSehIchDichGame.startNextTiebreakRound(state), true);
   assert.equal(state.game.tiebreak.imageIndex, 1);
-  assert.equal(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0).playerIndex, 1);
+  assert.deepEqual(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 0, true).assignerIndexes, [2, 3]);
 
   daSehIchDichGame.startTiebreakRound(state);
   daSehIchDichGame.submitTeam(state, "blue");
   daSehIchDichGame.submitTeam(state, "red");
   daSehIchDichGame.completeTurn(state);
+  assert.deepEqual(getMatchingTurn(getMatchingRoleRoundIndex(state.game), 1, true).assignerIndexes, [0, 1]);
   daSehIchDichGame.submitTeam(state, "blue");
-  daSehIchDichGame.completeTurn(state);
   daSehIchDichGame.submitTeam(state, "red");
   daSehIchDichGame.completeTurn(state);
   assert.equal(daSehIchDichGame.revealTiebreak(state, {
