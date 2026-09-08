@@ -769,8 +769,12 @@ test("ships detailed European country geometry", () => {
 
 test("keeps map distance lines visually constant while zooming", () => {
   const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
+  const mapScript = readFileSync(new URL("../js/europe-map-view.js", import.meta.url), "utf8");
   const distanceLineRule = styles.match(/\.distance-line\s*\{([^}]*)\}/)?.[1] || "";
   assert.match(distanceLineRule, /vector-effect:\s*non-scaling-stroke/);
+  assert.match(mapScript, /const MAX_ZOOM = 10;/);
+  assert.doesNotMatch(styles, /\.europe-map-svg\.zoomable\.zoomed\s*\{[^}]*cursor:\s*grab;/s);
+  assert.match(styles, /\.europe-map-svg\.zoomable\.dragging\s*\{[^}]*cursor:\s*grabbing;/s);
 });
 
 test("keeps the moderator map and its zoom controls inside the styled map frame", () => {

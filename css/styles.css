@@ -853,7 +853,6 @@ button.ranking-candidate:disabled { opacity: .72; }
 .europe-map-svg { display: block; width: 100%; height: auto; }
 .europe-map-svg.interactive { cursor: crosshair; touch-action: manipulation; }
 .europe-map-svg.zoomable { touch-action: none; }
-.europe-map-svg.zoomable.zoomed { cursor: grab; }
 .europe-map-svg.zoomable.dragging { cursor: grabbing; }
 
 .map-zoom-controls {

@@ -6,7 +6,7 @@ const MAP_BOUNDS = {
 };
 
 const VIEWBOX = { width: 760, height: 650, padding: 24 };
-const MAX_ZOOM = 6;
+const MAX_ZOOM = 10;
 const CENTER_LATITUDE_RADIANS =
   (MAP_BOUNDS.minLat + MAP_BOUNDS.maxLat) / 2 * Math.PI / 180;
 const LONGITUDE_SCALE = Math.cos(CENTER_LATITUDE_RADIANS);
@@ -272,7 +272,6 @@ export function createEuropeMap(container, options = {}) {
       moved: false
     };
     svg.setPointerCapture(event.pointerId);
-    svg.classList.add("dragging");
   });
 
   container.addEventListener("pointermove", (event) => {
@@ -283,7 +282,10 @@ export function createEuropeMap(container, options = {}) {
     const view = viewport();
     const deltaX = event.clientX - drag.startX;
     const deltaY = event.clientY - drag.startY;
-    if (Math.hypot(deltaX, deltaY) > 4) drag.moved = true;
+    if (Math.hypot(deltaX, deltaY) > 4) {
+      drag.moved = true;
+      svg.classList.add("dragging");
+    }
     center.x = drag.centerX - deltaX / bounds.width * view.width;
     center.y = drag.centerY - deltaY / bounds.height * view.height;
     updateViewport();
