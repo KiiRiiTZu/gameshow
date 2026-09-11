@@ -1,0 +1,66 @@
+Valorant Agents nach Usage in Comp
+Jett 9,9%
+Reyna 9,4%
+Clove 8,7%
+Chamber 7,2%
+Sova 5,3%
+Cypher 4,1%
+Miks 3,7%
+Neon 3,3%
+Gekko 2,2%
+Iso 1,8% (Vorgabe)
+Tejo 1,6%
+Breach 1,5%
+Yoru 1,4%
+Veto 0,7%
+Harbor 0,5%
+
+Lebensmittel nach Zuckergehalt
+Ja Blütenhonig 75g
+Rosinen 65g
+Nutella 56,3g
+Mövenpick Erdbeermarmelade 52,3g
+Corny Schoko-Banane 35,9g
+Heinz Tomatenketchup 22,8g
+Cremissimo Bourbon Vanilleeis 19g
+Banane 15,8g (Vorgabe)
+Coca Cola 10,6g
+Apfel 10g
+Erdbeeren 4,9g
+Maggie Würze 3,5g
+Vollkornbrot 2g
+Avocado 0,7g
+Gouda Käse 0g
+
+Tiere nach Lebenserwartung:
+Riesenschildkröte: 150 Jahre
+Blauwal: 90 Jahre
+Frau in Deutschland: 83,6 Jahre
+Mann in Deutschland: 79,1 Jahre (Vorgabe)
+Afrikanischer Elefant: 65 Jahre
+Ponys: 30 Jahre
+Königspinguin: 20 Jahre
+Hauskatze: 13 Jahre
+Meerschweinchen: 7 Jahre
+Buchfink: 5 Jahre
+Bienenkönigin: 4 Jahre
+Goldhamster: 2,5 Jahre
+Gottesanbeterin: 1 Jahr
+Fruchtfliege: 45 Tage
+Eintagsfliege: 1 Tag
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

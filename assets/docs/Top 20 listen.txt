@@ -1,0 +1,68 @@
+Rang	Künstler	Streams in Mrd.
+1	Taylor Swift	127,7
+2	Drake		105,0
+3	Bad Bunny	98,5
+4	The Weekend	84,8
+5	Ariana Grande	66,6
+6	Ed Sheeran	60,3
+7	Billie Eilish	58,5
+8	Eminem		57,6
+9	Kanye West	56,2
+10	BTS		53,2
+11	Justin Bieber	52,7
+12	Bruno Mars	51,0
+13	Post Malone	50,6
+14	Rihanna		48,3
+15	Coldplay	47,2
+16	Travis Scott	44,1
+17	Kendrick Lamar	43,4
+18	Dua Lipa	41,7
+19	J Balvin	40,6
+20	Imagine Dragons	40,3
+
+Rang	Land		Einwohner	Anteil
+1	Indien		1,48 Milliarden	~17,8 %
+2	China		1,41 Milliarden	~17,0 %
+3	USA		349 Millionen	~4,2 %
+4	Indonesien	288 Millionen	~3,5 %
+5	Pakistan	259 Millionen	~3,1 %
+6	Nigeria		242 Millionen	~2,9 %
+7	Brasilien	214 Millionen	~2,6 %
+8	Bangladesch	178 Millionen	~2,1 %
+9	Russland	143 Millionen	~1,7 %
+10	Äthiopien	139 Millionen	~1,7 %
+11	Mexiko		133 Millionen	~1,6 %
+12	Japan		122 Millionen	~1,5 %
+13	Ägypten		120 Millionen	~1,4 %
+14	Philippinen	118 Millionen	~1,4 %
+15	DR Kongo	116 Millionen	~1,4 %
+16	Vietnam		102 Millionen	~1,2 %
+17	Iran		93 Millionen	~1,1 %
+18	Türkei		88 Millionen	~1,1 %
+19	Deutschland	84 Millionen	~1,0 %
+20	Tansania	73 Millionen	~0,9 %
+
+--------------------------------------------------------------------
+
+Rang	Unternehmen				Jahresumsatz
+1	Volkswagen AG				~324,6 Mrd. €
+2	Schwarz-Gruppe (Lidl & Kaufland)	~175,4 Mrd. €
+3	Allianz SE				~161,7 Mrd. €
+4	Mercedes-Benz Group AG			~145,6 Mrd. €
+5	BMW Group				~142,4 Mrd. €
+6	Deutsche Telekom AG			~115,8 Mrd. €
+7	Aldi-Gruppe (Nord & Süd)		~110,0 Mrd. €
+8	Uniper SE				~107,9 Mrd. €
+9	E.ON SE					~93,7 Mrd. €
+10	REWE Group				~92,3 Mrd. €
+11	Robert Bosch GmbH			~91,6 Mrd. €
+12	DHL Group (Deutsche Post)		~81,8 Mrd. €
+13	Siemens AG				~78,0 Mrd. €
+14	EDEKA-Zentrale				~70,7 Mrd. €
+15	Münchener Rück 				~69,3 Mrd. €
+16	Deutsche Bank AG			~63,9 Mrd. €
+17	BASF SE					~59,7 Mrd. €
+18	Talanx					~57,3 Mrd. €
+19	PHOENIX Pharmahandel			~57,0 Mrd. €
+20	Continental AG				~41,4 Mrd. €
+
