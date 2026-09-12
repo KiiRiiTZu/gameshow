@@ -1088,24 +1088,27 @@ function hitsterSecondsRemaining() {
 function renderHitsterTimeline(team, showDraft = false) {
   const game = state.game; const items = [...game.timelines[team]];
   const position = showDraft ? (Number.isInteger(hitsterDrafts[team]) ? hitsterDrafts[team] : game.submissions[team]) : null;
-  if (showDraft && Number.isInteger(position)) items.splice(position, 0, { pending: true });
-  return `<article class="hitster-timeline ${team}"><strong>${getTeamName(team)} · Fehler: ${game.mistakes[team]}/2</strong><div class="hitster-line">${items.map((item) => item.pending ? `<span class="hitster-card pending">Aktueller Song</span>` : `<span class="hitster-card">${HITSTER_SONGS[item.songIndex].year} · ${escapeHtml(HITSTER_SONGS[item.songIndex].title)}</span>`).join("")}</div></article>`;
+  if (showDraft && !game.revealedTeams.includes(team) && Number.isInteger(position)) items.splice(position, 0, { pending: true });
+  const result = game.revealResults?.[team];
+  return `<article class="hitster-timeline ${team}"><strong>${getTeamName(team)} · Fehler: ${game.mistakes[team]}/2 ${result === true ? "· ✓ Richtig" : result === false ? "· ✕ Falsch" : ""}</strong><div class="hitster-axis"><span>1953</span><span>2020</span></div><div class="hitster-line">${items.map((item) => item.pending ? `<span class="hitster-card pending">Aktueller Song</span>` : `<span class="hitster-card">${HITSTER_SONGS[item.songIndex].year} · ${escapeHtml(HITSTER_SONGS[item.songIndex].title)}</span>`).join("")}</div></article>`;
 }
 function renderHitsterGame() {
   const game = state.game; const song = getHitsterSong(game.roundIndex + 1) || getHitsterSong(0);
   const playing = game.status === "playing"; const review = game.status === "review";
   const audio = $("hitster-audio"); const volume = Number(localStorage.getItem("gameshow-hitster-volume") || 80);
   audio.volume = volume / 100; $("hitster-volume").value = volume;
-  $("hitster-round").textContent = `Song ${game.roundIndex + 1} von ${HITSTER_SONGS.length - 1}`;
+  $("hitster-round").textContent = game.status === "not-started"
+    ? "Song 1 ist die Vorgabe"
+    : `Song ${game.roundIndex + 2} von ${HITSTER_SONGS.length}`;
   $("hitster-song-label").textContent = game.status === "not-started" ? `Vorgabe: ${getHitsterSong(0).artist} – ${getHitsterSong(0).title} (${getHitsterSong(0).year})` : `${song.artist} – ${song.title}`;
   if (audio.src !== new URL(song.src, window.location.href).href) { audio.src = song.src; if (playing) void audio.play().catch(() => {}); }
   const seconds = playing ? hitsterSecondsRemaining() : 0;
-  $("hitster-timer").textContent = formatCountdown(seconds); $("hitster-progress").style.width = `${playing ? 100 - seconds / HITSTER_SECONDS * 100 : 0}%`;
+  $("hitster-progress").style.width = `${playing ? 100 - seconds / HITSTER_SECONDS * 100 : review ? 100 : 0}%`;
+  $("hitster-game-panel").querySelector(".hitster-now-playing").classList.toggle("playing", playing);
   $("hitster-status").textContent = playing ? "Song läuft" : review ? "Auswertung" : game.status === "finished" ? "Spiel beendet" : "Bereit";
   $("hitster-status").className = `status-pill ${playing ? "open" : "closed"}`;
   $("hitster-host-timelines").innerHTML = ["blue", "red"].map((team) => renderHitsterTimeline(team, playing || review)).join("");
   $("start-hitster-round").classList.toggle("hidden", !["not-started", "round-finished"].includes(game.status));
-  $("close-hitster-round").classList.toggle("hidden", !playing);
   $("reveal-hitster-blue").classList.toggle("hidden", !review || game.revealedTeams.includes("blue"));
   $("reveal-hitster-red").classList.toggle("hidden", !review || game.revealedTeams.includes("red"));
   $("start-map-after-hitster").classList.toggle("hidden", game.status !== "finished");
@@ -2377,6 +2380,28 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "hitster_submission") {
+    const roomPlayer = state.players.find((item) => item.id === payload?.playerId);
+    const position = Number(payload?.position);
+    const accepted = Boolean(roomPlayer) && hitsterGame.submit(state, roomPlayer.team, position);
+    if (accepted) {
+      hitsterDrafts[roomPlayer.team] = position;
+      render();
+      try {
+        await persistRoomState();
+      } catch (error) {
+        console.warn("Hitster position could not be persisted:", error);
+      }
+    }
+    await realtime.send("hitster_lock_result", {
+      playerId: payload?.playerId,
+      team: roomPlayer?.team || null,
+      accepted,
+      reason: accepted ? "" : "Die Position konnte nicht eingeloggt werden."
+    });
+    return;
+  }
+
   if (event === "map_pin") {
     const player = state.players.find((item) => item.id === payload.playerId);
     if (!player || !kartenwissenGame.placePin(state, player.team, payload.position)) return;
@@ -2501,17 +2526,6 @@ $("skip-current-game").addEventListener("click", async () => {
   const accepted = await runModeratorAction(skipCurrentGameForTesting);
   if (!accepted) {
     $("skip-game-error").textContent = "Für dieses Spiel müssen zuerst vier Spieler verbunden sein.";
-  }
-  if (event === "hitster_submission") {
-    const player = state.players.find((item) => item.id === payload?.playerId);
-    if (player && state.game.id === hitsterGame.id && state.game.status === "playing") {
-      const position = Number(payload.position);
-      if (hitsterGame.submit(state, player.team, position)) {
-        hitsterDrafts[player.team] = position;
-        render();
-      }
-    }
-    return;
   }
 });
 
@@ -2925,11 +2939,19 @@ $("hitster-volume").addEventListener("input", () => {
   const value = Number($("hitster-volume").value); localStorage.setItem("gameshow-hitster-volume", String(value));
   $("hitster-audio").volume = value / 100;
 });
+$("hitster-audio").addEventListener("timeupdate", () => {
+  const audio = $("hitster-audio");
+  $("hitster-progress").style.width = `${Math.min(100, audio.currentTime / HITSTER_SECONDS * 100)}%`;
+});
+$("hitster-audio").addEventListener("ended", async () => {
+  if (state?.game?.id === hitsterGame.id && state.game.status === "playing") {
+    await runModeratorAction(() => hitsterGame.closeRound(state));
+  }
+});
 $("start-hitster-round").addEventListener("click", async () => {
   const accepted = await runModeratorAction(() => hitsterGame.startRound(state));
   if (accepted) { hitsterDrafts.blue = null; hitsterDrafts.red = null; $("hitster-audio").currentTime = 0; void $("hitster-audio").play().catch(() => {}); }
 });
-$("close-hitster-round").addEventListener("click", async () => { $("hitster-audio").pause(); await runModeratorAction(() => hitsterGame.closeRound(state)); });
 $("reveal-hitster-blue").addEventListener("click", async () => { await runModeratorAction(() => hitsterGame.revealTeam(state, "blue")); });
 $("reveal-hitster-red").addEventListener("click", async () => { await runModeratorAction(() => hitsterGame.revealTeam(state, "red")); });
 

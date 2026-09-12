@@ -866,12 +866,27 @@ test("Hitster keeps team timelines separate and ends on the second mistake", () 
   hitsterGame.start(state);
   assert.equal(hitsterGame.startRound(state, 1_000), true);
   assert.equal(hitsterGame.submit(state, "blue", 1), true);
+  assert.equal(hitsterGame.submit(state, "blue", 0), false, "eine eingeloggte Position bleibt gesperrt");
   assert.equal(hitsterGame.submit(state, "red", 0), true);
   assert.equal(hitsterGame.closeRound(state), true);
   assert.equal(hitsterGame.revealTeam(state, "blue"), true);
   assert.equal(state.game.timelines.blue.length, 2);
   assert.equal(hitsterGame.revealTeam(state, "red"), true);
   assert.equal(state.game.mistakes.red, 1);
+});
+
+test("Hitster synchronizes playback without player transport controls or a second timer", () => {
+  const hostMarkup = readFileSync(new URL("../host.html", import.meta.url), "utf8");
+  const playerMarkup = readFileSync(new URL("../player.html", import.meta.url), "utf8");
+  const playerScript = readFileSync(new URL("../js/player.js", import.meta.url), "utf8");
+  const hostScript = readFileSync(new URL("../js/host.js", import.meta.url), "utf8");
+  const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
+  assert.match(playerMarkup, /id="player-hitster-audio" preload="auto"><\/audio>/);
+  assert.doesNotMatch(playerMarkup, /player-hitster-timer|player-hitster-audio" controls/);
+  assert.doesNotMatch(hostMarkup, /hitster-timer|hitster-audio" controls/);
+  assert.match(playerScript, /function syncPlayerHitsterAudio/);
+  assert.match(hostScript, /event === "hitster_submission"/);
+  assert.match(styles, /\.hitster-timelines\s*\{[^}]*grid-template-columns:\s*1fr/s);
 });
 
 test("supports skipping games and four independent player tabs for testing", () => {

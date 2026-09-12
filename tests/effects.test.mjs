@@ -91,6 +91,7 @@ test("names every game of the active sequence for the transition card", () => {
   const sequence = [
     ["mittelwert", 1, "Mittelwert"],
     ["thrifty", 2, "Thrifty"],
+    ["hitster", 2, "Hitster"],
     ["kartenwissen", 3, "Kartenwissen"],
     ["begriffsmatch", 4, "Begriffsmatch"],
     ["einordnen", 5, "Einordnen"],
@@ -123,6 +124,7 @@ test("lists the seven active games in playing order", () => {
   ]);
   // Das Bankspiel Top 20 gehört nicht zur aktiven Reihenfolge.
   assert.ok(!GAME_SEQUENCE.includes("top-20"));
+  assert.ok(!GAME_SEQUENCE.includes("thrifty"));
   assert.equal(new Set(GAME_SEQUENCE).size, GAME_SEQUENCE.length, "keine Dopplungen");
 });
 

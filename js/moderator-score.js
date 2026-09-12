@@ -29,7 +29,6 @@ const FIXED_WINNING_SCORES = {
   "einordnen": RANKING_ROUNDS_TO_WIN,
   "kartenwissen": KARTENWISSEN_ROUNDS_TO_WIN,
   "thrifty": PRICE_GAME_WINNING_SCORE,
-  "hitster": HITSTER_MAX_MISTAKES,
   "mittelwert": ESTIMATION_ROUNDS_TO_WIN
 };
 
@@ -49,6 +48,10 @@ function remainingRegularRounds(game, roundCount) {
 function manualWinningTeam(game, editedTeam) {
   const score = getModeratorGameScore(game)?.scores;
   if (!score) return null;
+
+  if (game.id === "hitster" && score[editedTeam] >= HITSTER_MAX_MISTAKES) {
+    return otherTeam(editedTeam);
+  }
 
   const fixedTarget = FIXED_WINNING_SCORES[game.id];
   if (fixedTarget && score[editedTeam] >= fixedTarget) return editedTeam;

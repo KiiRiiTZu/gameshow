@@ -135,6 +135,8 @@ let wordMatchDraft = {
 };
 let wordMatchDraftTimer = null;
 let hitsterSelectedPosition = null;
+let hitsterLocked = false;
+let hitsterSubmissionPending = false;
 let wordMatchSubmissionPending = false;
 let previousGameId = null;
 let previousGameStatus = null;
@@ -230,6 +232,14 @@ $("player-form").addEventListener("submit", async (event) => {
   // Aus der Nutzergeste heraus, damit der Buzzer-Sound später auch bei denen
   // ankommt, die nicht selbst buzzern.
   void unlockBuzzerSound();
+  const hitsterAudio = $("player-hitster-audio");
+  hitsterAudio.src ||= getHitsterSong(1).src;
+  hitsterAudio.muted = true;
+  void hitsterAudio.play().then(() => {
+    hitsterAudio.pause();
+    hitsterAudio.currentTime = 0;
+    hitsterAudio.muted = false;
+  }).catch(() => { hitsterAudio.muted = false; });
 
   $("join-error").textContent = "";
 
@@ -770,7 +780,20 @@ async function handleEvent(event, payload) {
     return;
   }
 
+  if (event === "hitster_lock_result" && payload.team === player?.team) {
+    if (payload.accepted) hitsterLocked = true;
+    if (payload.accepted || payload.playerId === playerId) hitsterSubmissionPending = false;
+    if (payload.accepted || payload.playerId === playerId) {
+      $("player-hitster-message").textContent = payload.accepted
+        ? "Eure Position ist eingeloggt."
+        : payload.reason || "Die Position konnte nicht eingeloggt werden.";
+    }
+    render();
+    return;
+  }
+
   if (event === "room_state") {
+    const previousHitsterGame = roomState?.game?.id === HITSTER_GAME_ID ? roomState.game : null;
     roomState = payload;
 
     if (player && roomState.players?.some((item) => item.id === playerId)) {
@@ -834,6 +857,17 @@ async function handleEvent(event, payload) {
         lists: null
       };
       wordMatchSubmissionPending = false;
+    }
+    if (roomState.game?.id === HITSTER_GAME_ID) {
+      if (!previousHitsterGame || previousHitsterGame.roundIndex !== roomState.game.roundIndex ||
+          previousHitsterGame.status !== "playing" && roomState.game.status === "playing") {
+        hitsterSelectedPosition = null;
+        hitsterLocked = false;
+        hitsterSubmissionPending = false;
+      }
+      syncPlayerHitsterAudio(roomState.game, previousHitsterGame);
+    } else {
+      $("player-hitster-audio").pause();
     }
     render();
   }
@@ -1840,10 +1874,9 @@ async function tickPlayerWordMatchTimer() {
 
 setInterval(() => void tickPlayerWordMatchTimer(), 250);
 setInterval(updatePlayerRankingTimer, 250);
-setInterval(() => { if (roomState?.game?.id === HITSTER_GAME_ID) renderHitsterGame(); }, 250);
 
 $("player-hitster-volume").addEventListener("input", () => {
-  const value = Number($("player-hitster-volume").value); localStorage.setItem("gameshow-hitster-volume", String(value));
+  const value = Number($("player-hitster-volume").value); sessionStorage.setItem("gameshow-hitster-volume", String(value));
   $("player-hitster-audio").volume = value / 100;
 });
 $("player-hitster-choices").addEventListener("click", (event) => {
@@ -1851,27 +1884,58 @@ $("player-hitster-choices").addEventListener("click", (event) => {
   hitsterSelectedPosition = Number(button.dataset.hitsterPosition); renderHitsterGame();
 });
 $("lock-hitster").addEventListener("click", async () => {
-  if (!realtime || !Number.isInteger(hitsterSelectedPosition)) return;
+  if (!realtime || hitsterSubmissionPending || hitsterLocked || !Number.isInteger(hitsterSelectedPosition)) return;
+  hitsterSubmissionPending = true;
+  renderHitsterGame();
   await realtime.send("hitster_submission", { playerId, position: hitsterSelectedPosition });
 });
 
+$("player-hitster-audio").addEventListener("timeupdate", () => {
+  const audio = $("player-hitster-audio");
+  $("player-hitster-progress").style.width = `${Math.min(100, audio.currentTime / HITSTER_SECONDS * 100)}%`;
+});
+document.addEventListener("pointerdown", () => {
+  if (roomState?.game?.id === HITSTER_GAME_ID && roomState.game.status === "playing" &&
+      $("player-hitster-audio").paused) syncPlayerHitsterAudio(roomState.game);
+}, { passive: true });
+
+function syncPlayerHitsterAudio(game, previousGame = null) {
+  const audio = $("player-hitster-audio");
+  if (game.status !== "playing") {
+    audio.pause();
+    return;
+  }
+  const song = getHitsterSong(game.roundIndex + 1);
+  const source = new URL(song.src, window.location.href).href;
+  if (audio.src !== source) audio.src = song.src;
+  const elapsed = Math.max(0, Math.min(HITSTER_SECONDS, (Date.now() - (game.phaseEndsAt - HITSTER_SECONDS * 1000)) / 1000));
+  if (!previousGame || previousGame.status !== "playing" || previousGame.roundIndex !== game.roundIndex ||
+      Math.abs(audio.currentTime - elapsed) > 1.5) audio.currentTime = elapsed;
+  void audio.play().catch(() => {
+    $("player-hitster-message").textContent = "Tippe einmal auf die Seite, damit der Song abgespielt werden kann.";
+  });
+}
+
 function renderHitsterGame() {
   const game = roomState.game; const ownTeam = player?.team || "blue"; const song = getHitsterSong(game.roundIndex + 1) || getHitsterSong(0);
-  const playing = game.status === "playing"; const seconds = playing ? Math.max(0, Math.ceil(((game.phaseEndsAt || Date.now()) - Date.now()) / 1000)) : 0;
-  const audio = $("player-hitster-audio"); const volume = Number(localStorage.getItem("gameshow-hitster-volume") || 80);
+  const playing = game.status === "playing";
+  const audio = $("player-hitster-audio"); const volume = Number(sessionStorage.getItem("gameshow-hitster-volume") || 80);
   audio.volume = volume / 100; $("player-hitster-volume").value = volume;
-  $("player-hitster-round").textContent = `Song ${game.roundIndex + 1} von ${HITSTER_SONGS.length - 1}`;
-  $("player-hitster-song").textContent = game.status === "not-started" ? `Vorgabe: ${getHitsterSong(0).artist} – ${getHitsterSong(0).title} (${getHitsterSong(0).year})` : `${song.artist} – ${song.title}`;
+  $("player-hitster-round").textContent = game.status === "not-started"
+    ? "Song 1 ist die Vorgabe"
+    : `Song ${game.roundIndex + 2} von ${HITSTER_SONGS.length}`;
+  $("player-hitster-song").textContent = game.status === "not-started" ? `Vorgabe: ${getHitsterSong(0).artist} – ${getHitsterSong(0).title} (${getHitsterSong(0).year})` : playing ? `Song ${game.roundIndex + 2} läuft …` : `${song.artist} – ${song.title} (${song.year})`;
   if (audio.src !== new URL(song.src, window.location.href).href) audio.src = song.src;
-  $("player-hitster-timer").textContent = formatCountdown(seconds);
-  $("player-hitster-progress").style.width = `${playing ? 100 - seconds / HITSTER_SECONDS * 100 : 0}%`;
+  if (!playing) $("player-hitster-progress").style.width = game.status === "review" ? "100%" : "0%";
+  $("player-hitster-game").querySelector(".hitster-now-playing").classList.toggle("playing", playing);
   $("player-hitster-status").textContent = playing ? "Song läuft" : game.status === "review" ? "Auswertung" : game.status === "finished" ? "Spiel beendet" : "Bereit";
   $("player-hitster-status").className = `status-pill ${playing ? "open" : "closed"}`;
-  $("player-hitster-timelines").innerHTML = ["blue", "red"].map((team) => { const cards = [...game.timelines[team]]; if (game.status === "review" && Number.isInteger(game.submissions?.[team])) cards.splice(game.submissions[team], 0, { pending: true }); return `<article class="hitster-timeline ${team}"><strong>${getTeamName(team)} · Fehler: ${game.mistakes[team]}/2</strong><div class="hitster-line">${cards.map((item) => item.pending ? `<span class="hitster-card pending">${escapeHtml(song.title)}</span>` : `<span class="hitster-card">${HITSTER_SONGS[item.songIndex].year} · ${escapeHtml(HITSTER_SONGS[item.songIndex].title)}</span>`).join("")}</div></article>`; }).join("");
-  const locked = game.submissions?.[ownTeam] !== null;
-  $("player-hitster-choices").innerHTML = playing ? Array.from({ length: game.timelines[ownTeam].length + 1 }, (_, position) => `<button class="button tiny${hitsterSelectedPosition === position ? " selected" : " secondary"}" data-hitster-position="${position}" ${locked ? "disabled" : ""}>${position === 0 ? "Ganz links" : position === game.timelines[ownTeam].length ? "Ganz rechts" : `Nach Karte ${position}`}</button>`).join("") : "";
-  $("lock-hitster").classList.toggle("hidden", !playing); $("lock-hitster").disabled = !playing || locked || !Number.isInteger(hitsterSelectedPosition);
-  $("player-hitster-message").textContent = playing ? (locked ? "Eure Position ist eingeloggt." : "Wählt eine Position auf eurem Zeitstrahl.") : game.status === "review" ? "Der Moderator deckt beide Team-Ergebnisse auf." : "Wartet auf den Moderator.";
+  $("player-hitster-timelines").innerHTML = ["blue", "red"].map((team) => { const cards = [...game.timelines[team]]; if (game.status === "review" && !game.revealedTeams.includes(team) && Number.isInteger(game.submissions?.[team])) cards.splice(game.submissions[team], 0, { pending: true }); const result = game.revealResults?.[team]; return `<article class="hitster-timeline ${team}"><strong>${getTeamName(team)} · Fehler: ${game.mistakes[team]}/2 ${result === true ? "· ✓ Richtig" : result === false ? "· ✕ Falsch" : ""}</strong><div class="hitster-axis"><span>1953</span><span>2020</span></div><div class="hitster-line">${cards.map((item) => item.pending ? `<span class="hitster-card pending">${escapeHtml(song.title)}</span>` : `<span class="hitster-card">${HITSTER_SONGS[item.songIndex].year} · ${escapeHtml(HITSTER_SONGS[item.songIndex].title)}</span>`).join("")}</div></article>`; }).join("");
+  const locked = hitsterLocked || game.submissions?.[ownTeam] !== null;
+  $("player-hitster-choices").innerHTML = playing ? Array.from({ length: game.timelines[ownTeam].length + 1 }, (_, position) => `<button class="button tiny${hitsterSelectedPosition === position ? " selected" : " secondary"}" data-hitster-position="${position}" ${locked || hitsterSubmissionPending ? "disabled" : ""}>${position === 0 ? "Vor die erste Karte" : position === game.timelines[ownTeam].length ? "Nach die letzte Karte" : `Zwischen Karte ${position} und ${position + 1}`}</button>`).join("") : "";
+  $("lock-hitster").classList.toggle("hidden", !playing); $("lock-hitster").disabled = !playing || locked || hitsterSubmissionPending || !Number.isInteger(hitsterSelectedPosition);
+  $("lock-hitster").textContent = hitsterSubmissionPending ? "Wird eingeloggt …" : locked ? "Position eingeloggt ✓" : "Position einloggen";
+  if (!hitsterSubmissionPending) $("player-hitster-message").textContent = playing ? (locked ? "Eure Position ist eingeloggt." : "Wählt eine Position auf eurem Zeitstrahl.") : game.status === "review" ? "Der Moderator deckt beide Team-Ergebnisse auf." : "Wartet auf den Moderator.";
 }
 
 function getTeamName(team) {
