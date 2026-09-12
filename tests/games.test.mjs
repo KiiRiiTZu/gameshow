@@ -14,11 +14,14 @@ import {
   buzzerQuizGame
 } from "../js/games/buzzer-quiz.js";
 import { BUZZER_QUESTIONS } from "../js/games/buzzer-questions.js";
+import { SET_WINNING_SCORE, setGame } from "../js/games/set.js";
+import { SET_ROUNDS } from "../js/games/set-rounds.js";
 import { TOP_20_MAX_STRIKES, top20Game } from "../js/games/top-20.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT } from "../js/games/top-20-lists.js";
 import {
   RANKING_MAX_STRIKES,
   RANKING_ROUNDS_TO_WIN,
+  RANKING_TURN_SECONDS,
   einordnenGame
 } from "../js/games/einordnen.js";
 import { RANKING_LISTS } from "../js/games/ranking-lists.js";
@@ -126,7 +129,7 @@ test("contains presentation cards for all seven games", () => {
     "begriffsmatch",
     "einordnen",
     "da-seh-ich-dich",
-    "buzzer-quiz"
+    "set"
   ].map((gameId) => getGamePresentation(gameId).number), [1, 2, 3, 4, 5, 6, 7]);
   assert.equal(getGamePresentation("thrifty").name, "Thrifty");
   assert.equal(getGamePresentation("kartenwissen").name, "Kartenwissen");
@@ -135,6 +138,49 @@ test("contains presentation cards for all seven games", () => {
   assert.equal(getGamePresentation("begriffsmatch").name, "Begriffsmatch");
   assert.equal(getGamePresentation("einordnen").name, "Einordnen");
   assert.equal(getGamePresentation("top-20").name, "Top 20");
+  assert.equal(getGamePresentation("set").name, "SET");
+});
+
+test("SET contains the example and all nine supplied rounds", () => {
+  assert.equal(SET_ROUNDS.length, 10);
+  assert.equal(SET_ROUNDS[0].example, true);
+  assert.ok(SET_ROUNDS.every((round) => round.cards.length === 12));
+  assert.ok(SET_ROUNDS.flatMap((round) => round.cards).every((card) =>
+    ["oval", "diamond", "rectangle"].includes(card.shape) &&
+    ["red", "green", "blue"].includes(card.color) &&
+    ["open", "striped", "solid"].includes(card.fill) &&
+    [1, 2, 3].includes(card.count)
+  ));
+});
+
+test("SET lets the moderator select three cards and judge the answer", () => {
+  const state = createInitialRoomState("TEST");
+  setGame.setup(state);
+  assert.equal(setGame.startRound(state), true);
+  assert.equal(setGame.registerBuzz(state, { id: "b1", name: "Blau 1", team: "blue" }, 100), true);
+  assert.equal(setGame.toggleCard(state, 4), true);
+  assert.equal(setGame.toggleCard(state, 5), true);
+  assert.equal(setGame.resolve(state, true), false);
+  assert.equal(setGame.toggleCard(state, 6), true);
+  assert.equal(setGame.resolve(state, true), true);
+  assert.deepEqual(state.game.scores, { blue: 0, red: 0 }, "die Beispielrunde zählt nicht");
+  assert.equal(setGame.advanceRound(state), true);
+  assert.equal(state.game.status, "round-pending");
+});
+
+test("SET awards wrong answers to the opponent and ends at five", () => {
+  const state = createInitialRoomState("TEST");
+  setGame.setup(state);
+  state.game.roundIndex = 1;
+  state.game.scores.red = SET_WINNING_SCORE - 1;
+  setGame.startRound(state);
+  setGame.registerBuzz(state, { id: "b1", name: "Blau 1", team: "blue" });
+  [1, 2, 3].forEach((number) => setGame.toggleCard(state, number));
+  assert.equal(setGame.resolve(state, false), true);
+  assert.equal(state.game.scores.red, SET_WINNING_SCORE);
+  assert.equal(state.game.status, "finished");
+  assert.equal(state.game.winningTeam, "red");
+  assert.equal(state.scores.red, 1);
 });
 
 test("contains the three prepared Einordnen lists and their anchors", () => {
@@ -170,6 +216,22 @@ test("Einordnen validates relative placements and alternates turns", () => {
   assert.equal(state.game.strikes.red, 1);
   assert.equal(state.game.remainingIds.includes("harbor"), true);
   assert.equal(state.game.currentTeam, "blue");
+});
+
+test("Einordnen starts a 90 second timer and leaves timeout judgment to the moderator", () => {
+  const state = createInitialRoomState("TEST");
+  einordnenGame.start(state, "blue");
+  assert.equal(RANKING_TURN_SECONDS, 90);
+  assert.equal(einordnenGame.startFirstRound(state, 1_000), true);
+  assert.equal(state.game.turnEndsAt, 91_000);
+  assert.equal(einordnenGame.penalizeExpiredTurn(state, 90_999), false);
+  assert.equal(state.game.strikes.blue, 0);
+
+  assert.equal(einordnenGame.penalizeExpiredTurn(state, 91_000), true);
+  assert.equal(state.game.strikes.blue, 1);
+  assert.equal(state.game.currentTeam, "red");
+  assert.equal(state.game.turnEndsAt, 181_000);
+  assert.equal(state.game.lastResult.timedOut, true);
 });
 
 test("Einordnen lets the moderator move a pending placement before revealing it", () => {
@@ -244,6 +306,7 @@ test("finishes cumulative games once a manually entered lead is unreachable", ()
 test("maps every game to the score shown to the moderator", () => {
   const cases = [
     ["buzzer-quiz", "scores"],
+    ["set", "scores"],
     ["top-20", "roundWins"],
     ["einordnen", "roundWins"],
     ["kartenwissen", "roundScores"],
@@ -787,6 +850,17 @@ test("keeps the moderator map and its zoom controls inside the styled map frame"
     /id="host-kartenwissen-map"\s+class="europe-map"/
   );
   assert.doesNotMatch(hostMarkup, /id="target-legend"/);
+});
+
+test("supports skipping games and four independent player tabs for testing", () => {
+  const hostMarkup = readFileSync(new URL("../host.html", import.meta.url), "utf8");
+  const playerScript = readFileSync(new URL("../js/player.js", import.meta.url), "utf8");
+  const hostScript = readFileSync(new URL("../js/host.js", import.meta.url), "utf8");
+  assert.match(hostMarkup, /id="skip-current-game"[^>]*>Spiel überspringen</);
+  assert.match(playerScript, /sessionStorage\.getItem\(PLAYER_ID_KEY\)/);
+  assert.match(playerScript, /sessionStorage\.setItem\(PLAYER_ID_KEY, id\)/);
+  assert.doesNotMatch(playerScript, /localStorage\.setItem\(PLAYER_ID_KEY, id\)/);
+  assert.match(hostScript, /GAME_SEQUENCE\.indexOf\(state\.game\.id\)/);
 });
 
 test("keeps wide moderator games inside the middle chat column", () => {

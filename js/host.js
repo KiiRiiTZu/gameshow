@@ -21,11 +21,12 @@ import {
 import { createRoomChannel } from "./realtime.js";
 import { playBuzzerSound, unlockBuzzerSound } from "./audio.js";
 import { registerGame } from "./games/game-engine.js";
-import { BUZZER_WINNING_SCORE, buzzerQuizGame } from "./games/buzzer-quiz.js";
-import { BUZZER_QUESTIONS, getBuzzerQuestion } from "./games/buzzer-questions.js";
+import { setGame } from "./games/set.js";
+import { getSetRound } from "./games/set-rounds.js";
+import { renderSetBoard } from "./set-view.js";
 import { top20Game } from "./games/top-20.js";
 import { TOP_20_LISTS, TOP_20_SLOT_COUNT, getTop20List } from "./games/top-20-lists.js";
-import { einordnenGame } from "./games/einordnen.js";
+import { RANKING_TURN_SECONDS, einordnenGame } from "./games/einordnen.js";
 import { RANKING_LISTS, getRankingEntry, getRankingList } from "./games/ranking-lists.js";
 import { captureRankingMove, isRankingMotionPending, playRankingMove, resetRankingMotion } from "./ranking-motion.js";
 import { KARTENWISSEN_QUESTIONS, KARTENWISSEN_ROUNDS_TO_WIN, kartenwissenGame } from "./games/kartenwissen.js";
@@ -64,7 +65,7 @@ import {
   exportMatchingPublicKey
 } from "./matching-crypto.js";
 import { decryptPrivatePayload, encryptPrivatePayload } from "./private-channel-crypto.js";
-import { renderScoreOverview, showGameTransition, showGameWinner } from "./game-effects.js";
+import { GAME_SEQUENCE, renderScoreOverview, showGameTransition, showGameWinner } from "./game-effects.js";
 import { getModeratorGameScore, setModeratorScore } from "./moderator-score.js";
 import {
   addTeamChatMessage,
@@ -75,7 +76,7 @@ import {
   supportsTeamChat
 } from "./team-chat.js";
 
-registerGame(buzzerQuizGame);
+registerGame(setGame);
 registerGame(top20Game);
 registerGame(einordnenGame);
 registerGame(kartenwissenGame);
@@ -103,6 +104,7 @@ let estimationDrafts = emptyEstimationDrafts();
 let wordMatchDrafts = emptyWordMatchDrafts();
 const pricePlayerKeys = new Map();
 let wordTimerActionPending = false;
+let rankingTimerActionPending = false;
 let wordMatchEditTimer = null;
 let previousGameId = null;
 let previousGameStatus = null;
@@ -420,9 +422,9 @@ async function persistRoomState() {
     red_score: state.scores.red,
     current_game: state.game.id,
     game_status: state.game.status,
-    buzzer_winner_id: state.game.id === "buzzer-quiz" ? state.game.winner?.playerId ?? null : null,
-    buzzer_winner_name: state.game.id === "buzzer-quiz" ? state.game.winner?.playerName ?? null : null,
-    buzzer_winner_team: state.game.id === "buzzer-quiz" ? state.game.winner?.team ?? null : null
+    buzzer_winner_id: state.game.id === setGame.id ? state.game.winner?.playerId ?? null : null,
+    buzzer_winner_name: state.game.id === setGame.id ? state.game.winner?.playerName ?? null : null,
+    buzzer_winner_team: state.game.id === setGame.id ? state.game.winner?.team ?? null : null
   });
 
   if (supportsRemoteGameState) {
@@ -520,7 +522,7 @@ function renderGameEffects() {
 
   if (previousGameId && previousGameId !== gameId) {
     showGameTransition(gameId);
-  } else if ([buzzerQuizGame.id, mittelwertGame.id].includes(gameId) &&
+  } else if ([setGame.id, mittelwertGame.id].includes(gameId) &&
       previousGameStatus === "not-started" &&
       state.game.status !== "not-started") {
     showGameTransition(gameId);
@@ -570,6 +572,7 @@ function render() {
   const priceIsActive = state.game.id === thriftyGame.id;
   const estimationIsActive = state.game.id === mittelwertGame.id;
   const wordMatchIsActive = state.game.id === begriffsmatchGame.id;
+  const setIsActive = state.game.id === setGame.id;
   const chatIsActive = supportsTeamChat(state.game.id);
   $("host-layout").classList.toggle("chat-active", chatIsActive);
   $("host-chat-blue").classList.toggle("hidden", !chatIsActive);
@@ -577,12 +580,9 @@ function render() {
   if (chatIsActive) renderHostTeamChats();
   document.querySelector(".shell").classList.toggle(
     "wide-game",
-    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive || setIsActive
   );
-  $("buzzer-game-panel").classList.toggle(
-    "hidden",
-    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
-  );
+  $("set-game-panel").classList.toggle("hidden", !setIsActive);
   $("top20-game-panel").classList.toggle("hidden", !top20IsActive);
   $("ranking-game-panel").classList.toggle("hidden", !rankingIsActive);
   $("map-game-panel").classList.toggle("hidden", !mapIsActive);
@@ -598,7 +598,7 @@ function render() {
   else if (mapIsActive) renderMapGame();
   else if (rankingIsActive) renderRankingGame();
   else if (top20IsActive) renderTop20Game();
-  else renderBuzzerGame();
+  else if (setIsActive) renderSetGame();
 }
 
 function renderPriceDraft(team) {
@@ -999,6 +999,7 @@ function renderRankingGame() {
   const isNotStarted = game.status === "not-started";
   const displayTeam = game.roundWinner || game.winningTeam || game.currentTeam;
   const interactionLocked = game.status !== "playing";
+  updateHostRankingTimer();
 
   $("ranking-round-label").textContent = `Liste ${game.roundIndex + 1} von ${RANKING_LISTS.length}`;
   renderEditableScore("ranking-blue-score", game.roundWins.blue);
@@ -1031,8 +1032,10 @@ function renderRankingGame() {
   const result = game.lastResult;
   $("ranking-result").classList.toggle("hidden", !result && !isFinished);
   if (result) {
-    const entry = getRankingEntry(list, result.itemId);
-    const resultText = result.cleanupReveal
+    const entry = result.itemId ? getRankingEntry(list, result.itemId) : null;
+    const resultText = result.timedOut
+      ? `Die Zeit von ${getTeamName(result.team)} ist abgelaufen. Ein Strafpunkt wurde vergeben.`
+      : result.cleanupReveal
       ? `${entry.label} wurde aufgedeckt.`
       : result.correct
       ? `${entry.label} wurde richtig eingeordnet.`
@@ -1040,8 +1043,8 @@ function renderRankingGame() {
     const conclusion = isFinished
       ? game.winningTeam ? `🏆 ${getTeamName(game.winningTeam)} gewinnt Einordnen!` : "Einordnen endet unentschieden."
       : isRoundFinished && game.roundWinner ? `${getTeamName(game.roundWinner)} gewinnt diese Liste.` : "";
-    $("ranking-result").innerHTML = `<strong>${result.cleanupReveal ? "Aufgedeckt" : result.correct ? "✓ Richtig" : "✕ Falsch"}</strong>
-      <span>${escapeHtml(resultText)}${result.correct ? ` Wert: ${escapeHtml(entry.value)}` : ""}</span>
+    $("ranking-result").innerHTML = `<strong>${result.timedOut ? "Zeitstrafe" : result.cleanupReveal ? "Aufgedeckt" : result.correct ? "✓ Richtig" : "✕ Falsch"}</strong>
+      <span>${escapeHtml(resultText)}${result.correct && entry ? ` Wert: ${escapeHtml(entry.value)}` : ""}</span>
       ${conclusion ? `<p>${escapeHtml(conclusion)}</p>` : ""}`;
   } else if (isFinished) {
     $("ranking-result").innerHTML = `<strong>Spiel beendet</strong><span>🏆 ${getTeamName(game.winningTeam)} gewinnt Einordnen!</span>`;
@@ -1051,6 +1054,9 @@ function renderRankingGame() {
   $("confirm-ranking-placement").classList.toggle("hidden", game.status !== "playing");
   $("confirm-ranking-placement").disabled = moderatorActionPending ||
     !rankingSelection.itemId || !rankingSelection.position;
+  const turnExpired = game.status === "playing" && rankingSecondsRemaining() === 0;
+  $("penalize-ranking-timeout").classList.toggle("hidden", !turnExpired);
+  $("penalize-ranking-timeout").disabled = moderatorActionPending || rankingTimerActionPending;
   $("reveal-ranking-placement").classList.toggle("hidden", game.status !== "ready-to-reveal");
   $("reveal-next-ranking-entry").classList.toggle(
     "hidden",
@@ -1063,68 +1069,57 @@ function renderRankingGame() {
   }
 }
 
-function renderBuzzerGame() {
-  const status = state.game.status;
-  const isNotStarted = status === "not-started";
-  const isOpen = status === "open";
-  const isLocked = status === "locked";
-  const isFinished = status === "finished";
-  const winner = state.game.winner;
-  const gameScores = state.game.scores || { blue: 0, red: 0 };
-  const questionIndex = Number(state.game.questionIndex) || 0;
-  const question = getBuzzerQuestion(questionIndex);
+function rankingSecondsRemaining() {
+  if (state?.game?.id !== einordnenGame.id) return RANKING_TURN_SECONDS;
+  if (!state.game.turnEndsAt) return state.game.status === "playing" ? RANKING_TURN_SECONDS : 0;
+  return Math.max(0, Math.ceil((state.game.turnEndsAt - Date.now()) / 1000));
+}
 
-  renderEditableScore("buzzer-blue-score", gameScores.blue);
-  renderEditableScore("buzzer-red-score", gameScores.red);
-  $("buzzer-question-number").textContent = `FRAGE ${questionIndex + 1} VON ${BUZZER_QUESTIONS.length}`;
-  $("buzzer-question").textContent = question.question;
+function updateHostRankingTimer() {
+  if (state?.game?.id !== einordnenGame.id || !$("ranking-timer")) return;
+  $("ranking-timer-card").classList.toggle("hidden", state.game.status !== "playing");
+  const expired = state.game.status === "playing" && rankingSecondsRemaining() === 0;
+  $("ranking-timer").textContent = formatCountdown(rankingSecondsRemaining());
+  $("ranking-timer").classList.toggle("expired", expired);
+  $("ranking-timer-note").textContent = expired
+    ? "Zeit abgelaufen – Einordnung noch annehmen oder Strafpunkt geben."
+    : "Beratungszeit für das aktive Team";
+  $("penalize-ranking-timeout").classList.toggle("hidden", !expired);
+}
 
-  $("buzzer-status").textContent = isOpen
-    ? "Buzzer offen"
-    : isLocked
-      ? "Buzzer gesperrt"
-      : isFinished
-        ? "Spiel beendet"
-        : isNotStarted
-          ? "Noch nicht gestartet"
-          : "Buzzer geschlossen";
-  $("buzzer-status").className = `status-pill ${isOpen ? "open" : "closed"}`;
-
-  $("open-buzzer").disabled = moderatorActionPending || status !== "waiting";
-  $("reset-buzzer").disabled = moderatorActionPending || isFinished;
-  $("skip-buzzer-question").disabled = moderatorActionPending || isNotStarted || isFinished;
-  $("correct-answer").disabled = moderatorActionPending;
-  $("wrong-answer").disabled = moderatorActionPending;
-  $("buzzer-start-controls").classList.toggle("hidden", !isNotStarted);
-  $("start-buzzer-game").disabled = moderatorActionPending;
-  $("buzzer-question-card").classList.toggle("hidden", isNotStarted);
-  $("buzz-result").classList.toggle("hidden", isNotStarted);
-  $("buzzer-controls").classList.toggle("hidden", isNotStarted);
-  $("answer-controls").classList.toggle("hidden", !winner || isFinished);
-  $("buzzer-finished-controls").classList.toggle("hidden", !isFinished);
-
+function renderSetGame() {
+  const game = state.game;
+  const round = getSetRound(game.roundIndex);
+  const isPending = ["not-started", "round-pending"].includes(game.status);
+  const isLocked = game.status === "locked";
+  const isResolved = game.status === "resolved";
+  const isFinished = game.status === "finished";
+  renderEditableScore("set-blue-score", game.scores.blue);
+  renderEditableScore("set-red-score", game.scores.red);
+  $("set-round-label").textContent = round.example ? "Beispielrunde · ohne Punkte" : round.title;
+  $("set-status").textContent = isPending ? "Karten verdeckt" : game.status === "open" ? "Buzzer offen"
+    : isLocked ? "Antwort markieren" : isFinished ? "Spiel beendet" : "Antwort aufgedeckt";
+  $("set-status").className = `status-pill ${game.status === "open" ? "open" : "closed"}`;
+  $("set-explanation").classList.toggle("hidden", !round.example);
+  $("set-board").innerHTML = renderSetBoard(round, game, true, "host");
+  $("start-set-round").classList.toggle("hidden", !isPending);
+  $("start-set-round").textContent = round.example ? "Beispielrunde aufdecken" : `${round.title} aufdecken`;
+  $("next-set-round").classList.toggle("hidden", !isResolved);
+  $("set-answer-controls").classList.toggle("hidden", !isLocked);
+  const hasThree = game.selectedCards?.length === 3;
+  $("set-correct").disabled = moderatorActionPending || !hasThree;
+  $("set-wrong").disabled = moderatorActionPending || !hasThree;
+  $("set-result").classList.toggle("winner", Boolean(game.winner));
   if (isFinished) {
-    const winningTeam = state.game.winningTeam || (gameScores.blue >= BUZZER_WINNING_SCORE ? "blue" : "red");
-    const teamName = getTeamName(winningTeam);
-    $("buzzer-winner-message").textContent = `🏆 ${teamName} gewinnt das Buzzer Quiz mit ${gameScores[winningTeam]} Punkten!`;
-    $("buzz-result").classList.add("winner");
-    $("buzz-result").innerHTML = `<strong>${teamName} gewinnt Spiel 7</strong>`;
-    return;
-  }
-
-  if (winner) {
-    $("buzz-result").classList.add("winner");
-    $("buzz-result").innerHTML = `
-      <div>
-        <strong>⚡ ${escapeHtml(winner.playerName)}</strong>
-        <span>${getTeamName(winner.team)} hat zuerst gebuzzert</span>
-      </div>
-    `;
+    $("set-result").innerHTML = `<strong>🏆 ${getTeamName(game.winningTeam)} gewinnt SET!</strong>`;
+  } else if (game.result) {
+    $("set-result").innerHTML = `<strong>${game.result.correct ? "✓ Richtig" : "✕ Falsch"}${game.result.example ? " · Beispiel ohne Punkt" : ` · Punkt für ${getTeamName(game.result.scoringTeam)}`}</strong>`;
+  } else if (game.winner) {
+    $("set-result").innerHTML = `<strong>⚡ ${escapeHtml(game.winner.playerName)}</strong><span>${getTeamName(game.winner.team)} · drei genannte Karten anklicken</span>`;
   } else {
-    $("buzz-result").classList.remove("winner");
-    $("buzz-result").innerHTML = isOpen
-      ? "<strong>⚡ Buzzer ist offen!</strong>"
-      : '<span class="muted">Öffne den Buzzer, sobald du die Frage gestellt hast.</span>';
+    $("set-result").innerHTML = isPending
+      ? '<span class="muted">Der Moderator deckt die Karten auf.</span>'
+      : "<strong>⚡ Buzzer ist offen!</strong>";
   }
 }
 
@@ -1166,9 +1161,9 @@ function renderTop20Game() {
       ? `${getTeamName(game.roundWinner)} gewinnt Liste ${roundNumber}.`
       : "";
   $("next-top20-round").classList.toggle("hidden", isFinished);
-  $("start-buzzer-game-after-top20").classList.toggle("hidden", !isFinished || showIsFinished);
+  $("start-set-game-after-top20").classList.toggle("hidden", !isFinished || showIsFinished);
   $("next-top20-round").disabled = moderatorActionPending;
-  $("start-buzzer-game-after-top20").disabled = moderatorActionPending;
+  $("start-set-game-after-top20").disabled = moderatorActionPending;
 
   $("top20-miss").disabled = interactionLocked || moderatorActionPending;
 }
@@ -1401,18 +1396,16 @@ function renderMatchingGame() {
   $("complete-matching-turn").disabled = moderatorActionPending;
   const nextTurn = getMatchingTurn(getMatchingRoleRoundIndex(game), game.activeTurnIndex + 1, isTiebreak);
   $("complete-matching-turn").textContent = game.activeTurnIndex < getMatchingTurnCount(game) - 1
-    ? isTiebreak ? `Spieler ${nextTurn.playerIndex + 1} beider Teams` : `Spieler ${nextTurn.playerIndex + 1} · Team Blau`
-    : !isTiebreak && game.activeTurnIndex === 1
-      ? `Spieler ${nextTurn.playerIndex + 1} · Team Rot`
-      : "Antworten aufdecken";
+    ? nextTurn.label
+    : "Antworten aufdecken";
   $("reveal-matching-all").classList.toggle("hidden", !isRevealing);
   $("reveal-matching-all").disabled = moderatorActionPending;
   $("next-matching-round").classList.toggle("hidden", !isRoundFinished);
   $("next-matching-round").textContent = isTiebreak ? "Nächstes Golden Image"
     : game.roundIndex === MATCHING_GAME_ROUNDS.length - 1 ? "Golden Image starten" : "Nächste Runde";
   $("next-matching-round").disabled = moderatorActionPending;
-  $("start-buzzer-after-matching").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
-  $("start-buzzer-after-matching").disabled = moderatorActionPending;
+  $("start-set-after-matching").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
+  $("start-set-after-matching").disabled = moderatorActionPending;
   $("matching-round-result").classList.toggle("hidden", !result);
 
   if (result) {
@@ -1634,6 +1627,50 @@ async function persistRenderAndBroadcast() {
     // Bleibt der Broadcast aus, zeigt bereits die Verbindungsanzeige das Problem.
     console.error("Room state could not be broadcast:", error);
   }
+}
+
+function setupGameForTesting(gameId) {
+  if (gameId === mittelwertGame.id) {
+    if (!mittelwertGame.start(state, state.players)) return false;
+    estimationDrafts = emptyEstimationDrafts();
+    saveEstimationDrafts();
+    return true;
+  }
+  if (gameId === thriftyGame.id) {
+    priceDrafts = emptyPriceDrafts();
+    savePriceDrafts();
+    return thriftyGame.start(state);
+  }
+  if (gameId === kartenwissenGame.id) {
+    mapNotes = emptyMapNotes();
+    saveMapNotes();
+    return kartenwissenGame.start(state);
+  }
+  if (gameId === begriffsmatchGame.id) {
+    if (!begriffsmatchGame.start(state, state.players)) return false;
+    wordMatchDrafts = emptyWordMatchDrafts();
+    saveWordMatchDrafts();
+    return true;
+  }
+  if (gameId === einordnenGame.id) {
+    rankingSelection = { itemId: null, position: null };
+    return einordnenGame.start(state);
+  }
+  if (gameId === daSehIchDichGame.id) {
+    const assignerOrder = getMatchingAssignerOrder();
+    if (assignerOrder.some((player) => !player) || !daSehIchDichGame.start(state, assignerOrder)) return false;
+    matchingAssignments = emptyMatchingAssignments();
+    saveMatchingAssignments();
+    return true;
+  }
+  if (gameId === setGame.id) return setGame.setup(state);
+  return false;
+}
+
+function skipCurrentGameForTesting() {
+  const currentIndex = GAME_SEQUENCE.indexOf(state.game.id);
+  const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % GAME_SEQUENCE.length;
+  return setupGameForTesting(GAME_SEQUENCE[nextIndex]);
 }
 
 async function runModeratorAction(action) {
@@ -2313,7 +2350,7 @@ async function handleEvent(event, payload) {
 
   if (event === "buzz") {
     const player = state.players.find((item) => item.id === payload.playerId);
-    if (!player || !buzzerQuizGame.registerBuzz(state, player)) return;
+    if (!player || !setGame.registerBuzz(state, player)) return;
     await realtime.send("buzz_winner", {
       playerId: player.id,
       receivedAt: state.game.winner.receivedAt
@@ -2410,34 +2447,34 @@ document.addEventListener("keydown", async (event) => {
   await setScoreOverviewVisible(false);
 });
 
-$("open-buzzer").addEventListener("click", async () => {
-  await runModeratorAction(() => buzzerQuizGame.open(state));
+$("set-board").addEventListener("click", async (event) => {
+  const card = event.target.closest("[data-set-card]");
+  if (!card || card.disabled) return;
+  await runModeratorAction(() => setGame.toggleCard(state, card.dataset.setCard));
 });
 
-$("reset-buzzer").addEventListener("click", async () => {
-  await runModeratorAction(() => buzzerQuizGame.reset(state));
+$("skip-current-game").addEventListener("click", async () => {
+  $("skip-game-error").textContent = "";
+  const accepted = await runModeratorAction(skipCurrentGameForTesting);
+  if (!accepted) {
+    $("skip-game-error").textContent = "Für dieses Spiel müssen zuerst vier Spieler verbunden sein.";
+  }
 });
 
-$("skip-buzzer-question").addEventListener("click", async () => {
-  await runModeratorAction(() => buzzerQuizGame.advanceQuestion(state));
+$("start-set-round").addEventListener("click", async () => {
+  await runModeratorAction(() => setGame.startRound(state));
 });
 
-$("correct-answer").addEventListener("click", async () => {
-  await runModeratorAction(() => {
-    if (!buzzerQuizGame.awardPoint(state)) return false;
-    if (state.game.status !== "finished") buzzerQuizGame.advanceQuestion(state);
-    return true;
-  });
+$("set-correct").addEventListener("click", async () => {
+  await runModeratorAction(() => setGame.resolve(state, true));
 });
 
-$("start-buzzer-game").addEventListener("click", async () => {
-  await runModeratorAction(() => buzzerQuizGame.start(state));
+$("set-wrong").addEventListener("click", async () => {
+  await runModeratorAction(() => setGame.resolve(state, false));
 });
 
-$("wrong-answer").addEventListener("click", async () => {
-  await runModeratorAction(() => {
-    return buzzerQuizGame.awardOpponentPoint(state);
-  });
+$("next-set-round").addEventListener("click", async () => {
+  await runModeratorAction(() => setGame.advanceRound(state));
 });
 
 $("top20-board").addEventListener("click", async (event) => {
@@ -2512,6 +2549,17 @@ $("reveal-ranking-placement").addEventListener("click", async () => {
   await runModeratorAction(() => einordnenGame.revealPlacement(state));
 });
 
+$("penalize-ranking-timeout").addEventListener("click", async () => {
+  rankingTimerActionPending = true;
+  try {
+    rankingSelection = { itemId: null, position: null };
+    await runModeratorAction(() => einordnenGame.penalizeExpiredTurn(state));
+  } finally {
+    rankingTimerActionPending = false;
+    render();
+  }
+});
+
 $("reveal-next-ranking-entry").addEventListener("click", async () => {
   $("ranking-error").textContent = "";
   await runModeratorAction(() => einordnenGame.revealNextRemaining(state));
@@ -2544,11 +2592,11 @@ $("start-matching-after-ranking").addEventListener("click", async () => {
   });
 });
 
-$("start-buzzer-game-after-top20").addEventListener("click", async () => {
+$("start-set-game-after-top20").addEventListener("click", async () => {
   $("top20-error").textContent = "";
   await runModeratorAction(() => {
     if (getShowWinner(state) || state.game.id !== top20Game.id || state.game.status !== "finished") return false;
-    return buzzerQuizGame.start(state);
+    return setGame.setup(state);
   });
 });
 
@@ -2922,6 +2970,11 @@ async function tickWordMatchTimer() {
 setInterval(() => void tickWordMatchTimer(), 250);
 
 setInterval(() => {
+  if (state?.game?.id !== einordnenGame.id) return;
+  updateHostRankingTimer();
+}, 250);
+
+setInterval(() => {
   if (!supportsTeamChat(state?.game?.id) || teamChat.gameId !== state.game.id) return;
   const expiredEntries = clearExpiredTeamChatTyping(teamChat);
   if (!expiredEntries.length) return;
@@ -2944,10 +2997,10 @@ $("start-ranking-after-word").addEventListener("click", async () => {
   });
 });
 
-$("start-buzzer-after-matching").addEventListener("click", async () => {
+$("start-set-after-matching").addEventListener("click", async () => {
   await runModeratorAction(() => {
     if (getShowWinner(state) || state.game.id !== daSehIchDichGame.id || state.game.status !== "finished") return false;
-    return buzzerQuizGame.start(state);
+    return setGame.setup(state);
   });
 });
 

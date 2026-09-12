@@ -1,3 +1,4 @@
+import { SET_WINNING_SCORE } from "./games/set.js";
 import { BUZZER_WINNING_SCORE } from "./games/buzzer-quiz.js";
 import { TOP_20_ROUNDS_TO_WIN } from "./games/top-20.js";
 import { RANKING_ROUNDS_TO_WIN } from "./games/einordnen.js";
@@ -9,6 +10,7 @@ import { WORD_MATCH_CATEGORIES, WORD_MATCH_TERM_COUNT } from "./games/begriffsma
 
 const GAME_SCORE_CONFIG = {
   "buzzer-quiz": { key: "scores", label: "Quizpunkte" },
+  "set": { key: "scores", label: "SET-Punkte" },
   "top-20": { key: "roundWins", label: "Rundensiege" },
   "einordnen": { key: "roundWins", label: "Listensiege" },
   "kartenwissen": { key: "roundScores", label: "Kartenpunkte" },
@@ -20,6 +22,7 @@ const GAME_SCORE_CONFIG = {
 
 const FIXED_WINNING_SCORES = {
   "buzzer-quiz": BUZZER_WINNING_SCORE,
+  "set": SET_WINNING_SCORE,
   "top-20": TOP_20_ROUNDS_TO_WIN,
   "einordnen": RANKING_ROUNDS_TO_WIN,
   "kartenwissen": KARTENWISSEN_ROUNDS_TO_WIN,

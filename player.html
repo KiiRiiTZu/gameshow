@@ -47,16 +47,17 @@
 
       <div id="player-show-winner-banner" class="show-winner-banner hidden"></div>
 
-      <div id="player-buzzer-game">
+      <div id="player-set-game" class="hidden">
         <div class="game-title-line">
-          <h2>Buzzer Quiz</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 7 · FIRST TO 40</p>
+          <h2>SET</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 7 · FIRST TO 5</p>
         </div>
-        <div class="round-score" aria-label="Punktestand im Buzzer Quiz">
-          <span>Blau <strong id="player-buzzer-blue-score">0</strong></span>
-          <span>Quizpunkte</span>
-          <span><strong id="player-buzzer-red-score">0</strong> Rot</span>
+        <p id="player-set-round" class="muted">Beispielrunde</p>
+        <div class="round-score" aria-label="Punktestand bei SET">
+          <span>Blau <strong id="player-set-blue-score">0</strong></span>
+          <span>SET-Punkte</span>
+          <span><strong id="player-set-red-score">0</strong> Rot</span>
         </div>
-
+        <div id="player-set-board" class="set-board player-set-board"></div>
         <button id="buzzer" class="buzzer" disabled>
           <span class="buzzer-small">JETZT</span>
           <span>BUZZERN!</span>
@@ -92,6 +93,10 @@
           <div class="ranking-meta">
             <div id="player-ranking-turn" class="turn-card blue">Team Blau ist dran</div>
             <div id="player-ranking-strikes" class="strike-board">Blau: — · Rot: —</div>
+          </div>
+          <div id="player-ranking-timer-card" class="ranking-timer-card hidden">
+            <strong id="player-ranking-timer" class="ranking-timer">01:30</strong>
+            <span id="player-ranking-timer-note">Beratungszeit</span>
           </div>
           <div class="ranking-title-card">
             <span class="eyebrow">EINORDNEN</span>

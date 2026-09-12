@@ -9,7 +9,7 @@ const GAME_PRESENTATIONS = {
   "einordnen": { number: 5, name: "Einordnen" },
   "top-20": { number: 5, name: "Top 20" },
   "thrifty": { number: 2, name: "Thrifty" },
-  "buzzer-quiz": { number: 7, name: "Buzzer Quiz" }
+  "set": { number: 7, name: "SET" }
 };
 
 // Reihenfolge der aktiven Spiele. Die Nummer auf Übergangskarte und
@@ -21,7 +21,7 @@ export const GAME_SEQUENCE = [
   "begriffsmatch",
   "einordnen",
   "da-seh-ich-dich",
-  "buzzer-quiz"
+  "set"
 ];
 
 // Ablauf der Übergangskarte. Die Werte werden als CSS-Variablen gesetzt,

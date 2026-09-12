@@ -95,7 +95,7 @@ test("names every game of the active sequence for the transition card", () => {
     ["begriffsmatch", 4, "Begriffsmatch"],
     ["einordnen", 5, "Einordnen"],
     ["da-seh-ich-dich", 6, "Da seh ich dich"],
-    ["buzzer-quiz", 7, "Buzzer Quiz"]
+    ["set", 7, "SET"]
   ];
 
   for (const [gameId, number, name] of sequence) {
@@ -119,7 +119,7 @@ test("lists the seven active games in playing order", () => {
     "begriffsmatch",
     "einordnen",
     "da-seh-ich-dich",
-    "buzzer-quiz"
+    "set"
   ]);
   // Das Bankspiel Top 20 gehört nicht zur aktiven Reihenfolge.
   assert.ok(!GAME_SEQUENCE.includes("top-20"));
@@ -161,5 +161,5 @@ test("highlights only the game that was just won", () => {
   assert.equal(getOverviewGameView("thrifty", 1, results, "thrifty").highlighted, true);
   assert.equal(getOverviewGameView("mittelwert", 0, results, "thrifty").highlighted, false);
   // Ein noch nicht gespieltes Spiel blinkt nicht, auch wenn es benannt wird.
-  assert.equal(getOverviewGameView("buzzer-quiz", 6, results, "buzzer-quiz").highlighted, false);
+  assert.equal(getOverviewGameView("set", 6, results, "set").highlighted, false);
 });

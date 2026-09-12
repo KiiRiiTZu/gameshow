@@ -39,6 +39,8 @@ import {
 import { renderScoreOverview, showGameTransition, showGameWinner } from "./game-effects.js";
 import { getModeratorGameScore } from "./moderator-score.js";
 import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
+import { getSetRound } from "./games/set-rounds.js";
+import { renderSetBoard } from "./set-view.js";
 
 const TOP_20_GAME_ID = "top-20";
 const RANKING_GAME_ID = "einordnen";
@@ -48,6 +50,7 @@ const MATCHING_GAME_ID = "da-seh-ich-dich";
 const PRICE_GAME_ID = "thrifty";
 const ESTIMATION_GAME_ID = "mittelwert";
 const WORD_MATCH_GAME_ID = "begriffsmatch";
+const SET_GAME_ID = "set";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -61,12 +64,11 @@ $("room-code").textContent = roomCode;
 
 const PLAYER_ID_KEY = `gameshow-player-id-${roomCode}`;
 
-// Die Spieler-Id liegt in localStorage, damit ein geschlossener oder
-// abgestürzter Tab den Platz im Team nicht verliert. sessionStorage wird nur
-// noch gelesen, um eine bereits laufende Show aus der Zeit davor zu übernehmen.
+// Jeder Tab simuliert einen eigenen Spieler. sessionStorage überlebt Reloads,
+// wird aber nicht mit den anderen Tabs desselben Browsers geteilt.
 function readStoredPlayerId() {
   try {
-    return localStorage.getItem(PLAYER_ID_KEY) || sessionStorage.getItem(PLAYER_ID_KEY) || null;
+    return sessionStorage.getItem(PLAYER_ID_KEY) || null;
   } catch (error) {
     console.warn("Player id could not be read:", error);
     return null;
@@ -75,7 +77,7 @@ function readStoredPlayerId() {
 
 function storePlayerId(id) {
   try {
-    localStorage.setItem(PLAYER_ID_KEY, id);
+    sessionStorage.setItem(PLAYER_ID_KEY, id);
   } catch (error) {
     // Privater Modus kann das Schreiben verbieten; die Sitzung läuft trotzdem,
     // nur ohne Wiedererkennung nach einem Reload.
@@ -845,7 +847,7 @@ function render() {
   const currentGameId = roomState.game?.id;
   if (previousGameId && previousGameId !== currentGameId) {
     showGameTransition(currentGameId);
-  } else if (["buzzer-quiz", ESTIMATION_GAME_ID].includes(currentGameId) &&
+  } else if ([SET_GAME_ID, ESTIMATION_GAME_ID].includes(currentGameId) &&
       previousGameStatus === "not-started" &&
       roomState.game.status !== "not-started") {
     showGameTransition(currentGameId);
@@ -872,14 +874,12 @@ function render() {
   const priceIsActive = roomState.game?.id === PRICE_GAME_ID;
   const estimationIsActive = roomState.game?.id === ESTIMATION_GAME_ID;
   const wordMatchIsActive = roomState.game?.id === WORD_MATCH_GAME_ID;
+  const setIsActive = roomState.game?.id === SET_GAME_ID;
   document.querySelector(".player-shell").classList.toggle(
     "wide-game",
-    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
+    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive || setIsActive
   );
-  $("player-buzzer-game").classList.toggle(
-    "hidden",
-    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive
-  );
+  $("player-set-game").classList.toggle("hidden", !setIsActive);
   $("player-top20-game").classList.toggle("hidden", !top20IsActive);
   $("player-ranking-game").classList.toggle("hidden", !rankingIsActive);
   $("player-map-game").classList.toggle("hidden", !mapIsActive);
@@ -923,19 +923,24 @@ function render() {
     return;
   }
 
+  if (!setIsActive) return;
+
   const status = roomState.game?.status;
   const winner = roomState.game?.winner;
   const buzzer = $("buzzer");
   const gameScores = roomState.game?.scores || { blue: 0, red: 0 };
+  const round = getSetRound(roomState.game.roundIndex);
 
-  $("player-buzzer-blue-score").textContent = gameScores.blue;
-  $("player-buzzer-red-score").textContent = gameScores.red;
+  $("player-set-blue-score").textContent = gameScores.blue;
+  $("player-set-red-score").textContent = gameScores.red;
+  $("player-set-round").textContent = round.example ? "Beispielrunde · ohne Punkte" : round.title;
+  $("player-set-board").innerHTML = renderSetBoard(round, roomState.game, false, "player");
 
-  buzzer.classList.toggle("hidden", status === "not-started");
+  buzzer.classList.toggle("hidden", ["not-started", "round-pending", "resolved", "finished"].includes(status));
   buzzer.disabled = status !== "open";
 
   if (status === "not-started") {
-    $("player-message").textContent = "Warte darauf, dass der Moderator Spiel 1 startet…";
+    $("player-message").textContent = "Warte darauf, dass der Moderator die Beispielrunde aufdeckt…";
     return;
   }
 
@@ -947,7 +952,18 @@ function render() {
   if (status === "finished") {
     const winningTeam = roomState.game.winningTeam ||
       (gameScores.blue >= gameScores.red ? "blue" : "red");
-    $("player-message").textContent = `🏆 ${getTeamName(winningTeam)} gewinnt das Buzzer Quiz!`;
+    $("player-message").textContent = `🏆 ${getTeamName(winningTeam)} gewinnt SET!`;
+    return;
+  }
+
+  if (status === "round-pending") {
+    $("player-message").textContent = "Die Karten sind verdeckt. Gleich beginnt die nächste Runde.";
+    return;
+  }
+
+  if (status === "resolved" && roomState.game.result) {
+    const result = roomState.game.result;
+    $("player-message").textContent = `${result.correct ? "✓ Richtig" : "✕ Falsch"}${result.example ? " · Beispielrunde ohne Punkt" : ` · Punkt für ${getTeamName(result.scoringTeam)}`}`;
     return;
   }
 
@@ -1078,6 +1094,7 @@ function renderRankingGame() {
   const isFinished = game.status === "finished";
   const isRoundFinished = game.status === "round-finished";
   const displayTeam = game.roundWinner || game.winningTeam || game.currentTeam;
+  updatePlayerRankingTimer();
   $("player-ranking-round").textContent = `Liste ${game.roundIndex + 1} von ${RANKING_LISTS.length}`;
   $("player-ranking-round-wins").textContent =
     `Listensiege · Blau ${game.roundWins.blue} : ${game.roundWins.red} Rot`;
@@ -1102,8 +1119,10 @@ function renderRankingGame() {
 
   const result = game.lastResult;
   if (result) {
-    const entry = getRankingEntry(list, result.itemId);
-    const resultText = result.cleanupReveal
+    const entry = result.itemId ? getRankingEntry(list, result.itemId) : null;
+    const resultText = result.timedOut
+      ? `Die Zeit von ${getTeamName(result.team)} ist abgelaufen. Der Moderator hat einen Strafpunkt vergeben.`
+      : result.cleanupReveal
       ? `${entry.label} wurde aufgedeckt.`
       : result.correct
       ? `✓ ${entry.label} wurde richtig eingeordnet.`
@@ -1111,12 +1130,29 @@ function renderRankingGame() {
     const conclusion = isFinished
       ? game.winningTeam ? ` 🏆 ${getTeamName(game.winningTeam)} gewinnt Einordnen!` : " Einordnen endet unentschieden."
       : isRoundFinished && game.roundWinner ? ` ${getTeamName(game.roundWinner)} gewinnt diese Liste.` : "";
-    $("player-ranking-result").textContent = `${resultText}${result.correct ? ` Wert: ${entry.value}.` : ""}${conclusion}`;
+    $("player-ranking-result").textContent = `${resultText}${result.correct && entry ? ` Wert: ${entry.value}.` : ""}${conclusion}`;
   } else {
     $("player-ranking-result").textContent = game.status === "ready-to-reveal"
       ? "Die Einordnung ist vorgemerkt. Der Moderator deckt gleich auf."
       : "";
   }
+}
+
+function playerRankingSecondsRemaining() {
+  if (!roomState?.game?.turnEndsAt) return 0;
+  return Math.max(0, Math.ceil((roomState.game.turnEndsAt - Date.now()) / 1000));
+}
+
+function updatePlayerRankingTimer() {
+  if (roomState?.game?.id !== RANKING_GAME_ID || !$("player-ranking-timer")) return;
+  $("player-ranking-timer-card").classList.toggle("hidden", roomState.game.status !== "playing");
+  const seconds = playerRankingSecondsRemaining();
+  const expired = roomState.game.status === "playing" && seconds === 0;
+  $("player-ranking-timer").textContent = formatCountdown(seconds);
+  $("player-ranking-timer").classList.toggle("expired", expired);
+  $("player-ranking-timer-note").textContent = expired
+    ? "Zeit abgelaufen – der Moderator entscheidet."
+    : "Beratungszeit";
 }
 
 function renderPersonalNoteFields(containerId, notes = {}, ownEditable = true) {
@@ -1788,6 +1824,7 @@ async function tickPlayerWordMatchTimer() {
 }
 
 setInterval(() => void tickPlayerWordMatchTimer(), 250);
+setInterval(updatePlayerRankingTimer, 250);
 
 function getTeamName(team) {
   return team === "blue" ? "Team Blau" : "Team Rot";

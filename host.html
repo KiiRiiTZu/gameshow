@@ -14,6 +14,8 @@
     <header class="topbar">
       <h1 class="host-room-title">Moderator <span aria-hidden="true">|</span> Raum <span id="room-code">----</span></h1>
       <div class="topbar-actions">
+        <button id="skip-current-game" class="button secondary small" title="Nur zum Testen">Spiel überspringen</button>
+        <span id="skip-game-error" class="error small"></span>
         <button id="toggle-score-overview" class="button secondary small" aria-pressed="false">Punktestand zeigen</button>
         <div class="connection">
           <span id="connection-dot" class="dot"></span>
@@ -40,51 +42,36 @@
 
     <section id="show-winner-banner" class="show-winner-banner hidden"></section>
 
-    <section id="buzzer-game-panel" class="card game-panel">
+    <section id="set-game-panel" class="card game-panel hidden">
       <div class="game-heading">
         <div>
           <div class="game-title-line">
-            <h2>Buzzer Quiz</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 7 · FIRST TO 40</p>
+            <h2>SET</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 7 · FIRST TO 5</p>
           </div>
+          <p id="set-round-label" class="muted">Beispielrunde</p>
         </div>
-        <span id="buzzer-status" class="status-pill closed">Buzzer geschlossen</span>
+        <span id="set-status" class="status-pill closed">Bereit</span>
       </div>
 
-      <div class="round-score" aria-label="Punktestand im Buzzer Quiz">
-        <span>Blau <strong id="buzzer-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="Quizpunkte von Team Blau" data-score-scope="game" data-score-team="blue">0</strong></span>
-        <span>Quizpunkte</span>
-        <span><strong id="buzzer-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="Quizpunkte von Team Rot" data-score-scope="game" data-score-team="red">0</strong> Rot</span>
+      <div class="round-score" aria-label="Punktestand bei SET">
+        <span>Blau <strong id="set-blue-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="SET-Punkte von Team Blau" data-score-scope="game" data-score-team="blue">0</strong></span>
+        <span>SET-Punkte</span>
+        <span><strong id="set-red-score" class="editable-score" contenteditable="true" inputmode="numeric" role="spinbutton" aria-label="SET-Punkte von Team Rot" data-score-scope="game" data-score-team="red">0</strong> Rot</span>
       </div>
 
-      <div id="buzzer-start-controls" class="game-finished">
-        <p>Bereit für das erste Spiel?</p>
-        <button id="start-buzzer-game" class="button primary">Spiel 7 starten</button>
+      <div id="set-explanation" class="set-explanation">
+        Finde drei Karten, bei denen Form, Farbe, Füllung und Anzahl jeweils entweder komplett gleich oder komplett unterschiedlich sind.
       </div>
-
-      <div id="buzzer-question-card" class="map-question-card buzzer-question-card">
-        <span id="buzzer-question-number" class="eyebrow">FRAGE 1</span>
-        <h3 id="buzzer-question"></h3>
+      <div id="set-board" class="set-board"></div>
+      <div id="set-result" class="buzz-result"><span class="muted">Der Moderator deckt die Karten auf.</span></div>
+      <div class="controls">
+        <button id="start-set-round" class="button primary">Beispielrunde aufdecken</button>
+        <button id="next-set-round" class="button primary hidden">Karten umdrehen</button>
       </div>
-
-      <div id="buzz-result" class="buzz-result">
-        <span class="muted">Öffne den Buzzer, sobald du die Frage gestellt hast.</span>
+      <div id="set-answer-controls" class="answer-controls hidden">
+        <button id="set-correct" class="button success">✓ Richtig</button>
+        <button id="set-wrong" class="button danger">✕ Falsch · Punkt für Gegner</button>
       </div>
-
-      <div id="buzzer-controls" class="controls">
-        <button id="open-buzzer" class="button primary">Buzzer öffnen</button>
-        <button id="reset-buzzer" class="button secondary">Zurücksetzen</button>
-        <button id="skip-buzzer-question" class="button secondary">Keine Antwort · Nächste Frage</button>
-      </div>
-
-      <div id="answer-controls" class="answer-controls hidden">
-        <button id="correct-answer" class="button success">✓ Richtig · +4 Quizpunkte</button>
-        <button id="wrong-answer" class="button danger">✕ Falsch · +1 Gegner</button>
-      </div>
-
-      <div id="buzzer-finished-controls" class="game-finished hidden">
-        <p id="buzzer-winner-message"></p>
-      </div>
-      <p id="buzzer-next-game-error" class="error"></p>
     </section>
 
     <section id="top20-game-panel" class="card game-panel hidden">
@@ -117,7 +104,7 @@
       <div id="top20-finished" class="game-finished hidden">
         <p id="top20-winner-message"></p>
         <button id="next-top20-round" class="button primary">Nächste Liste starten</button>
-        <button id="start-buzzer-game-after-top20" class="button primary hidden">Buzzer Quiz starten</button>
+        <button id="start-set-game-after-top20" class="button primary hidden">SET starten</button>
       </div>
     </section>
 
@@ -136,6 +123,10 @@
         <div id="ranking-turn" class="turn-card blue">Team Blau ist dran</div>
         <div id="ranking-strikes" class="strike-board">Blau: — · Rot: —</div>
       </div>
+      <div id="ranking-timer-card" class="ranking-timer-card hidden">
+        <strong id="ranking-timer" class="ranking-timer">01:30</strong>
+        <span id="ranking-timer-note">Beratungszeit für das aktive Team</span>
+      </div>
       <div class="ranking-title-card">
         <span class="eyebrow">EINORDNEN</span>
         <h3 id="ranking-title"></h3>
@@ -150,6 +141,7 @@
         <button id="start-first-ranking-round" class="button primary hidden">Erste Liste starten</button>
         <button id="confirm-ranking-placement" class="button primary">Einordnung vormerken</button>
         <button id="reveal-ranking-placement" class="button primary hidden">Einordnung aufdecken</button>
+        <button id="penalize-ranking-timeout" class="button danger hidden">Strafpunkt wegen Zeitüberschreitung</button>
         <button id="reveal-next-ranking-entry" class="button secondary hidden">Nächsten Begriff aufdecken</button>
         <button id="next-ranking-round" class="button primary hidden">Nächste Liste starten</button>
         <button id="start-matching-after-ranking" class="button primary hidden">Da seh ich dich starten</button>
@@ -221,7 +213,7 @@
         <button id="complete-matching-turn" class="button secondary hidden">Nächste Spieler</button>
         <button id="reveal-matching-all" class="button primary hidden">Antworten aufdecken</button>
         <button id="next-matching-round" class="button primary hidden">Nächste Runde</button>
-        <button id="start-buzzer-after-matching" class="button primary hidden">Buzzer Quiz starten</button>
+        <button id="start-set-after-matching" class="button primary hidden">SET starten</button>
       </div>
       <p id="matching-next-game-error" class="error"></p>
     </section>

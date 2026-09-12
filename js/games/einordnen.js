@@ -2,6 +2,11 @@ import { RANKING_LISTS, getRankingEntry, getRankingList } from "./ranking-lists.
 
 export const RANKING_MAX_STRIKES = 2;
 export const RANKING_ROUNDS_TO_WIN = 2;
+export const RANKING_TURN_SECONDS = 90;
+
+function turnEndsAt(now = Date.now()) {
+  return now + RANKING_TURN_SECONDS * 1000;
+}
 
 function otherTeam(team) {
   return team === "blue" ? "red" : "blue";
@@ -70,16 +75,18 @@ export const einordnenGame = {
       roundWinner: null,
       firstStartingTeam: startingTeam,
       currentTeam: startingTeam,
+      turnEndsAt: null,
       winningTeam: null,
       ...initialRoundState(0),
-      scoreSystemVersion: 1
+      scoreSystemVersion: 2
     };
     return true;
   },
 
-  startFirstRound(state) {
+  startFirstRound(state, now = Date.now()) {
     if (state.game.id !== this.id || state.game.status !== "not-started") return false;
     state.game.status = "playing";
+    state.game.turnEndsAt = turnEndsAt(now);
     return true;
   },
 
@@ -98,6 +105,9 @@ export const einordnenGame = {
     state.game.firstStartingTeam ||= "blue";
     state.game.currentTeam = ["blue", "red"].includes(state.game.currentTeam)
       ? state.game.currentTeam : state.game.firstStartingTeam;
+    state.game.turnEndsAt = Number.isFinite(Number(state.game.turnEndsAt))
+      ? Number(state.game.turnEndsAt)
+      : state.game.status === "playing" ? turnEndsAt() : null;
     state.game.placedIds = Array.isArray(state.game.placedIds) ? state.game.placedIds : defaults.placedIds;
     state.game.remainingIds = Array.isArray(state.game.remainingIds) ? state.game.remainingIds : defaults.remainingIds;
     state.game.proposal ||= null;
@@ -107,7 +117,7 @@ export const einordnenGame = {
       red: Number(state.game.strikes?.red) || 0
     };
     state.game.winningTeam ||= null;
-    state.game.scoreSystemVersion = 1;
+    state.game.scoreSystemVersion = 2;
     return true;
   },
 
@@ -124,6 +134,7 @@ export const einordnenGame = {
     };
     state.game.lastResult = null;
     state.game.status = "ready-to-reveal";
+    state.game.turnEndsAt = null;
     return true;
   },
 
@@ -137,7 +148,7 @@ export const einordnenGame = {
     return true;
   },
 
-  revealPlacement(state) {
+  revealPlacement(state, now = Date.now()) {
     if (state.game.id !== this.id || state.game.status !== "ready-to-reveal" ||
         !state.game.proposal) return false;
     const list = getRankingList(state.game.roundIndex);
@@ -180,6 +191,25 @@ export const einordnenGame = {
 
     state.game.currentTeam = otherTeam(state.game.currentTeam);
     state.game.status = "playing";
+    state.game.turnEndsAt = turnEndsAt(now);
+    return true;
+  },
+
+  penalizeExpiredTurn(state, now = Date.now()) {
+    if (state.game.id !== this.id || state.game.status !== "playing") return false;
+    if (!state.game.turnEndsAt || now < state.game.turnEndsAt) return false;
+    const team = state.game.currentTeam;
+    state.game.strikes[team] += 1;
+    state.game.lastResult = { team, timedOut: true };
+    state.game.turnEndsAt = null;
+
+    if (state.game.strikes[team] >= RANKING_MAX_STRIKES) {
+      finishRound(state, otherTeam(team));
+      return true;
+    }
+
+    state.game.currentTeam = otherTeam(team);
+    state.game.turnEndsAt = turnEndsAt(now);
     return true;
   },
 
@@ -205,7 +235,7 @@ export const einordnenGame = {
     return true;
   },
 
-  startNextRound(state) {
+  startNextRound(state, now = Date.now()) {
     if (state.game.id !== this.id || state.game.status !== "round-finished") return false;
     const nextRoundIndex = state.game.roundIndex + 1;
     if (!RANKING_LISTS[nextRoundIndex]) return false;
@@ -214,6 +244,7 @@ export const einordnenGame = {
     state.game.roundWinner = null;
     state.game.currentTeam = startingTeamForRound(state.game.firstStartingTeam, nextRoundIndex);
     Object.assign(state.game, initialRoundState(nextRoundIndex));
+    state.game.turnEndsAt = turnEndsAt(now);
     return true;
   }
 };

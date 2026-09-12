@@ -1,4 +1,4 @@
-# Gameshow V2.0
+# Gameshow V3.0
 
 Eine browserbasierte Multiplayer-Gameshow für einen Moderator und vier Spieler in zwei Teams. Räume, Spieler, Punkte und Spielzustände werden mit Supabase gespeichert und über Supabase Realtime synchronisiert.
 
@@ -18,7 +18,7 @@ Zwischen den Spielen dreht sich eine Ankündigungskarte, nach jedem gewonnenen S
 | 4 | Begriffsmatch | 4 Kategorien, meiste Treffer gewinnen |
 | 5 | Einordnen | 3 Listen, 2 Listensiege gewinnen |
 | 6 | Da seh ich dich | 4 Runden, meiste Übereinstimmungen gewinnen |
-| 7 | Buzzer Quiz | 34 Fragen, 40 Quizpunkte gewinnen |
+| 7 | SET | Beispielrunde plus 9 Kartenrunden, 5 Punkte gewinnen |
 
 Die Reihenfolge steht in `GAME_SEQUENCE` in `js/game-effects.js`.
 
@@ -56,6 +56,7 @@ Die Reihenfolge steht in `GAME_SEQUENCE` in `js/game-effects.js`.
 
 - Drei vorbereitete Ranglisten, jede mit einem bereits gesetzten Anker.
 - Die Teams ordnen abwechselnd einen Begriff relativ zu den bereits platzierten ein.
+- Pro Zug laufen 90 Sekunden; danach entscheidet der Moderator zwischen Kulanz und Strafpunkt.
 - Eine falsche Einordnung ist ein Kreuz; nach zwei Kreuzen verliert ein Team die Liste.
 - Das erste Team mit zwei Listensiegen gewinnt das Spiel.
 
@@ -67,16 +68,18 @@ Die Reihenfolge steht in `GAME_SEQUENCE` in `js/game-effects.js`.
 - Jede Übereinstimmung innerhalb eines Teams zählt einen Punkt.
 - Das Spiel endet vorzeitig, sobald ein Team mathematisch nicht mehr eingeholt werden kann. Bei Gleichstand entscheidet das Golden Image.
 
-### Spiel 7: Buzzer Quiz
+### Spiel 7: SET
 
-- Der Moderator öffnet den Buzzer für eine Frage; der erste gültige Buzz wird angenommen.
-- Sobald der Buzz bestätigt ist, ertönt der Buzzer-Sound beim Moderator und bei allen Spielern.
-- Richtige Antwort: vier Quizpunkte. Falsche Antwort: ein Quizpunkt für das Gegnerteam, die Frage wird erneut freigegeben.
-- Das erste Team mit 40 Punkten gewinnt das Spiel.
+- Zwölf nummerierte Karten zeigen Form, Farbe, Füllung und Anzahl in je drei Ausprägungen.
+- Alle vier Spieler können buzzern; der erste gültige Buzz wird angenommen.
+- Der Moderator markiert die drei genannten Karten und entscheidet anschließend richtig oder falsch.
+- Richtig gibt einen Punkt für das antwortende Team, falsch einen Punkt für das Gegnerteam.
+- Die erste Runde erklärt das Prinzip und zählt nicht; das erste Team mit fünf Punkten gewinnt.
+- Zwischen den Runden drehen sich alle Karten um und werden mit der nächsten Vorlage neu aufgedeckt.
 
 ## Spiel auf der Bank
 
-**Top 20** ist vollständig implementiert, gehört aber nicht zur aktiven Reihenfolge. Drei Listen (Spotify-Stars, bevölkerungsreichste Länder, umsatzstärkste deutsche Unternehmen), abwechselnd genannt, zwei Kreuze verlieren die Runde, Best of 3. Um es einzuhängen, muss es in `GAME_SEQUENCE` aufgenommen und der Spielwechsel verdrahtet werden.
+**Top 20** und **Buzzer Quiz** sind vollständig implementiert, gehören aber nicht zur aktiven Reihenfolge. Um eines davon wieder einzuhängen, muss es in `GAME_SEQUENCE` aufgenommen und der Spielwechsel verdrahtet werden.
 
 ## Lokal starten
 
