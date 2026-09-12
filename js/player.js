@@ -1143,6 +1143,11 @@ function playerRankingSecondsRemaining() {
   return Math.max(0, Math.ceil((roomState.game.turnEndsAt - Date.now()) / 1000));
 }
 
+function formatCountdown(seconds) {
+  const safeSeconds = Math.max(0, Number(seconds) || 0);
+  return `${String(Math.floor(safeSeconds / 60)).padStart(2, "0")}:${String(safeSeconds % 60).padStart(2, "0")}`;
+}
+
 function updatePlayerRankingTimer() {
   if (roomState?.game?.id !== RANKING_GAME_ID || !$("player-ranking-timer")) return;
   $("player-ranking-timer-card").classList.toggle("hidden", roomState.game.status !== "playing");

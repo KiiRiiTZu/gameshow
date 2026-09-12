@@ -863,6 +863,12 @@ test("supports skipping games and four independent player tabs for testing", () 
   assert.match(hostScript, /GAME_SEQUENCE\.indexOf\(state\.game\.id\)/);
 });
 
+test("formats the Einordnen player timer without interrupting the game view", () => {
+  const playerScript = readFileSync(new URL("../js/player.js", import.meta.url), "utf8");
+  assert.match(playerScript, /function formatCountdown\(seconds\)/);
+  assert.match(playerScript, /player-ranking-timer"\)\.textContent = formatCountdown\(seconds\)/);
+});
+
 test("keeps wide moderator games inside the middle chat column", () => {
   const styles = readFileSync(new URL("../css/styles.css", import.meta.url), "utf8");
   const hostMarkup = readFileSync(new URL("../host.html", import.meta.url), "utf8");
