@@ -708,6 +708,7 @@ function renderEstimationGame() {
 
 function wordMatchSecondsRemaining() {
   if (!state.game.phaseEndsAt) {
+    if (["blue-guess-review", "red-guess-review"].includes(state.game.status)) return 0;
     if (state.game.status === "tiebreak-pending") return WORD_MATCH_TIEBREAK_SECONDS;
     if (state.game.tiebreak) return 0;
     return ["round-pending", "seed-collecting"].includes(state.game.status)
@@ -771,7 +772,7 @@ function renderWordMatchGame() {
     </article>`;
     for (const id of [
       "start-word-seed-phase", "finish-word-seed-phase", "start-blue-guess-phase",
-      "finish-blue-guess-phase", "start-red-guess-phase", "finish-red-guess-phase",
+      "finish-blue-guess-phase", "confirm-blue-guess-phase", "start-red-guess-phase", "finish-red-guess-phase", "confirm-red-guess-phase",
       "reveal-word-match-round", "next-word-match-round"
     ]) $(id).classList.add("hidden");
     $("start-word-tiebreak").classList.toggle("hidden", game.status !== "tiebreak-pending");
@@ -811,8 +812,10 @@ function renderWordMatchGame() {
     "seed-collecting": "Listen werden geschrieben",
     "blue-guess-pending": "Team Blau bereit",
     "blue-guessing": "Team Blau rät",
+    "blue-guess-review": "Auswertung für Blau",
     "red-guess-pending": "Team Rot bereit",
     "red-guessing": "Team Rot rät",
+    "red-guess-review": "Auswertung für Rot",
     "results-pending": "Ergebnis bereit",
     "round-finished": "Runde beendet",
     finished: "Spiel beendet"
@@ -829,7 +832,7 @@ function renderWordMatchGame() {
   $("word-match-lists").innerHTML = ["blue", "red"].map((team) => {
     const seeder = roles.seeders[team];
     const terms = wordMatchDrafts.terms[seeder?.id] || emptyWordTerms();
-    const clickable = game.status === `${team}-guessing`;
+    const clickable = [`${team}-guessing`, `${team}-guess-review`].includes(game.status);
     const editable = game.status === `${firstGuessTeam}-guess-pending`;
     return `<article class="word-match-list ${team}">
       <strong>${getTeamName(team)} · Liste von ${escapeHtml(seeder?.name || "")}</strong>
@@ -853,8 +856,10 @@ function renderWordMatchGame() {
   $("finish-word-seed-phase").classList.toggle("hidden", !isSeedCollecting);
   $("start-blue-guess-phase").classList.toggle("hidden", game.status !== "blue-guess-pending");
   $("finish-blue-guess-phase").classList.toggle("hidden", game.status !== "blue-guessing");
+  $("confirm-blue-guess-phase").classList.toggle("hidden", game.status !== "blue-guess-review");
   $("start-red-guess-phase").classList.toggle("hidden", game.status !== "red-guess-pending");
   $("finish-red-guess-phase").classList.toggle("hidden", game.status !== "red-guessing");
+  $("confirm-red-guess-phase").classList.toggle("hidden", game.status !== "red-guess-review");
   $("reveal-word-match-round").classList.toggle("hidden", game.status !== "results-pending");
   $("next-word-match-round").classList.toggle("hidden", !isRoundFinished || finaleReady);
   $("start-ranking-after-word").classList.toggle("hidden", !isFinished || Boolean(getShowWinner(state)));
@@ -863,7 +868,7 @@ function renderWordMatchGame() {
   $("start-ranking-after-word").disabled = moderatorActionPending;
   for (const id of [
     "start-word-seed-phase", "finish-word-seed-phase", "start-blue-guess-phase",
-    "finish-blue-guess-phase", "start-red-guess-phase", "finish-red-guess-phase",
+    "finish-blue-guess-phase", "confirm-blue-guess-phase", "start-red-guess-phase", "finish-red-guess-phase", "confirm-red-guess-phase",
     "reveal-word-match-round", "next-word-match-round", "start-word-tiebreak"
   ]) $(id).disabled = moderatorActionPending || wordTimerActionPending;
 
@@ -2866,6 +2871,10 @@ $("finish-blue-guess-phase").addEventListener("click", async () => {
   await runModeratorAction(() => begriffsmatchGame.finishGuessPhase(state, "blue"));
 });
 
+$("confirm-blue-guess-phase").addEventListener("click", async () => {
+  await runModeratorAction(() => begriffsmatchGame.confirmGuessPhase(state, "blue"));
+});
+
 $("start-red-guess-phase").addEventListener("click", async () => {
   clearTimeout(wordMatchEditTimer);
   const accepted = await runModeratorAction(() => begriffsmatchGame.startGuessPhase(state, "red"));
@@ -2874,6 +2883,10 @@ $("start-red-guess-phase").addEventListener("click", async () => {
 
 $("finish-red-guess-phase").addEventListener("click", async () => {
   await runModeratorAction(() => begriffsmatchGame.finishGuessPhase(state, "red"));
+});
+
+$("confirm-red-guess-phase").addEventListener("click", async () => {
+  await runModeratorAction(() => begriffsmatchGame.confirmGuessPhase(state, "red"));
 });
 
 $("reveal-word-match-round").addEventListener("click", async () => {

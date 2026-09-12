@@ -196,7 +196,9 @@ export const begriffsmatchGame = {
   },
 
   toggleMatch(state, team, index) {
-    if (state.game.id !== this.id || state.game.status !== `${team}-guessing`) return false;
+    if (state.game.id !== this.id || ![
+      `${team}-guessing`, `${team}-guess-review`
+    ].includes(state.game.status)) return false;
     const slotIndex = Number(index);
     if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= WORD_MATCH_TERM_COUNT) return false;
     const matches = state.game.currentMatches[team];
@@ -210,6 +212,12 @@ export const begriffsmatchGame = {
   finishGuessPhase(state, team) {
     if (state.game.id !== this.id || state.game.status !== `${team}-guessing`) return false;
     state.game.phaseEndsAt = null;
+    state.game.status = `${team}-guess-review`;
+    return true;
+  },
+
+  confirmGuessPhase(state, team) {
+    if (state.game.id !== this.id || state.game.status !== `${team}-guess-review`) return false;
     const [firstTeam, secondTeam] = getWordMatchGuessOrder(state.game);
     if (team === firstTeam) {
       state.game.status = `${secondTeam}-guess-pending`;

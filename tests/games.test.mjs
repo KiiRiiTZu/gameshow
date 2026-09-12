@@ -384,8 +384,12 @@ test("alternates Begriffsmatch roles with 120 seconds to write and 45 seconds to
   begriffsmatchGame.startGuessPhase(state, "blue", 2_000);
   assert.equal(state.game.phaseEndsAt, 2_000 + WORD_MATCH_PHASE_SECONDS * 1000);
   begriffsmatchGame.finishGuessPhase(state, "blue");
+  assert.equal(state.game.status, "blue-guess-review");
+  assert.equal(begriffsmatchGame.toggleMatch(state, "blue", 0), true);
+  assert.equal(begriffsmatchGame.confirmGuessPhase(state, "blue"), true);
   begriffsmatchGame.startGuessPhase(state, "red", 3_000);
   begriffsmatchGame.finishGuessPhase(state, "red");
+  assert.equal(begriffsmatchGame.confirmGuessPhase(state, "red"), true);
   assert.equal(state.game.status, "results-pending");
   assert.equal(state.game.roundResults.length, 0);
   assert.deepEqual(state.game.scores, { blue: 0, red: 0 });
@@ -402,6 +406,7 @@ test("alternates Begriffsmatch roles with 120 seconds to write and 45 seconds to
   assert.equal(begriffsmatchGame.startGuessPhase(state, "blue"), false);
   assert.equal(begriffsmatchGame.startGuessPhase(state, "red"), true);
   assert.equal(begriffsmatchGame.finishGuessPhase(state, "red"), true);
+  assert.equal(begriffsmatchGame.confirmGuessPhase(state, "red"), true);
   assert.equal(state.game.status, "blue-guess-pending");
 });
 
@@ -421,6 +426,7 @@ test("starts the Begriffsmatch Kino tiebreak after four tied rounds", () => {
     for (const team of getWordMatchGuessOrder(state.game)) {
       begriffsmatchGame.startGuessPhase(state, team);
       begriffsmatchGame.finishGuessPhase(state, team);
+      begriffsmatchGame.confirmGuessPhase(state, team);
     }
     begriffsmatchGame.revealRound(state, { blue: [], red: [] });
     if (round < WORD_MATCH_CATEGORIES.length - 1) begriffsmatchGame.startNextRound(state);
@@ -493,6 +499,7 @@ test("ends Begriffsmatch early when the trailing team cannot catch up", () => {
       }
     }
     begriffsmatchGame.finishGuessPhase(state, firstTeam);
+    begriffsmatchGame.confirmGuessPhase(state, firstTeam);
     begriffsmatchGame.startGuessPhase(state, secondTeam);
     if (secondTeam === "blue") {
       for (let index = 0; index < WORD_MATCH_TERM_COUNT; index += 1) {
@@ -500,6 +507,7 @@ test("ends Begriffsmatch early when the trailing team cannot catch up", () => {
       }
     }
     begriffsmatchGame.finishGuessPhase(state, secondTeam);
+    begriffsmatchGame.confirmGuessPhase(state, secondTeam);
     assert.equal(state.game.status, "results-pending");
     begriffsmatchGame.revealRound(state, {
       blue: Array(WORD_MATCH_TERM_COUNT).fill("Blau"),

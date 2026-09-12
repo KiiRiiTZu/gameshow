@@ -1646,6 +1646,7 @@ function renderEstimationGame() {
 
 function wordMatchSecondsRemaining() {
   if (!roomState?.game?.phaseEndsAt) {
+    if (["blue-guess-review", "red-guess-review"].includes(roomState?.game?.status)) return 0;
     if (roomState?.game?.status === "tiebreak-pending") return WORD_MATCH_TIEBREAK_SECONDS;
     if (roomState?.game?.tiebreak) return 0;
     return ["round-pending", "seed-collecting"].includes(roomState?.game?.status)
@@ -1750,7 +1751,7 @@ function renderWordMatchGame() {
   const activeGuesser = game.status === `${ownTeam}-guessing` && isGuesser;
   const seederRoundActive = isSeeder && [
     "seed-collecting", "blue-guess-pending", "blue-guessing",
-    "red-guess-pending", "red-guessing", "results-pending"
+    "blue-guess-review", "red-guess-pending", "red-guessing", "red-guess-review", "results-pending"
   ].includes(game.status);
   const categoryVisible = seederRoundActive || activeGuesser || Boolean(game.revealedLists);
   const locked = game.lockedSeederIds.includes(playerId) || false;
@@ -1789,10 +1790,12 @@ function renderWordMatchGame() {
     "blue-guessing": activeGuesser
       ? "Nenne jetzt so viele passende Begriffe wie möglich."
       : `${activeName} aus Team Blau rät gerade.`,
+    "blue-guess-review": "Die Zeit für Team Blau ist abgelaufen. Der Moderator ordnet die genannten Begriffe noch zu.",
     "red-guess-pending": `Wartet auf den Start von ${roles.guessers.red?.name}.`,
     "red-guessing": activeGuesser
       ? "Nenne jetzt so viele passende Begriffe wie möglich."
       : `${activeName} aus Team Rot rät gerade.`,
+    "red-guess-review": "Die Zeit für Team Rot ist abgelaufen. Der Moderator ordnet die genannten Begriffe noch zu.",
     "results-pending": "Beide Ratephasen sind beendet. Der Moderator deckt gleich auf.",
     "round-finished": "Die Runde ist beendet.",
     finished: game.winningTeam
