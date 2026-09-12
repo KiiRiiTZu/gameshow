@@ -72,6 +72,7 @@ import {
   getWordMatchRoles,
   begriffsmatchGame
 } from "../js/games/begriffsmatch.js";
+import { hitsterGame } from "../js/games/hitster.js";
 import {
   createEncryptionKeyPair,
   decryptPrivatePayload,
@@ -858,6 +859,19 @@ test("keeps the moderator map and its zoom controls inside the styled map frame"
     /id="host-kartenwissen-map"\s+class="europe-map"/
   );
   assert.doesNotMatch(hostMarkup, /id="target-legend"/);
+});
+
+test("Hitster keeps team timelines separate and ends on the second mistake", () => {
+  const state = createInitialRoomState("TEST");
+  hitsterGame.start(state);
+  assert.equal(hitsterGame.startRound(state, 1_000), true);
+  assert.equal(hitsterGame.submit(state, "blue", 1), true);
+  assert.equal(hitsterGame.submit(state, "red", 0), true);
+  assert.equal(hitsterGame.closeRound(state), true);
+  assert.equal(hitsterGame.revealTeam(state, "blue"), true);
+  assert.equal(state.game.timelines.blue.length, 2);
+  assert.equal(hitsterGame.revealTeam(state, "red"), true);
+  assert.equal(state.game.mistakes.red, 1);
 });
 
 test("supports skipping games and four independent player tabs for testing", () => {

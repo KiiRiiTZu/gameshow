@@ -9,6 +9,7 @@ const GAME_PRESENTATIONS = {
   "einordnen": { number: 5, name: "Einordnen" },
   "top-20": { number: 5, name: "Top 20" },
   "thrifty": { number: 2, name: "Thrifty" },
+  "hitster": { number: 2, name: "Hitster" },
   "set": { number: 7, name: "SET" }
 };
 
@@ -16,7 +17,7 @@ const GAME_PRESENTATIONS = {
 // Punkteübersicht ergibt sich aus dieser Liste, nicht aus einer zweiten Tabelle.
 export const GAME_SEQUENCE = [
   "mittelwert",
-  "thrifty",
+  "hitster",
   "kartenwissen",
   "begriffsmatch",
   "einordnen",

@@ -41,6 +41,8 @@ import { getModeratorGameScore } from "./moderator-score.js";
 import { TEAM_CHAT_TEXT_LIMIT, supportsTeamChat } from "./team-chat.js";
 import { getSetRound } from "./games/set-rounds.js";
 import { renderSetBoard } from "./set-view.js";
+import { HITSTER_SECONDS } from "./games/hitster.js";
+import { HITSTER_SONGS, getHitsterSong } from "./games/hitster-songs.js";
 
 const TOP_20_GAME_ID = "top-20";
 const RANKING_GAME_ID = "einordnen";
@@ -51,6 +53,7 @@ const PRICE_GAME_ID = "thrifty";
 const ESTIMATION_GAME_ID = "mittelwert";
 const WORD_MATCH_GAME_ID = "begriffsmatch";
 const SET_GAME_ID = "set";
+const HITSTER_GAME_ID = "hitster";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(window.location.search);
@@ -131,6 +134,7 @@ let wordMatchDraft = {
   lists: null
 };
 let wordMatchDraftTimer = null;
+let hitsterSelectedPosition = null;
 let wordMatchSubmissionPending = false;
 let previousGameId = null;
 let previousGameStatus = null;
@@ -875,9 +879,10 @@ function render() {
   const estimationIsActive = roomState.game?.id === ESTIMATION_GAME_ID;
   const wordMatchIsActive = roomState.game?.id === WORD_MATCH_GAME_ID;
   const setIsActive = roomState.game?.id === SET_GAME_ID;
+  const hitsterIsActive = roomState.game?.id === HITSTER_GAME_ID;
   document.querySelector(".player-shell").classList.toggle(
     "wide-game",
-    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive || setIsActive
+    top20IsActive || rankingIsActive || mapIsActive || matchingIsActive || priceIsActive || estimationIsActive || wordMatchIsActive || setIsActive || hitsterIsActive
   );
   $("player-set-game").classList.toggle("hidden", !setIsActive);
   $("player-top20-game").classList.toggle("hidden", !top20IsActive);
@@ -887,7 +892,9 @@ function render() {
   $("player-price-game").classList.toggle("hidden", !priceIsActive);
   $("player-estimation-game").classList.toggle("hidden", !estimationIsActive);
   $("player-word-match-game").classList.toggle("hidden", !wordMatchIsActive);
+  $("player-hitster-game").classList.toggle("hidden", !hitsterIsActive);
 
+  if (hitsterIsActive) { renderHitsterGame(); return; }
   if (wordMatchIsActive) {
     renderWordMatchGame();
     return;
@@ -1833,6 +1840,39 @@ async function tickPlayerWordMatchTimer() {
 
 setInterval(() => void tickPlayerWordMatchTimer(), 250);
 setInterval(updatePlayerRankingTimer, 250);
+setInterval(() => { if (roomState?.game?.id === HITSTER_GAME_ID) renderHitsterGame(); }, 250);
+
+$("player-hitster-volume").addEventListener("input", () => {
+  const value = Number($("player-hitster-volume").value); localStorage.setItem("gameshow-hitster-volume", String(value));
+  $("player-hitster-audio").volume = value / 100;
+});
+$("player-hitster-choices").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-hitster-position]"); if (!button) return;
+  hitsterSelectedPosition = Number(button.dataset.hitsterPosition); renderHitsterGame();
+});
+$("lock-hitster").addEventListener("click", async () => {
+  if (!realtime || !Number.isInteger(hitsterSelectedPosition)) return;
+  await realtime.send("hitster_submission", { playerId, position: hitsterSelectedPosition });
+});
+
+function renderHitsterGame() {
+  const game = roomState.game; const ownTeam = player?.team || "blue"; const song = getHitsterSong(game.roundIndex + 1) || getHitsterSong(0);
+  const playing = game.status === "playing"; const seconds = playing ? Math.max(0, Math.ceil(((game.phaseEndsAt || Date.now()) - Date.now()) / 1000)) : 0;
+  const audio = $("player-hitster-audio"); const volume = Number(localStorage.getItem("gameshow-hitster-volume") || 80);
+  audio.volume = volume / 100; $("player-hitster-volume").value = volume;
+  $("player-hitster-round").textContent = `Song ${game.roundIndex + 1} von ${HITSTER_SONGS.length - 1}`;
+  $("player-hitster-song").textContent = game.status === "not-started" ? `Vorgabe: ${getHitsterSong(0).artist} – ${getHitsterSong(0).title} (${getHitsterSong(0).year})` : `${song.artist} – ${song.title}`;
+  if (audio.src !== new URL(song.src, window.location.href).href) audio.src = song.src;
+  $("player-hitster-timer").textContent = formatCountdown(seconds);
+  $("player-hitster-progress").style.width = `${playing ? 100 - seconds / HITSTER_SECONDS * 100 : 0}%`;
+  $("player-hitster-status").textContent = playing ? "Song läuft" : game.status === "review" ? "Auswertung" : game.status === "finished" ? "Spiel beendet" : "Bereit";
+  $("player-hitster-status").className = `status-pill ${playing ? "open" : "closed"}`;
+  $("player-hitster-timelines").innerHTML = ["blue", "red"].map((team) => { const cards = [...game.timelines[team]]; if (game.status === "review" && Number.isInteger(game.submissions?.[team])) cards.splice(game.submissions[team], 0, { pending: true }); return `<article class="hitster-timeline ${team}"><strong>${getTeamName(team)} · Fehler: ${game.mistakes[team]}/2</strong><div class="hitster-line">${cards.map((item) => item.pending ? `<span class="hitster-card pending">${escapeHtml(song.title)}</span>` : `<span class="hitster-card">${HITSTER_SONGS[item.songIndex].year} · ${escapeHtml(HITSTER_SONGS[item.songIndex].title)}</span>`).join("")}</div></article>`; }).join("");
+  const locked = game.submissions?.[ownTeam] !== null;
+  $("player-hitster-choices").innerHTML = playing ? Array.from({ length: game.timelines[ownTeam].length + 1 }, (_, position) => `<button class="button tiny${hitsterSelectedPosition === position ? " selected" : " secondary"}" data-hitster-position="${position}" ${locked ? "disabled" : ""}>${position === 0 ? "Ganz links" : position === game.timelines[ownTeam].length ? "Ganz rechts" : `Nach Karte ${position}`}</button>`).join("") : "";
+  $("lock-hitster").classList.toggle("hidden", !playing); $("lock-hitster").disabled = !playing || locked || !Number.isInteger(hitsterSelectedPosition);
+  $("player-hitster-message").textContent = playing ? (locked ? "Eure Position ist eingeloggt." : "Wählt eine Position auf eurem Zeitstrahl.") : game.status === "review" ? "Der Moderator deckt beide Team-Ergebnisse auf." : "Wartet auf den Moderator.";
+}
 
 function getTeamName(team) {
   return team === "blue" ? "Team Blau" : "Team Rot";

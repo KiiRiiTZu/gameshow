@@ -114,7 +114,7 @@ test("labels both teams and falls back on a draw", () => {
 test("lists the seven active games in playing order", () => {
   assert.deepEqual(GAME_SEQUENCE, [
     "mittelwert",
-    "thrifty",
+    "hitster",
     "kartenwissen",
     "begriffsmatch",
     "einordnen",

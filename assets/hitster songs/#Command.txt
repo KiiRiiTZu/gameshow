@@ -1,0 +1,13 @@
+Dieser Befehl schneidet die Songs auf 2:00 Minuten, Baut einen Fade Out von 10 Sekunden ein, komprimiert auf 128kbps und gleicht die Lautstärke aus
+
+Get-ChildItem -Filter *.mp3 | ForEach-Object {
+    & ""C:\Program Files (x86)\ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe"" -y `
+        -i $_.FullName `
+        -t 120 `
+        -af "loudnorm=I=-16:TP=-1.5:LRA=11,afade=t=out:st=110:d=10" `
+        -c:a libmp3lame `
+        -b:a 96k `
+        -ar 44100 `
+        -map_metadata -1 `
+        "output\$($_.BaseName).mp3"
+}

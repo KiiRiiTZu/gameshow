@@ -7,6 +7,7 @@ import { MATCHING_GAME_ROUNDS } from "./games/da-seh-ich-dich.js";
 import { PRICE_GAME_WINNING_SCORE } from "./games/thrifty.js";
 import { ESTIMATION_ROUNDS_TO_WIN } from "./games/mittelwert.js";
 import { WORD_MATCH_CATEGORIES, WORD_MATCH_TERM_COUNT } from "./games/begriffsmatch.js";
+import { HITSTER_MAX_MISTAKES } from "./games/hitster.js";
 
 const GAME_SCORE_CONFIG = {
   "buzzer-quiz": { key: "scores", label: "Quizpunkte" },
@@ -16,6 +17,7 @@ const GAME_SCORE_CONFIG = {
   "kartenwissen": { key: "roundScores", label: "Kartenpunkte" },
   "da-seh-ich-dich": { key: "scores", label: "Übereinstimmungen" },
   "thrifty": { key: "roundScores", label: "Rundensiege" },
+  "hitster": { key: "mistakes", label: "Fehler" },
   "mittelwert": { key: "roundScores", label: "Rundensiege" },
   "begriffsmatch": { key: "scores", label: "Treffer" }
 };
@@ -27,6 +29,7 @@ const FIXED_WINNING_SCORES = {
   "einordnen": RANKING_ROUNDS_TO_WIN,
   "kartenwissen": KARTENWISSEN_ROUNDS_TO_WIN,
   "thrifty": PRICE_GAME_WINNING_SCORE,
+  "hitster": HITSTER_MAX_MISTAKES,
   "mittelwert": ESTIMATION_ROUNDS_TO_WIN
 };
 

@@ -306,7 +306,7 @@
         <button id="start-estimation-question" class="button primary">Erste Frage starten</button>
         <button id="reveal-estimation-round" class="button primary hidden">Richtige Antwort und Sieger aufdecken</button>
         <button id="next-estimation-question" class="button primary hidden">Nächste Frage starten</button>
-        <button id="start-price-after-estimation" class="button primary hidden">Thrifty starten</button>
+        <button id="start-price-after-estimation" class="button primary hidden">Hitster starten</button>
       </div>
     </section>
 
@@ -354,6 +354,13 @@
         <button id="next-word-match-round" class="button primary hidden">Nächste Runde</button>
         <button id="start-ranking-after-word" class="button primary hidden">Einordnen starten</button>
       </div>
+    </section>
+
+    <section id="hitster-game-panel" class="card game-panel hidden">
+      <div class="game-heading"><div><div class="game-title-line"><h2>Hitster</h2><span aria-hidden="true">|</span><p class="eyebrow">SPIEL 2 · 2 FEHLER</p></div><p id="hitster-round" class="muted">Song 1 von 20</p></div><span id="hitster-status" class="status-pill closed">Bereit</span></div>
+      <div class="hitster-player"><strong id="hitster-song-label">Startet mit Song 1 als Vorgabe.</strong><audio id="hitster-audio" controls preload="metadata"></audio><label>Lautstärke <input id="hitster-volume" type="range" min="0" max="100" value="80"></label><div class="hitster-progress"><span id="hitster-progress"></span></div><strong id="hitster-timer">02:00</strong></div>
+      <div id="hitster-host-timelines" class="hitster-timelines"></div>
+      <div class="controls"><button id="start-hitster-round" class="button primary">Song starten</button><button id="close-hitster-round" class="button secondary hidden">Zeit beenden & Eingaben aufdecken</button><button id="reveal-hitster-blue" class="button blue hidden">Team Blau aufdecken</button><button id="reveal-hitster-red" class="button danger hidden">Team Rot aufdecken</button><button id="start-map-after-hitster" class="button primary hidden">Kartenwissen starten</button></div>
     </section>
 
     </main>
